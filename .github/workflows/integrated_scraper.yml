@@ -7,6 +7,10 @@ permissions:
   contents: write
   actions: write
 
+concurrency:
+  group: scraper-24-7
+  cancel-in-progress: false
+
 on:
   schedule:
     # Main scraper: Run every 6 hours
