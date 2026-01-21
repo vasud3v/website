@@ -125,17 +125,47 @@ def normalize_folder_name(name):
 def get_or_create_folder(folder_name, api_key):
     """
     Get folder ID for a folder name, create if doesn't exist
-    Supports nested folder paths like "PARENT/CHILD" by creating a single folder with that name
+    Supports nested folder paths like "PARENT/CHILD" by creating parent first, then child
     
-    Note: StreamWish API doesn't support true nested folders, so we use the full path as folder name
-    Example: "JAV_VIDEOS/MIDA-486" creates a folder named "JAV_VIDEOS/MIDA-486"
+    Example: "JAV_VIDEOS/MIDA-486" creates:
+    1. Parent folder "JAV_VIDEOS" (if not exists)
+    2. Child folder "MIDA-486" inside parent
     """
     if not folder_name or not api_key:
         return None
     
-    # Keep the original folder name as-is (don't normalize paths with /)
-    cache_key = folder_name
-    display_name = folder_name
+    # Check if this is a nested path
+    if '/' in folder_name:
+        parts = folder_name.split('/', 1)
+        parent_name = parts[0]
+        child_name = parts[1] if len(parts) > 1 else None
+        
+        if child_name:
+            # Create parent folder first
+            print(f"   [Folder] Creating nested structure: {parent_name}/{child_name}")
+            parent_id = _get_or_create_single_folder(parent_name, api_key, parent_id=None)
+            
+            if not parent_id:
+                print(f"   [Folder] ❌ Failed to create parent folder")
+                return None
+            
+            # Create child folder inside parent
+            child_id = _get_or_create_single_folder(child_name, api_key, parent_id=parent_id)
+            return child_id
+    
+    # Single folder (no nesting)
+    return _get_or_create_single_folder(folder_name, api_key, parent_id=None)
+
+
+def _get_or_create_single_folder(folder_name, api_key, parent_id=None):
+    """
+    Internal function to create a single folder (with optional parent)
+    """
+    if not folder_name or not api_key:
+        return None
+    
+    # Create cache key that includes parent_id
+    cache_key = f"{folder_name}@{parent_id}" if parent_id else folder_name
     
     cache = load_folder_cache()
     if cache_key in cache:
@@ -145,7 +175,7 @@ def get_or_create_folder(folder_name, api_key):
             folders = list_folders(api_key)
             for folder in folders:
                 if str(folder.get('fld_id')) == str(folder_id):
-                    print(f"   [Folder] Using cached ID for '{display_name}': {folder_id}")
+                    print(f"   [Folder] Using cached ID for '{folder_name}': {folder_id}")
                     return folder_id
             # Cached folder doesn't exist anymore, remove from cache
             print(f"   [Folder] Cached folder no longer exists, will recreate")
@@ -154,15 +184,17 @@ def get_or_create_folder(folder_name, api_key):
         except:
             pass
     
-    print(f"   [Folder] Checking if folder '{display_name}' exists...")
+    print(f"   [Folder] Checking if folder '{folder_name}' exists...")
     try:
         folders = list_folders(api_key)
         for folder in folders:
             server_folder_name = folder.get('name', '')
+            server_parent_id = str(folder.get('parent_id', '0'))
             folder_id = str(folder.get('fld_id'))
             
-            # Exact match - case sensitive
-            if server_folder_name == display_name:
+            # Match by name and parent_id
+            expected_parent = str(parent_id) if parent_id else '0'
+            if server_folder_name == folder_name and server_parent_id == expected_parent:
                 print(f"   [Folder] ✅ Found existing folder: {folder_id}")
                 cache[cache_key] = folder_id
                 save_folder_cache(cache)
@@ -170,13 +202,17 @@ def get_or_create_folder(folder_name, api_key):
     except Exception as e:
         print(f"   [Folder] ⚠️ Could not check existing folders: {e}")
     
-    print(f"   [Folder] Creating new folder '{display_name}'...")
+    print(f"   [Folder] Creating new folder '{folder_name}'" + (f" in parent {parent_id}" if parent_id else ""))
     
     try:
         params = {
             'key': api_key,
-            'name': display_name  # Use exact folder name
+            'name': folder_name
         }
+        
+        # Add parent_id if specified
+        if parent_id:
+            params['parent_id'] = str(parent_id)
         
         r = requests.get("https://api.streamwish.com/api/folder/create",
                         params=params, timeout=10)
@@ -189,7 +225,7 @@ def get_or_create_folder(folder_name, api_key):
                     folder_id = str(folder_id)
                     cache[cache_key] = folder_id
                     save_folder_cache(cache)
-                    print(f"   [Folder] ✅ Created folder '{display_name}' with ID: {folder_id}")
+                    print(f"   [Folder] ✅ Created folder '{folder_name}' with ID: {folder_id}")
                     return folder_id
             else:
                 error_msg = result.get('msg', 'Unknown error')
@@ -199,7 +235,11 @@ def get_or_create_folder(folder_name, api_key):
                     # Refresh folder list and find it
                     folders = list_folders(api_key)
                     for folder in folders:
-                        if folder.get('name', '') == display_name:
+                        server_folder_name = folder.get('name', '')
+                        server_parent_id = str(folder.get('parent_id', '0'))
+                        expected_parent = str(parent_id) if parent_id else '0'
+                        
+                        if server_folder_name == folder_name and server_parent_id == expected_parent:
                             folder_id = str(folder.get('fld_id'))
                             cache[cache_key] = folder_id
                             save_folder_cache(cache)
