@@ -993,6 +993,9 @@ def process_one_video(scraper, url, num, total):
                 if JAVDB_INTEGRATION_AVAILABLE:
                     log("\n🎭 Step 5.5: Enriching with JAVDatabase metadata...")
                     try:
+                        # Import datetime for this scope
+                        from datetime import datetime as dt
+                        
                         # Build Jable data structure for enrichment
                         jable_data = {
                             "code": video_data.code,
@@ -1005,7 +1008,7 @@ def process_one_video(scraper, url, num, total):
                             "likes": video_data.likes,
                             "release_date": video_data.release_date,
                             "upload_time": video_data.upload_time if hasattr(video_data, 'upload_time') else '',
-                            "processed_at": datetime.now().isoformat(),
+                            "processed_at": dt.now().isoformat(),
                             "categories": video_data.categories if video_data.categories else [],
                             "models": video_data.models if video_data.models else [],
                             "tags": video_data.tags if video_data.tags else [],

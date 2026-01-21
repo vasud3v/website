@@ -116,12 +116,10 @@ def normalize_folder_name(name):
         return ""
     
     import re
-    # Normalize whitespace
+    # Normalize whitespace only - DON'T change case
     name = re.sub(r'\s+', ' ', name.strip())
-    # Title case for consistency
-    name = name.title()
-    # Remove any trailing/leading special chars
-    name = re.sub(r'^[^\w\s]+|[^\w\s]+$', '', name).strip()
+    # Remove any trailing/leading special chars (but keep underscores, hyphens, slashes)
+    name = re.sub(r'^[^\w\s\-_/]+|[^\w\s\-_/]+$', '', name).strip()
     return name if name else ""
 
 def get_or_create_folder(folder_name, api_key):
@@ -135,16 +133,9 @@ def get_or_create_folder(folder_name, api_key):
     if not folder_name or not api_key:
         return None
     
-    # Don't normalize if it contains a path separator - keep the full path
-    if '/' in folder_name:
-        # Keep the path structure as-is for nested folders
-        cache_key = folder_name
-        display_name = folder_name
-    else:
-        # Normalize single folder names
-        folder_name = normalize_folder_name(folder_name)
-        cache_key = folder_name
-        display_name = folder_name
+    # Keep the original folder name as-is (don't normalize paths with /)
+    cache_key = folder_name
+    display_name = folder_name
     
     cache = load_folder_cache()
     if cache_key in cache:
@@ -170,21 +161,12 @@ def get_or_create_folder(folder_name, api_key):
             server_folder_name = folder.get('name', '')
             folder_id = str(folder.get('fld_id'))
             
-            # Exact match for nested paths, normalized match for single folders
-            if '/' in folder_name:
-                # Exact match for paths
-                if server_folder_name == display_name:
-                    print(f"   [Folder] ✅ Found existing folder: {folder_id}")
-                    cache[cache_key] = folder_id
-                    save_folder_cache(cache)
-                    return folder_id
-            else:
-                # Normalized match for single folders
-                if normalize_folder_name(server_folder_name) == folder_name:
-                    print(f"   [Folder] ✅ Found existing folder: {folder_id}")
-                    cache[cache_key] = folder_id
-                    save_folder_cache(cache)
-                    return folder_id
+            # Exact match - case sensitive
+            if server_folder_name == display_name:
+                print(f"   [Folder] ✅ Found existing folder: {folder_id}")
+                cache[cache_key] = folder_id
+                save_folder_cache(cache)
+                return folder_id
     except Exception as e:
         print(f"   [Folder] ⚠️ Could not check existing folders: {e}")
     
@@ -193,7 +175,7 @@ def get_or_create_folder(folder_name, api_key):
     try:
         params = {
             'key': api_key,
-            'name': display_name  # Use full path as folder name
+            'name': display_name  # Use exact folder name
         }
         
         r = requests.get("https://api.streamwish.com/api/folder/create",
