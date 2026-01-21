@@ -1,0 +1,12 @@
+# Critical - Environment variables (contains API keys and secrets)
+.env
+
+# Critical - Temporary downloads (large video files)
+temp_downloads/
+
+# Critical - Python cache
+__pycache__/
+*.pyc
+
+# Critical - Process locks
+*.lock

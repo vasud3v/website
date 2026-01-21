@@ -1,0 +1,47 @@
+🔐 YOUR API KEYS - READY TO USE
+=====================================
+
+Copy these into GitHub Secrets:
+
+1. STREAMTAPE_LOGIN
+   Value: 802b5ceb257b3faabd5d
+
+2. STREAMTAPE_API_KEY
+   Value: LOyGYY2aO1URVa7
+
+3. LULUSTREAM_API_KEY
+   Value: 229747ohh6h2cd4t2gh3ep
+
+4. STREAMWISH_API_KEY
+   Value: 31637q4gsnt23yyvd0or6
+
+
+📍 WHERE TO ADD THESE:
+=====================================
+1. Go to: https://github.com/vasud3v/jable--scraper/settings/secrets/actions
+2. Click "New repository secret"
+3. Add each key one by one
+4. Name must match exactly (case-sensitive)
+
+
+✅ VERIFICATION:
+=====================================
+After adding secrets, run:
+1. Go to Actions tab
+2. Click "Jable Scraper - 6 Hour Run"
+3. Click "Run workflow"
+4. Watch it process videos!
+
+
+📁 LOCAL DEVELOPMENT:
+=====================================
+Your .env file is already created with these keys.
+Just run: python load_env.py
+
+
+⚠️ SECURITY NOTE:
+=====================================
+- This file contains your actual API keys
+- Keep it private
+- Don't share publicly
+- Delete after adding to GitHub Secrets

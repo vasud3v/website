@@ -1,0 +1,10 @@
+seleniumbase
+beautifulsoup4
+flask
+flask-cors
+requests
+m3u8
+pycryptodome
+requests-toolbelt
+urllib3
+pykakasi
