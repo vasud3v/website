@@ -72,7 +72,30 @@ def merge_single_video(jable_data: dict, javdb_data: Optional[dict]) -> dict:
     merged["rating_count"] = javdb_data.get("rating_count") if javdb_data else None
     
     # Streaming (always from Jable)
-    merged["hosting"] = jable_data.get("hosting", {})
+    # Handle both old format (single service object) and new format (dict of services)
+    hosting_data = jable_data.get("hosting", {})
+    if hosting_data:
+        # Check if it's old format (has 'service' key) or new format (dict of services)
+        if isinstance(hosting_data, dict) and 'service' in hosting_data:
+            # Old format: convert to new format
+            service_name = hosting_data.get('service', 'unknown').lower()
+            merged["hosting"] = {
+                service_name: {
+                    'embed_url': hosting_data.get('embed_url', ''),
+                    'watch_url': hosting_data.get('watch_url', ''),
+                    'download_url': hosting_data.get('download_url', ''),
+                    'direct_url': hosting_data.get('direct_url', ''),
+                    'api_url': hosting_data.get('api_url', ''),
+                    'filecode': hosting_data.get('filecode', ''),
+                    'upload_time': hosting_data.get('time', 0),
+                    'uploaded_at': hosting_data.get('uploaded_at', '')
+                }
+            }
+        else:
+            # New format: use as-is
+            merged["hosting"] = hosting_data
+    else:
+        merged["hosting"] = {}
     
     # Sources
     merged["source_javdb"] = javdb_data.get("source_url") if javdb_data else None

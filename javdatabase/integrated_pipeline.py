@@ -58,20 +58,53 @@ class IntegratedPipeline:
             return []
     
     def save_combined_database(self, data: list) -> bool:
-        """Save combined database with atomic write"""
+        """Save combined database with atomic write and file locking"""
         try:
             # Write to temporary file first
             temp_path = f"{self.combined_db_path}.tmp"
-            with open(temp_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
             
-            # Atomic rename
-            if os.path.exists(self.combined_db_path):
-                backup_path = f"{self.combined_db_path}.bak"
-                shutil.copy(self.combined_db_path, backup_path)
+            # Use file locking to prevent race conditions (cross-platform)
+            lock_path = f"{self.combined_db_path}.lock"
+            lock_file = None
             
-            shutil.move(temp_path, self.combined_db_path)
-            return True
+            try:
+                # Acquire lock (simple file-based lock for cross-platform compatibility)
+                max_wait = 30  # seconds
+                wait_time = 0
+                while os.path.exists(lock_path) and wait_time < max_wait:
+                    time.sleep(0.1)
+                    wait_time += 0.1
+                
+                if wait_time >= max_wait:
+                    print(f"⚠️ Lock timeout, proceeding anyway...")
+                
+                # Create lock file
+                lock_file = open(lock_path, 'w')
+                lock_file.write(str(os.getpid()))
+                lock_file.flush()
+                
+                # Write data
+                with open(temp_path, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False)
+                
+                # Backup existing file
+                if os.path.exists(self.combined_db_path):
+                    backup_path = f"{self.combined_db_path}.bak"
+                    shutil.copy(self.combined_db_path, backup_path)
+                
+                # Atomic rename
+                shutil.move(temp_path, self.combined_db_path)
+                
+                return True
+                
+            finally:
+                # Release lock
+                if lock_file:
+                    lock_file.close()
+                    try:
+                        os.remove(lock_path)
+                    except:
+                        pass
             
         except Exception as e:
             print(f"❌ Error saving database: {e}")

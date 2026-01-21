@@ -88,16 +88,17 @@
     "rating": null,
     "rating_count": null,
     "hosting": {
-      "streamwish": {
-        "embed_url": "https://hglink.to/e/7w01z8mkzd04",
-        "watch_url": "https://hglink.to/7w01z8mkzd04",
-        "download_url": "https://hglink.to/7w01z8mkzd04",
-        "direct_url": "https://streamwish.com/7w01z8mkzd04",
-        "api_url": "https://api.streamwish.com/api/file/direct_link?key=31637q4gsnt23yyvd0or6&file_code=7w01z8mkzd04",
-        "filecode": "7w01z8mkzd04",
-        "upload_time": 128.30690121650696,
-        "uploaded_at": "2026-01-22T02:36:50.273001"
-      }
+      "service": "StreamWish",
+      "success": true,
+      "filecode": "7w01z8mkzd04",
+      "embed_url": "https://hglink.to/e/7w01z8mkzd04",
+      "watch_url": "https://hglink.to/7w01z8mkzd04",
+      "download_url": "https://hglink.to/7w01z8mkzd04",
+      "direct_url": "https://streamwish.com/7w01z8mkzd04",
+      "api_url": "https://api.streamwish.com/api/file/direct_link?key=31637q4gsnt23yyvd0or6&file_code=7w01z8mkzd04",
+      "time": 128.30690121650696,
+      "folder": "JAV_VIDEOS/NMSL-032",
+      "file_size": 1913890892
     },
     "source_javdb": "https://www.javdatabase.com/movies/nmsl-032/",
     "source_jable": "https://jable.tv/videos/nmsl-032/",
@@ -187,16 +188,17 @@
     "rating": null,
     "rating_count": null,
     "hosting": {
-      "streamwish": {
-        "embed_url": "https://hglink.to/e/p9ktkgglhqcu",
-        "watch_url": "https://hglink.to/p9ktkgglhqcu",
-        "download_url": "https://hglink.to/p9ktkgglhqcu",
-        "direct_url": "https://streamwish.com/p9ktkgglhqcu",
-        "api_url": "https://api.streamwish.com/api/file/direct_link?key=31637q4gsnt23yyvd0or6&file_code=p9ktkgglhqcu",
-        "filecode": "p9ktkgglhqcu",
-        "upload_time": 102.94806742668152,
-        "uploaded_at": "2026-01-22T02:36:50.273313"
-      }
+      "service": "StreamWish",
+      "success": true,
+      "filecode": "p9ktkgglhqcu",
+      "embed_url": "https://hglink.to/e/p9ktkgglhqcu",
+      "watch_url": "https://hglink.to/p9ktkgglhqcu",
+      "download_url": "https://hglink.to/p9ktkgglhqcu",
+      "direct_url": "https://streamwish.com/p9ktkgglhqcu",
+      "api_url": "https://api.streamwish.com/api/file/direct_link?key=31637q4gsnt23yyvd0or6&file_code=p9ktkgglhqcu",
+      "time": 102.94806742668152,
+      "folder": "JAV_VIDEOS/MNGS-033",
+      "file_size": 1587401559
     },
     "source_javdb": "https://www.javdatabase.com/movies/mngs-033/",
     "source_jable": "https://jable.tv/videos/mngs-033/",

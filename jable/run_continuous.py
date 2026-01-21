@@ -996,6 +996,30 @@ def process_one_video(scraper, url, num, total):
                         # Import datetime for this scope
                         from datetime import datetime as dt
                         
+                        # Build hosting dict in correct format (service_name: data)
+                        hosting_dict = {}
+                        file_size_from_upload = None
+                        upload_folder_from_upload = None
+                        
+                        if upload_results and upload_results.get('successful'):
+                            for result in upload_results['successful']:
+                                service = result.get('service', 'unknown').lower()
+                                hosting_dict[service] = {
+                                    'embed_url': result.get('embed_url', ''),
+                                    'watch_url': result.get('watch_url', ''),
+                                    'download_url': result.get('download_url', ''),
+                                    'direct_url': result.get('direct_url', ''),
+                                    'api_url': result.get('api_url', ''),
+                                    'filecode': result.get('filecode', ''),
+                                    'upload_time': result.get('time', 0),
+                                    'uploaded_at': dt.now().isoformat()
+                                }
+                                # Get file size and folder from first result
+                                if not file_size_from_upload and result.get('file_size'):
+                                    file_size_from_upload = result.get('file_size')
+                                if not upload_folder_from_upload and result.get('folder'):
+                                    upload_folder_from_upload = result.get('folder')
+                        
                         # Build Jable data structure for enrichment
                         jable_data = {
                             "code": video_data.code,
@@ -1013,9 +1037,9 @@ def process_one_video(scraper, url, num, total):
                             "models": video_data.models if video_data.models else [],
                             "tags": video_data.tags if video_data.tags else [],
                             "preview_images": video_data.preview_images if hasattr(video_data, 'preview_images') else [],
-                            "hosting": upload_results.get('successful', [{}])[0] if upload_results.get('successful') else {},
-                            "file_size": upload_results.get('successful', [{}])[0].get('file_size') if upload_results.get('successful') else None,
-                            "upload_folder": folder_name if 'folder_name' in locals() else video_data.code
+                            "hosting": hosting_dict,
+                            "file_size": file_size_from_upload,
+                            "upload_folder": upload_folder_from_upload or video_data.code
                         }
                         
                         log(f"   Calling JAVDatabase enrichment for {video_data.code}...")
