@@ -106,30 +106,6 @@ class IntegratedPipeline:
         if self.use_db_manager:
             db_manager.update_stats()
             db_manager.update_progress()
-        # Legacy stats handling removed
-            
-            if os.path.exists(self.stats_path):
-                with open(self.stats_path, 'r', encoding='utf-8') as f:
-                    stats = json.load(f)
-            
-            stats["total_processed"] += 1
-            if success:
-                stats["successful"] += 1
-            else:
-                stats["failed"] += 1
-            
-            if javdb_available:
-                stats["javdb_available"] += 1
-            else:
-                stats["javdb_unavailable"] += 1
-            
-            stats["last_updated"] = datetime.now().isoformat()
-            
-            with open(self.stats_path, 'w', encoding='utf-8') as f:
-                json.dump(stats, f, indent=2, ensure_ascii=False)
-                
-        except Exception as e:
-            print(f"⚠️ Could not update stats: {e}")
     
     def process_video(self, jable_data: dict, headless: bool = True) -> Optional[dict]:
         """
