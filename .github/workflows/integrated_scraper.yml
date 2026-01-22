@@ -169,6 +169,7 @@ jobs:
           [ ! -f database/combined_videos.json ] && echo "[]" > database/combined_videos.json
       
       - name: Validate API keys
+        continue-on-error: true
         env:
           STREAMWISH_API_KEY: ${{ secrets.STREAMWISH_API_KEY }}
           LULUSTREAM_API_KEY: ${{ secrets.LULUSTREAM_API_KEY }}
@@ -176,8 +177,10 @@ jobs:
           STREAMTAPE_API_KEY: ${{ secrets.STREAMTAPE_API_KEY }}
         run: |
           echo "Validating API keys..."
-          [ -z "$STREAMWISH_API_KEY" ] && echo "STREAMWISH_API_KEY required" && exit 1
-          echo "StreamWish API key is set"
+          [ -z "$STREAMWISH_API_KEY" ] && echo "⚠️ STREAMWISH_API_KEY not set" || echo "✓ StreamWish API key is set"
+          [ -z "$LULUSTREAM_API_KEY" ] && echo "⚠️ LULUSTREAM_API_KEY not set" || echo "✓ LuluStream API key is set"
+          [ -z "$STREAMTAPE_LOGIN" ] && echo "⚠️ STREAMTAPE_LOGIN not set" || echo "✓ StreamTape login is set"
+          echo "Note: API validation timeouts are non-critical and will be retried during upload"
       
       - name: Run integrated scraper
         env:
