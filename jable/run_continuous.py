@@ -598,6 +598,24 @@ def save_video(video_data, upload_results, thumbnail_hosted_url=None, preview_re
         videos.sort(key=lambda x: x.get('processed_at', ''), reverse=True)
         log(f"   [save_video] Sorted {len(videos)} videos by processed_at")
         
+        # Remove duplicates (keep first occurrence which is newest due to sort)
+        seen_codes = set()
+        unique_videos = []
+        duplicates_removed = 0
+        for video in videos:
+            code = video.get('code')
+            if code and code not in seen_codes:
+                seen_codes.add(code)
+                unique_videos.append(video)
+            elif code:
+                duplicates_removed += 1
+                log(f"   [save_video] ⚠️ Removing duplicate entry for {code}")
+        
+        if duplicates_removed > 0:
+            log(f"   [save_video] ✓ Removed {duplicates_removed} duplicate entries")
+            videos = unique_videos
+        
+        log(f"   [save_video] Final count: {len(videos)} unique videos")
         log(f"   [save_video] Saving {len(videos)} videos to {DB_FILE} with lock...")
         
         # Show what we're about to save
