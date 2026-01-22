@@ -8,3 +8,4 @@ pycryptodome
 requests-toolbelt
 urllib3
 pykakasi
+numpy
