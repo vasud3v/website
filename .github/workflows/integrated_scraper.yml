@@ -1,8 +1,5 @@
 name: Integrated Jable + JAVDatabase Scraper 24/7
 
-# Enhanced workflow with JAVDatabase integration monitoring
-# This is OPTIONAL - the existing workflow works fine!
-
 permissions:
   contents: write
   actions: write
@@ -13,9 +10,7 @@ concurrency:
 
 on:
   schedule:
-    # Main scraper: Run every 6 hours
     - cron: '0 */6 * * *'
-    # Auto-restart check: Every 10 minutes
     - cron: '*/10 * * * *'
   
   workflow_dispatch:
@@ -35,7 +30,6 @@ on:
         default: ''
 
 jobs:
-  # Job 1: Determine what to do (unchanged)
   determine-action:
     runs-on: ubuntu-latest
     timeout-minutes: 3
@@ -50,7 +44,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
         run: |
-          echo "🔍 Determining action..."
+          echo "Determining action..."
           
           if [ "${{ github.event.inputs.action }}" = "scrape" ]; then
             echo "should_scrape=true" >> $GITHUB_OUTPUT
@@ -73,7 +67,6 @@ jobs:
           CURRENT_MINUTE=$((10#$(date +%M)))
           CURRENT_HOUR=$((10#$(date +%H)))
           
-          # Check if it's a 6-hour scheduled time (0, 6, 12, 18)
           if [ "$CURRENT_MINUTE" -lt 5 ]; then
             if [ "$CURRENT_HOUR" -eq 0 ] || [ "$CURRENT_HOUR" -eq 6 ] || [ "$CURRENT_HOUR" -eq 12 ] || [ "$CURRENT_HOUR" -eq 18 ]; then
               echo "should_scrape=true" >> $GITHUB_OUTPUT
@@ -129,23 +122,18 @@ jobs:
             echo "reason=Recently completed (${MINUTES_SINCE} minutes ago)" >> $GITHUB_OUTPUT
           fi
   
-  # Job 2: Run the integrated scraper
   scrape-and-upload:
     needs: determine-action
     if: needs.determine-action.outputs.should_scrape == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 360  # 6h 0m (safe margin with 45min gap for cleanup)
+    timeout-minutes: 360
     
     steps:
       - name: Log start reason
         run: |
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "🚀 STARTING INTEGRATED SCRAPER"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "STARTING INTEGRATED SCRAPER"
           echo "Reason: ${{ needs.determine-action.outputs.reason }}"
           echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-          echo "Integration: Jable + JAVDatabase"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
       
       - name: Checkout code
         uses: actions/checkout@v4
@@ -168,30 +156,18 @@ jobs:
       
       - name: Install Python dependencies
         run: |
-          cd jable
           pip install --upgrade pip
-          pip install -r requirements.txt
-          cd ../javdatabase
-          pip install -r requirements.txt || echo "No separate requirements for javdatabase"
+          pip install -r jable/requirements.txt
+          pip install -r javdatabase/requirements.txt || echo "No separate requirements"
       
-      - name: Check disk space (before)
-        run: |
-          df -h
-          echo "Available space:"
-          df -h . | tail -1 | awk '{print $4}'
+      - name: Check disk space
+        run: df -h
       
-      - name: Create necessary directories
+      - name: Create directories
         run: |
-          mkdir -p jable/temp_downloads
-          mkdir -p jable/database
-          mkdir -p javdatabase/database
-          mkdir -p database
-          if [ ! -f jable/database/videos_complete.json ]; then
-            echo "[]" > jable/database/videos_complete.json
-          fi
-          if [ ! -f database/combined_videos.json ]; then
-            echo "[]" > database/combined_videos.json
-          fi
+          mkdir -p jable/temp_downloads jable/database javdatabase/database database
+          [ ! -f jable/database/videos_complete.json ] && echo "[]" > jable/database/videos_complete.json
+          [ ! -f database/combined_videos.json ] && echo "[]" > database/combined_videos.json
       
       - name: Validate API keys
         env:
@@ -200,59 +176,11 @@ jobs:
           STREAMTAPE_LOGIN: ${{ secrets.STREAMTAPE_LOGIN }}
           STREAMTAPE_API_KEY: ${{ secrets.STREAMTAPE_API_KEY }}
         run: |
-          echo "🔑 Validating API keys..."
-          
-          # Check if required keys are set
-          if [ -z "$STREAMWISH_API_KEY" ]; then
-            echo "❌ STREAMWISH_API_KEY not set (required)"
-            exit 1
-          fi
-          echo "✓ STREAMWISH_API_KEY is set"
-          
-          if [ -z "$LULUSTREAM_API_KEY" ]; then
-            echo "⚠️ LULUSTREAM_API_KEY not set (optional fallback)"
-          else
-            echo "✓ LULUSTREAM_API_KEY is set"
-          fi
-          
-          if [ -z "$STREAMTAPE_LOGIN" ] || [ -z "$STREAMTAPE_API_KEY" ]; then
-            echo "⚠️ STREAMTAPE credentials not set (optional fallback)"
-          else
-            echo "✓ STREAMTAPE credentials are set"
-          fi
-          
-          # Test StreamWish API
-          echo ""
-          echo "Testing StreamWish API..."
-          python3 -c "
-import os
-import sys
-import requests
-
-api_key = os.getenv('STREAMWISH_API_KEY')
-try:
-    response = requests.get(f'https://api.streamwish.com/api/account/info?key={api_key}', timeout=10)
-    if response.status_code == 200:
-        data = response.json()
-        if data.get('status') == 200:
-            print('✅ StreamWish API key valid')
-            print(f'   Account: {data.get(\"result\", {}).get(\"email\", \"N/A\")}')
-            sys.exit(0)
-        else:
-            print(f'❌ StreamWish API returned error: {data.get(\"msg\", \"Unknown error\")}')
-            sys.exit(1)
-    else:
-        print(f'❌ StreamWish API key invalid: HTTP {response.status_code}')
-        sys.exit(1)
-except Exception as e:
-    print(f'❌ StreamWish API test failed: {e}')
-    sys.exit(1)
-          "
-          
-          echo ""
-          echo "✅ API validation complete"
+          echo "Validating API keys..."
+          [ -z "$STREAMWISH_API_KEY" ] && echo "STREAMWISH_API_KEY required" && exit 1
+          echo "StreamWish API key is set"
       
-      - name: Run integrated scraper pipeline
+      - name: Run integrated scraper
         env:
           MAX_VIDEOS: ${{ github.event.inputs.max_videos || '999999' }}
           STREAMTAPE_LOGIN: ${{ secrets.STREAMTAPE_LOGIN }}
@@ -264,111 +192,37 @@ except Exception as e:
           GITHUB_ACTIONS: 'true'
         run: |
           cd jable
-          echo "Starting integrated scraper (Jable + JAVDatabase)..."
-          echo "GitHub Repository: $GITHUB_REPOSITORY"
-          echo "GitHub Token available: $([ -n "$GITHUB_TOKEN" ] && echo 'Yes' || echo 'No')"
           python run_continuous.py 2>&1 | tee pipeline.log
-          echo "Pipeline completed with exit code: $?"
         continue-on-error: true
       
-      - name: Check integration statistics
+      - name: Check statistics
         if: always()
         run: |
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "📊 INTEGRATION STATISTICS"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          
-          if [ -f javdatabase/database/stats.json ]; then
-            echo "JAVDatabase Integration Stats:"
-            cat javdatabase/database/stats.json | jq '.'
-          else
-            echo "No JAVDatabase stats available"
-          fi
-          
-          echo ""
-          echo "Database Files:"
-          ls -lh jable/database/*.json 2>/dev/null || echo "No Jable database"
-          ls -lh database/*.json 2>/dev/null || echo "No combined database"
-          
-          if [ -f database/combined_videos.json ]; then
-            COMBINED_COUNT=$(cat database/combined_videos.json | jq 'length' 2>/dev/null || echo "0")
-            JAVDB_COUNT=$(cat database/combined_videos.json | jq '[.[] | select(.javdb_available == true)] | length' 2>/dev/null || echo "0")
-            echo ""
-            echo "Combined Database:"
-            echo "  Total videos: $COMBINED_COUNT"
-            echo "  With JAVDatabase: $JAVDB_COUNT"
-            if [ "$COMBINED_COUNT" -gt 0 ]; then
-              COVERAGE=$((JAVDB_COUNT * 100 / COMBINED_COUNT))
-              echo "  Coverage: ${COVERAGE}%"
-            fi
-          fi
-          
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-      
-      - name: Check disk space (after)
-        if: always()
-        run: |
-          df -h
-          echo "Temp folder size:"
-          du -sh jable/temp_downloads/ || echo "No temp folder"
+          echo "Integration Statistics"
+          [ -f javdatabase/database/stats.json ] && cat javdatabase/database/stats.json | jq '.'
+          ls -lh jable/database/*.json 2>/dev/null || true
+          ls -lh database/*.json 2>/dev/null || true
       
       - name: Emergency cleanup
         if: always()
         run: |
-          echo "Cleaning up temp files..."
           rm -rf jable/temp_downloads/*
-          rm -rf jable/temp_downloads/.*_segments 2>/dev/null || true
           df -h
       
       - name: Commit and push results
         if: always()
         run: |
-          # Use trap to handle cancellation
-          trap 'echo "⚠️ Caught cancellation signal"; git stash push -m "Auto-stash: $(date -u +%Y-%m-%d_%H:%M:%S)" 2>/dev/null || true; exit 0' SIGTERM SIGINT
-          
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          echo "Checking for changes..."
-          git status
+          git add jable/database/ javdatabase/database/ database/ *.log jable/*.log 2>/dev/null || true
           
-          # Check for uncommitted changes
-          if ! git diff --quiet || ! git diff --staged --quiet; then
-            echo "📝 Uncommitted changes detected"
-            
-            # Stash changes first as backup
-            git stash push -m "Auto-stash: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" 2>/dev/null || true
-            echo "✓ Changes stashed as backup"
-            
-            # Try to commit stashed changes
-            git stash pop 2>/dev/null || true
-          fi
-          
-          echo "Adding database folders..."
-          git add jable/database/ 2>/dev/null || echo "No jable database"
-          git add javdatabase/database/ 2>/dev/null || echo "No javdatabase database"
-          git add database/ 2>/dev/null || echo "No combined database"
-          
-          echo "Adding log files..."
-          git add *.log 2>/dev/null || echo "No log files"
-          git add jable/*.log 2>/dev/null || echo "No jable logs"
-          
-          echo "Staged changes:"
-          git diff --staged --name-only
-          
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            echo "Committing changes..."
-            git commit -m "Auto-update: $(date -u '+%Y-%m-%d %H:%M:%S UTC') [Integrated]" || echo "Commit failed"
-            
-            echo "Pushing to repository..."
-            git push || echo "⚠️ Push failed, changes are committed locally"
-            
-            echo "✅ Database updated and pushed!"
+          if ! git diff --staged --quiet; then
+            git commit -m "Auto-update: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            git push || echo "Push failed"
           fi
       
-      - name: Upload logs and databases as artifacts
+      - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -380,51 +234,7 @@ except Exception as e:
             javdatabase/database/
             database/
           retention-days: 7
-      
-      - name: Enhanced summary
-        if: always()
-        run: |
-          echo "# Integrated Scraper Run Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Run Number:** ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
-          echo "**Reason:** ${{ needs.determine-action.outputs.reason }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          echo "## 📊 Statistics" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [ -f jable/database/videos_complete.json ]; then
-            JABLE_COUNT=$(python -c "import json; print(len(json.load(open('jable/database/videos_complete.json'))))" 2>/dev/null || echo "0")
-            echo "**Jable Videos:** $JABLE_COUNT" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          if [ -f database/combined_videos.json ]; then
-            COMBINED_COUNT=$(python -c "import json; print(len(json.load(open('database/combined_videos.json'))))" 2>/dev/null || echo "0")
-            JAVDB_COUNT=$(python -c "import json; data=json.load(open('database/combined_videos.json')); print(len([v for v in data if v.get('javdb_available')]))" 2>/dev/null || echo "0")
-            echo "**Combined Videos:** $COMBINED_COUNT" >> $GITHUB_STEP_SUMMARY
-            echo "**With JAVDatabase:** $JAVDB_COUNT" >> $GITHUB_STEP_SUMMARY
-            if [ "$COMBINED_COUNT" -gt 0 ]; then
-              COVERAGE=$((JAVDB_COUNT * 100 / COMBINED_COUNT))
-              echo "**Coverage:** ${COVERAGE}%" >> $GITHUB_STEP_SUMMARY
-            fi
-          fi
-          
-          if [ -f javdatabase/database/stats.json ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "## 🎭 JAVDatabase Integration" >> $GITHUB_STEP_SUMMARY
-            echo '```json' >> $GITHUB_STEP_SUMMARY
-            cat javdatabase/database/stats.json >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## 💾 Disk Usage" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          df -h . >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
   
-  # Job 3: Status report (when scraper doesn't run)
   status-report:
     needs: determine-action
     if: needs.determine-action.outputs.should_scrape == 'false'
@@ -434,23 +244,6 @@ except Exception as e:
     steps:
       - name: Report status
         run: |
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "ℹ️ NO ACTION NEEDED"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "NO ACTION NEEDED"
           echo "Reason: ${{ needs.determine-action.outputs.reason }}"
           echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-      
-      - name: Summary
-        run: |
-          echo "# Status Check" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
-          echo "**Status:** No action needed" >> $GITHUB_STEP_SUMMARY
-          echo "**Reason:** ${{ needs.determine-action.outputs.reason }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Configuration" >> $GITHUB_STEP_SUMMARY
-          echo "- Main scraper: Every 6 hours" >> $GITHUB_STEP_SUMMARY
-          echo "- Auto-restart check: Every 10 minutes" >> $GITHUB_STEP_SUMMARY
-          echo "- Restart delay: 5 minutes after completion" >> $GITHUB_STEP_SUMMARY
-          echo "- Integration: Jable + JAVDatabase" >> $GITHUB_STEP_SUMMARY
