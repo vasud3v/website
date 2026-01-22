@@ -612,6 +612,24 @@ def upload_to_streamwish(file_path, code, title, folder_name=None):
             print(f"[StreamWish] Filename: {filename}")
             print(f"[StreamWish] Status: {status}")
             
+            # Check for quota/limit errors in status
+            if status and isinstance(status, str):
+                status_lower = status.lower()
+                if 'too many files' in status_lower or 'quota' in status_lower or 'limit' in status_lower or 'daily' in status_lower:
+                    print(f"[StreamWish] 🚫 DAILY UPLOAD QUOTA EXCEEDED!")
+                    print(f"[StreamWish] Status message: {status}")
+                    print(f"[StreamWish] The file was uploaded but rejected by StreamWish")
+                    wait_seconds = 24 * 3600  # 24 hours
+                    wait_until = time.time() + wait_seconds
+                    return {
+                        'service': 'StreamWish',
+                        'success': False,
+                        'error': 'QUOTA_EXCEEDED',
+                        'error_msg': status,
+                        'wait_until': wait_until,
+                        'wait_seconds': wait_seconds
+                    }
+            
             if not filecode:
                 print(f"[StreamWish] ❌ No filecode in file info")
                 if attempt < max_retries - 1:
@@ -795,9 +813,9 @@ def upload_all(file_path, code, title, video_data=None):
     
     total_time = time.time() - start_time
     
-    if result.get('error') == 'RATE_LIMIT':
+    if result.get('error') in ['RATE_LIMIT', 'QUOTA_EXCEEDED']:
         print(f"\n{'='*60}")
-        print(f"🚫 STREAMWISH RATE LIMITED - TRYING LULUSTREAM FALLBACK")
+        print(f"🚫 STREAMWISH QUOTA EXCEEDED - TRYING LULUSTREAM FALLBACK")
         print(f"{'='*60}")
         print(f"StreamWish error: {result.get('error_msg', 'Upload quota exceeded')}")
         print(f"Wait time: {result.get('wait_seconds', 0) / 3600:.1f} hours")

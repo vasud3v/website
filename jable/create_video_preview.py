@@ -94,19 +94,21 @@ def create_preview(video_path, output_path=None, duration=15, num_clips=3):
         concat_file = os.path.join(temp_dir, "concat_list.txt")
         with open(concat_file, 'w') as f:
             for clip in clip_files:
-                f.write(f"file '{os.path.basename(clip)}'\n")
+                # Use forward slashes and escape for ffmpeg
+                clip_basename = os.path.basename(clip)
+                f.write(f"file '{clip_basename}'\n")
         
         print(f"[Preview] Concatenating clips...")
         
-        # Concatenate clips
+        # Concatenate clips - use absolute path for concat file
         subprocess.run([
             'ffmpeg', '-y',
             '-f', 'concat',
             '-safe', '0',
-            '-i', concat_file,
+            '-i', os.path.abspath(concat_file),
             '-c', 'copy',
-            output_path
-        ], capture_output=True, cwd=temp_dir, timeout=60)
+            os.path.abspath(output_path)
+        ], capture_output=True, timeout=60)
         
         # Cleanup temp files
         for clip in clip_files:
