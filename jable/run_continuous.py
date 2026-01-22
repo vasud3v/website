@@ -827,14 +827,25 @@ def process_one_video(scraper, url, num, total):
         if ADVANCED_PREVIEW_AVAILABLE:
             log("\n🎬 Step 3.5: Creating and uploading preview video...")
             try:
-                from upload_all_hosts import upload_to_streamwish
+                from upload_all_hosts import upload_all
+                
+                # Create wrapper function for preview upload with multi-host fallback
+                def upload_preview_with_fallback(file_path, code, title, folder_name, allow_small_files=False):
+                    """Wrapper to use upload_all for preview with multi-host fallback"""
+                    result = upload_all(file_path, code, title)
+                    # Return first successful upload or last failed attempt
+                    if result.get('successful'):
+                        return result['successful'][0]
+                    elif result.get('failed'):
+                        return result['failed'][-1]  # Return last failed attempt
+                    return {'success': False, 'error': 'Upload failed'}
                 
                 # Use advanced preview generation with scene detection
                 preview_result = integrate_with_workflow(
                     video_path=mp4_file,
                     video_code=code,
                     video_title=video_data.title,
-                    upload_function=upload_to_streamwish,
+                    upload_function=upload_preview_with_fallback,
                     folder_name=f"JAV_VIDEOS/{code}",
                     enable_preview=True,
                     enable_gif=False  # Set to True if you want GIF too
