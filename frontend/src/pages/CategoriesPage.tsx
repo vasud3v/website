@@ -15,16 +15,16 @@ export default function CategoriesPage() {
 
     return (
         <div>
-            <h1 className="text-3xl font-bold mb-8">Categories</h1>
+            <h1 className="text-3xl font-bold mb-8 text-zinc-900 dark:text-white">Categories</h1>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {data.map((category) => (
                     <Link
                         key={category.name}
                         to={`/category/${encodeURIComponent(category.name)}`}
-                        className="p-6 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors"
+                        className="p-6 bg-zinc-200 dark:bg-gray-800 rounded-lg hover:bg-zinc-300 dark:hover:bg-gray-700 transition-colors"
                     >
-                        <h3 className="font-semibold mb-2">{category.name}</h3>
-                        <p className="text-sm text-gray-400">{category.video_count} videos</p>
+                        <h3 className="font-semibold mb-2 text-zinc-900 dark:text-white">{category.name}</h3>
+                        <p className="text-sm text-zinc-600 dark:text-gray-400">{category.video_count} videos</p>
                     </Link>
                 ))}
             </div>

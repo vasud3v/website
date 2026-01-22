@@ -19,42 +19,42 @@ export default function HomePage() {
         <div className="space-y-12 pb-12">
             {data.featured?.length > 0 && (
                 <section>
-                    <h2 className="text-2xl font-bold mb-6">Featured</h2>
+                    <h2 className="text-2xl font-bold mb-6 text-zinc-900 dark:text-white">Featured</h2>
                     <VideoGrid videos={data.featured} />
                 </section>
             )}
             
             {data.trending?.length > 0 && (
                 <section>
-                    <h2 className="text-2xl font-bold mb-6">Trending</h2>
+                    <h2 className="text-2xl font-bold mb-6 text-zinc-900 dark:text-white">Trending</h2>
                     <VideoGrid videos={data.trending} />
                 </section>
             )}
             
             {data.popular?.length > 0 && (
                 <section>
-                    <h2 className="text-2xl font-bold mb-6">Popular</h2>
+                    <h2 className="text-2xl font-bold mb-6 text-zinc-900 dark:text-white">Popular</h2>
                     <VideoGrid videos={data.popular} />
                 </section>
             )}
             
             {data.top_rated?.length > 0 && (
                 <section>
-                    <h2 className="text-2xl font-bold mb-6">Top Rated</h2>
+                    <h2 className="text-2xl font-bold mb-6 text-zinc-900 dark:text-white">Top Rated</h2>
                     <VideoGrid videos={data.top_rated} />
                 </section>
             )}
             
             {data.new_releases?.length > 0 && (
                 <section>
-                    <h2 className="text-2xl font-bold mb-6">New Releases</h2>
+                    <h2 className="text-2xl font-bold mb-6 text-zinc-900 dark:text-white">New Releases</h2>
                     <VideoGrid videos={data.new_releases} />
                 </section>
             )}
             
             {data.classics?.length > 0 && (
                 <section>
-                    <h2 className="text-2xl font-bold mb-6">Classics</h2>
+                    <h2 className="text-2xl font-bold mb-6 text-zinc-900 dark:text-white">Classics</h2>
                     <VideoGrid videos={data.classics} />
                 </section>
             )}

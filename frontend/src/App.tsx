@@ -9,7 +9,7 @@ import VideoDetailPage from './pages/VideoDetailPage';
 function App() {
     return (
         <Router>
-            <div className="min-h-screen bg-[#09090b] text-white">
+            <div className="min-h-screen bg-zinc-50 dark:bg-[#09090b] text-zinc-900 dark:text-white transition-colors duration-300">
                 <Navbar />
                 <main className="pt-14 px-4">
                     <Routes>
