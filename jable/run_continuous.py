@@ -840,7 +840,8 @@ def process_one_video(scraper, url, num, total):
                         return result['failed'][-1]  # Return last failed attempt
                     return {'success': False, 'error': 'Upload failed'}
                 
-                # Use advanced preview generation with scene detection
+                # Use advanced preview generation with comprehensive sex scene detection
+                # Skips first 5 minutes, captures ALL sex scenes, 30 clips × 2s / 1.3x = ~46s
                 preview_result = integrate_with_workflow(
                     video_path=mp4_file,
                     video_code=code,
