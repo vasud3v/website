@@ -592,29 +592,48 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
     else:
         upload_title = f"{code} - {title[:100]}"
     
-    # Validate API key by testing account info
+    # Validate API key by testing account info with retry logic
     print(f"[StreamWish] Validating API key...")
-    try:
-        test_response = requests.get(
-            "https://api.streamwish.com/api/account/info",
-            params={'key': STREAMWISH_API_KEY},
-            timeout=30
-        )
-        if test_response.status_code == 200:
-            test_data = test_response.json()
-            if test_data.get('status') == 200:
-                account_info = test_data.get('result', {})
-                print(f"[StreamWish] ✓ API key valid")
-                print(f"[StreamWish] Account: {account_info.get('email', 'N/A')}")
-                print(f"[StreamWish] Storage used: {account_info.get('storage_used', 'N/A')}")
+    validation_attempts = 3
+    for val_attempt in range(validation_attempts):
+        try:
+            test_response = requests.get(
+                "https://api.streamwish.com/api/account/info",
+                params={'key': STREAMWISH_API_KEY},
+                timeout=30
+            )
+            if test_response.status_code == 200:
+                test_data = test_response.json()
+                if test_data.get('status') == 200:
+                    account_info = test_data.get('result', {})
+                    print(f"[StreamWish] ✓ API key valid")
+                    print(f"[StreamWish] Account: {account_info.get('email', 'N/A')}")
+                    print(f"[StreamWish] Storage used: {account_info.get('storage_used', 'N/A')}")
+                    break
+                else:
+                    print(f"[StreamWish] ❌ API key invalid: {test_data.get('msg', 'Unknown error')}")
+                    return {'service': 'StreamWish', 'success': False, 'error': 'Invalid API key'}
             else:
-                print(f"[StreamWish] ❌ API key invalid: {test_data.get('msg', 'Unknown error')}")
-                return {'service': 'StreamWish', 'success': False, 'error': 'Invalid API key'}
-        else:
-            print(f"[StreamWish] ⚠️ Could not validate API key (HTTP {test_response.status_code})")
-    except Exception as e:
-        print(f"[StreamWish] ⚠️ API key validation error: {str(e)[:100]}")
-        print(f"[StreamWish] Continuing anyway...")
+                print(f"[StreamWish] ⚠️ Could not validate API key (HTTP {test_response.status_code})")
+                if val_attempt < validation_attempts - 1:
+                    print(f"[StreamWish] Retrying validation in 5s...")
+                    time.sleep(5)
+        except requests.exceptions.Timeout:
+            print(f"[StreamWish] ⚠️ API key validation timeout (attempt {val_attempt + 1}/{validation_attempts})")
+            if val_attempt < validation_attempts - 1:
+                wait_time = 5 * (val_attempt + 1)  # 5s, 10s, 15s
+                print(f"[StreamWish] Retrying in {wait_time}s...")
+                time.sleep(wait_time)
+            else:
+                print(f"[StreamWish] ⚠️ Validation timed out after {validation_attempts} attempts")
+                print(f"[StreamWish] Continuing anyway...")
+        except Exception as e:
+            print(f"[StreamWish] ⚠️ API key validation error: {str(e)[:100]}")
+            if val_attempt < validation_attempts - 1:
+                print(f"[StreamWish] Retrying in 5s...")
+                time.sleep(5)
+            else:
+                print(f"[StreamWish] Continuing anyway...")
     
     # Get folder ID if folder name provided
     folder_id = None
@@ -966,92 +985,135 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
             if folder_name:
                 print(f"[StreamWish] Folder: {folder_name}")
             
-            # Verify upload by checking file info
+            # Verify upload by checking file info with retry logic
             print(f"\n[StreamWish] Verifying upload...")
             verification_passed = False
-            try:
-                verify_response = requests.get(
-                    "https://api.streamwish.com/api/file/info",
-                    params={'key': STREAMWISH_API_KEY, 'file_code': filecode},
-                    timeout=30
-                )
-                if verify_response.status_code == 200:
-                    verify_data = verify_response.json()
-                    print(f"[StreamWish] Verification response: {verify_data}")
-                    
-                    if verify_data.get('status') == 200 and 'result' in verify_data:
-                        file_info_verify = verify_data['result']
-
-                        # Handle case where result is a list (StreamWish API inconsistency)
-                        if isinstance(file_info_verify, list):
-                            if len(file_info_verify) > 0:
-                                file_info_verify = file_info_verify[0]
-                            else:
-                                file_info_verify = {}
-
-                        # Get file size - StreamWish returns it in file_sizes array
-                        server_size = 0
-                        if 'file_sizes' in file_info_verify:
-                            file_sizes = file_info_verify.get('file_sizes', [])
-                            if isinstance(file_sizes, list) and len(file_sizes) > 0:
-                                server_size = file_sizes[0].get('size', 0)
-                        else:
-                            # Fallback to direct size field
-                            server_size = file_info_verify.get('size', 0)
+            verify_attempts = 3
+            for verify_attempt in range(verify_attempts):
+                try:
+                    verify_response = requests.get(
+                        "https://api.streamwish.com/api/file/info",
+                        params={'key': STREAMWISH_API_KEY, 'file_code': filecode},
+                        timeout=30
+                    )
+                    if verify_response.status_code == 200:
+                        verify_data = verify_response.json()
+                        print(f"[StreamWish] Verification response: {verify_data}")
                         
-                        server_size_gb = int(server_size) / (1024**3) if server_size else 0
-                        server_size_mb = int(server_size) / (1024**2) if server_size else 0
-                        print(f"[StreamWish] ✓ Server confirms file size: {server_size_gb:.2f} GB ({server_size:,} bytes)")
-                        
-                        # Check file size based on whether it's a preview or full video
-                        if allow_small_files:
-                            # Preview file - expect 5-100 MB
-                            if server_size_mb < 5:
-                                print(f"[StreamWish] ❌ WARNING: Preview file too small ({server_size_mb:.1f} MB)!")
-                                print(f"[StreamWish] ❌ Upload may have failed silently")
-                                verification_passed = False
+                        if verify_data.get('status') == 200 and 'result' in verify_data:
+                            file_info_verify = verify_data['result']
+
+                            # Handle case where result is a list (StreamWish API inconsistency)
+                            if isinstance(file_info_verify, list):
+                                if len(file_info_verify) > 0:
+                                    file_info_verify = file_info_verify[0]
+                                else:
+                                    file_info_verify = {}
+
+                            # Get file size - StreamWish returns it in file_sizes array
+                            server_size = 0
+                            if 'file_sizes' in file_info_verify:
+                                file_sizes = file_info_verify.get('file_sizes', [])
+                                if isinstance(file_sizes, list) and len(file_sizes) > 0:
+                                    server_size = file_sizes[0].get('size', 0)
                             else:
-                                print(f"[StreamWish] ✓ Preview file size valid ({server_size_mb:.1f} MB)")
-                                verification_passed = True
+                                # Fallback to direct size field
+                                server_size = file_info_verify.get('size', 0)
+                            
+                            server_size_gb = int(server_size) / (1024**3) if server_size else 0
+                            server_size_mb = int(server_size) / (1024**2) if server_size else 0
+                            print(f"[StreamWish] ✓ Server confirms file size: {server_size_gb:.2f} GB ({server_size:,} bytes)")
+                            
+                            # Check file size based on whether it's a preview or full video
+                            if allow_small_files:
+                                # Preview file - expect 5-100 MB
+                                if server_size_mb < 5:
+                                    print(f"[StreamWish] ❌ WARNING: Preview file too small ({server_size_mb:.1f} MB)!")
+                                    print(f"[StreamWish] ❌ Upload may have failed silently")
+                                    verification_passed = False
+                                else:
+                                    print(f"[StreamWish] ✓ Preview file size valid ({server_size_mb:.1f} MB)")
+                                    verification_passed = True
+                            else:
+                                # Full video - expect > 100 MB
+                                if server_size_gb < 0.1:
+                                    print(f"[StreamWish] ❌ WARNING: Server shows very small file size!")
+                                    print(f"[StreamWish] ❌ Upload may have failed silently")
+                                    verification_passed = False
+                                else:
+                                    verification_passed = True
+                            break  # Success, exit retry loop
                         else:
-                            # Full video - expect > 100 MB
-                            if server_size_gb < 0.1:
-                                print(f"[StreamWish] ❌ WARNING: Server shows very small file size!")
-                                print(f"[StreamWish] ❌ Upload may have failed silently")
-                                verification_passed = False
-                            else:
-                                verification_passed = True
+                            print(f"[StreamWish] ❌ Verification failed: {verify_data.get('msg', 'Unknown error')}")
+                            verification_passed = False
+                            if verify_attempt < verify_attempts - 1:
+                                print(f"[StreamWish] Retrying verification in 5s...")
+                                time.sleep(5)
                     else:
-                        print(f"[StreamWish] ❌ Verification failed: {verify_data.get('msg', 'Unknown error')}")
+                        print(f"[StreamWish] ❌ Verification HTTP error: {verify_response.status_code}")
                         verification_passed = False
-                else:
-                    print(f"[StreamWish] ❌ Verification HTTP error: {verify_response.status_code}")
-                    verification_passed = False
-            except Exception as e:
-                print(f"[StreamWish] ❌ Verification exception: {str(e)[:100]}")
-                verification_passed = False
+                        if verify_attempt < verify_attempts - 1:
+                            print(f"[StreamWish] Retrying verification in 5s...")
+                            time.sleep(5)
+                except requests.exceptions.Timeout:
+                    print(f"[StreamWish] ⚠️ Verification timeout (attempt {verify_attempt + 1}/{verify_attempts})")
+                    if verify_attempt < verify_attempts - 1:
+                        wait_time = 5 * (verify_attempt + 1)  # 5s, 10s, 15s
+                        print(f"[StreamWish] Retrying in {wait_time}s...")
+                        time.sleep(wait_time)
+                    else:
+                        print(f"[StreamWish] ⚠️ Verification timed out after {verify_attempts} attempts")
+                        verification_passed = False
+                except Exception as e:
+                    print(f"[StreamWish] ❌ Verification exception: {str(e)[:100]}")
+                    if verify_attempt < verify_attempts - 1:
+                        print(f"[StreamWish] Retrying verification in 5s...")
+                        time.sleep(5)
+                    else:
+                        verification_passed = False
             
             # Test direct access to file (Double check even if verification failed)
             print(f"\n[StreamWish] Testing direct access...")
             direct_access_passed = False
-            try:
-                test_url = f"https://streamwish.com/{filecode}"
-                test_response = requests.head(test_url, timeout=30, allow_redirects=True)
-                print(f"[StreamWish] Direct access test: HTTP {test_response.status_code}")
-                
-                if test_response.status_code == 403:
-                    print(f"[StreamWish] ⚠️ 403 Forbidden - File is still processing")
-                    print(f"[StreamWish] ℹ️ This is normal for newly uploaded files")
-                    print(f"[StreamWish] ℹ️ File will be accessible once processing completes")
-                elif test_response.status_code == 404:
-                    print(f"[StreamWish] ❌ 404 Not Found - File doesn't exist!")
-                elif test_response.status_code in [200, 302]:
-                    print(f"[StreamWish] ✓ File is accessible!")
-                    direct_access_passed = True
-                else:
-                    print(f"[StreamWish] ⚠️ Unexpected status: {test_response.status_code}")
-            except Exception as e:
-                print(f"[StreamWish] ⚠️ Access test error: {str(e)[:100]}")
+            access_attempts = 3
+            for access_attempt in range(access_attempts):
+                try:
+                    test_url = f"https://streamwish.com/{filecode}"
+                    test_response = requests.head(test_url, timeout=30, allow_redirects=True)
+                    print(f"[StreamWish] Direct access test: HTTP {test_response.status_code}")
+                    
+                    if test_response.status_code == 403:
+                        print(f"[StreamWish] ⚠️ 403 Forbidden - File is still processing")
+                        print(f"[StreamWish] ℹ️ This is normal for newly uploaded files")
+                        print(f"[StreamWish] ℹ️ File will be accessible once processing completes")
+                        break
+                    elif test_response.status_code == 404:
+                        print(f"[StreamWish] ❌ 404 Not Found - File doesn't exist!")
+                        if access_attempt < access_attempts - 1:
+                            print(f"[StreamWish] Retrying in 5s...")
+                            time.sleep(5)
+                    elif test_response.status_code in [200, 302]:
+                        print(f"[StreamWish] ✓ File is accessible!")
+                        direct_access_passed = True
+                        break
+                    else:
+                        print(f"[StreamWish] ⚠️ Unexpected status: {test_response.status_code}")
+                        if access_attempt < access_attempts - 1:
+                            print(f"[StreamWish] Retrying in 5s...")
+                            time.sleep(5)
+                except requests.exceptions.Timeout:
+                    print(f"[StreamWish] ⚠️ Access test timeout (attempt {access_attempt + 1}/{access_attempts})")
+                    if access_attempt < access_attempts - 1:
+                        wait_time = 5 * (access_attempt + 1)  # 5s, 10s, 15s
+                        print(f"[StreamWish] Retrying in {wait_time}s...")
+                        time.sleep(wait_time)
+                    else:
+                        print(f"[StreamWish] ⚠️ Access test timed out after {access_attempts} attempts")
+                except Exception as e:
+                    print(f"[StreamWish] ⚠️ Access test error: {str(e)[:100]}")
+                    if access_attempt < access_attempts - 1:
+                        print(f"[StreamWish] Retrying in 5s...")
+                        time.sleep(5)
 
             # Decision Logic
             if verification_passed:

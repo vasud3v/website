@@ -1,14 +1,23 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
+import HomePage from './pages/HomePage';
+import CategoriesPage from './pages/CategoriesPage';
+import StudiosPage from './pages/StudiosPage';
+import ActressesPage from './pages/ActressesPage';
+import VideoDetailPage from './pages/VideoDetailPage';
 
 function App() {
     return (
         <Router>
-            <div className="min-h-screen bg-background text-foreground">
+            <div className="min-h-screen bg-[#09090b] text-white">
                 <Navbar />
-                <main className="container mx-auto px-4 py-8">
+                <main className="pt-14 px-4">
                     <Routes>
-                        <Route path="/" element={<div className="text-center mt-20">Home Page (Content Missing)</div>} />
+                        <Route path="/" element={<HomePage />} />
+                        <Route path="/categories" element={<CategoriesPage />} />
+                        <Route path="/studios" element={<StudiosPage />} />
+                        <Route path="/actresses" element={<ActressesPage />} />
+                        <Route path="/video/:code" element={<VideoDetailPage />} />
                     </Routes>
                 </main>
             </div>
