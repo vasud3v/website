@@ -219,6 +219,12 @@ class DatabaseManager:
     def _write_json(self, filepath: str, data: Any, backup: bool = True):
         """Safely write JSON file with atomic write and backup"""
         try:
+            # Ensure directory exists
+            dir_path = os.path.dirname(filepath)
+            if dir_path and not os.path.exists(dir_path):
+                os.makedirs(dir_path, exist_ok=True)
+                print(f"✓ Created directory: {dir_path}")
+            
             # Create backup if file exists
             if backup and os.path.exists(filepath):
                 backup_path = filepath + '.backup'
@@ -237,6 +243,8 @@ class DatabaseManager:
             return True
         except Exception as e:
             print(f"❌ Error writing {filepath}: {e}")
+            import traceback
+            traceback.print_exc()
             # Clean up temp file
             if os.path.exists(filepath + '.tmp'):
                 try:
