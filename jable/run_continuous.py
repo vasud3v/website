@@ -29,14 +29,23 @@ from upload_thumbnail import upload_thumbnail_to_streamwish
 from set_streamwish_thumbnail import set_streamwish_thumbnail
 from set_thumbnail_advanced import set_streamwish_thumbnail_advanced
 
-# Import preview creation
+# Import advanced preview generation
 try:
-    from create_video_preview import create_preview
-    PREVIEW_CREATION_AVAILABLE = True
-    print("✓ Preview creation available")
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'preview_generator'))
+    from workflow_integration import integrate_with_workflow
+    ADVANCED_PREVIEW_AVAILABLE = True
+    print("✓ Advanced preview generation available")
 except ImportError as e:
-    PREVIEW_CREATION_AVAILABLE = False
-    print(f"⚠️ Preview creation not available: {e}")
+    ADVANCED_PREVIEW_AVAILABLE = False
+    print(f"⚠️ Advanced preview generation not available: {e}")
+    # Fallback to simple preview
+    try:
+        from create_video_preview import create_preview
+        PREVIEW_CREATION_AVAILABLE = True
+        print("✓ Simple preview creation available")
+    except ImportError:
+        PREVIEW_CREATION_AVAILABLE = False
+        print(f"⚠️ Preview creation not available")
 
 print("All imports successful!")
 
@@ -431,7 +440,7 @@ def mark_as_failed(url, error_msg):
     except Exception as e:
         log(f"⚠️ Could not mark as failed: {e}")
 
-def save_video(video_data, upload_results, thumbnail_hosted_url=None, preview_url=None):
+def save_video(video_data, upload_results, thumbnail_hosted_url=None, preview_result=None):
     """Save complete video metadata with embed URLs - Enhanced version with detailed logging"""
     try:
         log(f"   [save_video] ========== SAVE VIDEO START ==========")
@@ -478,8 +487,13 @@ def save_video(video_data, upload_results, thumbnail_hosted_url=None, preview_ur
             # Preview images
             'preview_images': video_data.preview_images if hasattr(video_data, 'preview_images') else [],
             
-            # Preview video URL (if uploaded)
-            'preview_video_url': preview_url if preview_url else None,
+            # Preview video (if generated)
+            'preview_video_url': preview_result.get('preview_video_url') if preview_result and preview_result.get('success') else None,
+            'preview_gif_url': preview_result.get('preview_gif_url') if preview_result and preview_result.get('success') else None,
+            'preview_duration': preview_result.get('preview_duration', 0) if preview_result and preview_result.get('success') else 0,
+            'preview_clips': preview_result.get('num_clips', 0) if preview_result and preview_result.get('success') else 0,
+            'preview_file_size_mb': preview_result.get('preview_file_size_mb', 0) if preview_result and preview_result.get('success') else 0,
+            'preview_generated': preview_result.get('success', False) if preview_result else False,
             # Hosting info
             'hosting': {},
             
@@ -808,22 +822,81 @@ def process_one_video(scraper, url, num, total):
             mark_as_failed(url, error_msg)
             return False
         
-        # STEP 3.5: Create preview video
-        preview_file = None
-        if PREVIEW_CREATION_AVAILABLE:
-            log("\n🎬 Step 3.5: Creating preview video...")
+        # STEP 3.5: Create and upload preview video (ADVANCED)
+        preview_result = None
+        if ADVANCED_PREVIEW_AVAILABLE:
+            log("\n🎬 Step 3.5: Creating and uploading preview video...")
+            try:
+                from upload_all_hosts import upload_to_streamwish
+                
+                # Use advanced preview generation with scene detection
+                preview_result = integrate_with_workflow(
+                    video_path=mp4_file,
+                    video_code=code,
+                    video_title=video_data.title,
+                    upload_function=upload_to_streamwish,
+                    folder_name=f"JAV_VIDEOS/{code}",
+                    enable_preview=True,
+                    enable_gif=False  # Set to True if you want GIF too
+                )
+                
+                if preview_result and preview_result.get('success'):
+                    log(f"✅ Preview created and uploaded")
+                    log(f"   URL: {preview_result['preview_video_url']}")
+                    log(f"   Size: {preview_result['preview_file_size_mb']:.1f} MB")
+                    log(f"   Duration: {preview_result['preview_duration']:.1f}s")
+                    log(f"   Clips: {preview_result['num_clips']}")
+                else:
+                    log(f"⚠️ Preview generation failed: {preview_result.get('error') if preview_result else 'Unknown error'}")
+                    preview_result = None
+                    
+            except Exception as e:
+                log(f"⚠️ Preview generation error: {str(e)[:100]}")
+                preview_result = None
+        
+        elif PREVIEW_CREATION_AVAILABLE:
+            # Fallback to simple preview (old method)
+            log("\n🎬 Step 3.5: Creating preview video (simple mode)...")
+            preview_file = None
             try:
                 preview_file = f"{TEMP_DIR}/{code}_preview.mp4"
                 result = create_preview(mp4_file, preview_file, duration=15, num_clips=3)
                 if result and os.path.exists(result):
                     preview_size_mb = os.path.getsize(result) / (1024 * 1024)
                     log(f"✅ Preview created: {preview_size_mb:.1f} MB")
+                    
+                    # Upload preview
+                    log(f"📤 Uploading preview...")
+                    try:
+                        from upload_all_hosts import upload_to_streamwish
+                        preview_folder = f"JAV_VIDEOS/{code}"
+                        preview_title = f"{code} - PREVIEW"
+                        
+                        preview_upload = upload_to_streamwish(preview_file, code, preview_title, preview_folder)
+                        
+                        if preview_upload and preview_upload.get('success'):
+                            preview_result = {
+                                'success': True,
+                                'preview_video_url': preview_upload.get('embed_url'),
+                                'preview_file_size_mb': preview_size_mb,
+                                'preview_duration': 45,  # 3 clips x 15s
+                                'num_clips': 3
+                            }
+                            log(f"✅ Preview uploaded: {preview_result['preview_video_url']}")
+                        else:
+                            log(f"⚠️ Preview upload failed")
+                    except Exception as e:
+                        log(f"⚠️ Preview upload error: {str(e)[:100]}")
+                    
+                    # Cleanup
+                    try:
+                        os.remove(preview_file)
+                    except:
+                        pass
                 else:
-                    log(f"⚠️ Preview creation failed, continuing without preview")
-                    preview_file = None
+                    log(f"⚠️ Preview creation failed")
             except Exception as e:
                 log(f"⚠️ Preview creation error: {str(e)[:100]}")
-                preview_file = None
         else:
             log("\n⚠️ Step 3.5: Preview creation not available (skipping)")
         
@@ -977,25 +1050,6 @@ def process_one_video(scraper, url, num, total):
             return False
         
         # STEP 5: Save metadata with embed URLs
-        # STEP 4.5: Upload preview video (if created)
-        preview_url = None
-        if preview_file and os.path.exists(preview_file):
-            log("\n📤 Step 4.5: Uploading preview video...")
-            try:
-                from upload_all_hosts import upload_to_streamwish
-                preview_folder = f"JAV_VIDEOS/{code}"
-                preview_title = f"{code} - PREVIEW"
-                
-                preview_result = upload_to_streamwish(preview_file, code, preview_title, preview_folder)
-                
-                if preview_result and preview_result.get('success'):
-                    preview_url = preview_result.get('embed_url')
-                    log(f"✅ Preview uploaded: {preview_url}")
-                else:
-                    log(f"⚠️ Preview upload failed, continuing without preview URL")
-            except Exception as e:
-                log(f"⚠️ Preview upload error: {str(e)[:100]}")
-        
         log("\n💾 Step 5: Saving to database...")
         try:
             log(f"   Video data code: {video_data.code}")
@@ -1012,7 +1066,7 @@ def process_one_video(scraper, url, num, total):
                 log(f"   ⚠️ WARNING: No successful uploads to save!")
                 log(f"   Upload results full: {upload_results}")
             
-            if save_video(video_data, upload_results, thumbnail_url, preview_url):
+            if save_video(video_data, upload_results, thumbnail_url, preview_result):
                 log("✅ Saved to database")
                 
                 # Verify it was saved
