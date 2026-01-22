@@ -91,13 +91,21 @@ class IntegratedPipeline:
             return False
     
     def is_already_processed(self, video_code: str) -> bool:
-        """Check if video already exists in combined database"""
+        """Check if video already has JAVDatabase data"""
         if self.use_db_manager:
-            return db_manager.is_processed(code=video_code)
+            video = db_manager.get_video_by_code(video_code)
+            if video:
+                # Check if it has JAVDatabase data
+                return video.get('javdb_available', False) or video.get('javdb_data') is not None
+            return False
         
         # Legacy fallback
         existing = self.load_combined_database()
-        return any(v.get("code") == video_code.upper() for v in existing)
+        for v in existing:
+            if v.get("code") == video_code.upper():
+                # Check if it has JAVDatabase data
+                return v.get('javdb_available', False) or v.get('javdb_data') is not None
+        return False
     
     def log_error(self, video_code: str, error: str, error_type: str = "unknown"):
         """Log error"""
@@ -175,23 +183,36 @@ class IntegratedPipeline:
         # Step 3: Save to combined database
         print(f"\n💾 Step 3: Saving to combined database...")
         try:
-            existing = self.load_combined_database()
-            
-            # Remove if exists (shouldn't happen, but just in case)
-            existing = [v for v in existing if v.get("code") != video_code]
-            
-            # Add new video
-            existing.append(merged_data)
-            
-            # Save
-            if self.save_combined_database(existing):
-                print(f"  ✅ Saved to {self.combined_db_path}")
-                print(f"     Total videos in database: {len(existing)}")
-                self.update_stats(success=True, javdb_available=bool(javdb_data))
+            if self.use_db_manager:
+                # Use database manager to add or update
+                if db_manager.add_or_update_video(merged_data):
+                    print(f"  ✅ Saved to centralized database")
+                    all_videos = db_manager.get_all_videos()
+                    print(f"     Total videos in database: {len(all_videos)}")
+                    self.update_stats(success=True, javdb_available=bool(javdb_data))
+                else:
+                    print(f"  ❌ Failed to save database")
+                    self.log_error(video_code, "Failed to save database", "save_error")
+                    return None
             else:
-                print(f"  ❌ Failed to save database")
-                self.log_error(video_code, "Failed to save database", "save_error")
-                return None
+                # Legacy: Load, update, save
+                existing = self.load_combined_database()
+                
+                # Remove if exists
+                existing = [v for v in existing if v.get("code") != video_code]
+                
+                # Add new video
+                existing.append(merged_data)
+                
+                # Save
+                if self.save_combined_database(existing):
+                    print(f"  ✅ Saved to {self.combined_db_path}")
+                    print(f"     Total videos in database: {len(existing)}")
+                    self.update_stats(success=True, javdb_available=bool(javdb_data))
+                else:
+                    print(f"  ❌ Failed to save database")
+                    self.log_error(video_code, "Failed to save database", "save_error")
+                    return None
                 
         except Exception as e:
             print(f"  ❌ Save failed: {e}")
