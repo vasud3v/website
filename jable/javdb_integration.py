@@ -56,7 +56,7 @@ def enrich_with_javdb(video_data: dict, headless: bool = True) -> bool:
         pipeline = IntegratedPipeline(combined_db_path="database/combined_videos.json")
         
         # Process the video
-        result = pipeline.process_jable_video(video_data, headless=headless)
+        result = pipeline.process_video(video_data, headless=headless)
         
         if result:
             print(f"✓ JAVDatabase enrichment successful for {video_data.get('code')}")
