@@ -1,8 +1,8 @@
 {
-  "total_processed": 2,
-  "successful": 2,
+  "total_processed": 19,
+  "successful": 19,
   "failed": 0,
-  "javdb_available": 2,
+  "javdb_available": 19,
   "javdb_unavailable": 0,
-  "last_updated": "2026-01-21T18:14:02.829985"
+  "last_updated": "2026-01-21T22:11:47.643782"
 }

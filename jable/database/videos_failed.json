@@ -1,1 +1,98 @@
-[]
+[
+  {
+    "source_url": "https://jable.tv/videos/mfyd-084/",
+    "retry_count": 2,
+    "last_error": "Upload failed - no successful uploads",
+    "last_attempt": "2026-01-21T22:27:26.981008"
+  },
+  {
+    "source_url": "https://jable.tv/videos/mikr-071/",
+    "retry_count": 2,
+    "last_error": "Upload failed - no successful uploads",
+    "last_attempt": "2026-01-21T22:40:46.200396"
+  },
+  {
+    "source_url": "https://jable.tv/videos/mikr-069/",
+    "retry_count": 2,
+    "last_error": "Upload failed - no successful uploads",
+    "last_attempt": "2026-01-21T22:53:01.401658"
+  },
+  {
+    "source_url": "https://jable.tv/videos/mfyd-083/",
+    "retry_count": 2,
+    "last_error": "Upload failed - no successful uploads",
+    "last_attempt": "2026-01-21T23:12:55.089465"
+  },
+  {
+    "source_url": "https://jable.tv/videos/mfyd-082/",
+    "retry_count": 2,
+    "last_error": "Upload failed - no successful uploads",
+    "last_attempt": "2026-01-21T23:43:37.831792"
+  },
+  {
+    "source_url": "https://jable.tv/videos/mfyd-074/",
+    "retry_count": 2,
+    "last_error": "Upload failed - no successful uploads",
+    "last_attempt": "2026-01-22T00:08:55.688560"
+  },
+  {
+    "source_url": "https://jable.tv/videos/mfyd-067/",
+    "retry_count": 2,
+    "last_error": "Upload failed - no successful uploads",
+    "last_attempt": "2026-01-22T00:34:55.358427"
+  },
+  {
+    "source_url": "https://jable.tv/videos/mikr-068/",
+    "retry_count": 2,
+    "last_error": "Upload failed - no successful uploads",
+    "last_attempt": "2026-01-22T00:48:50.556491"
+  },
+  {
+    "source_url": "https://jable.tv/videos/miab-602/",
+    "retry_count": 2,
+    "last_error": "Upload failed - no successful uploads",
+    "last_attempt": "2026-01-22T01:06:59.722314"
+  },
+  {
+    "source_url": "https://jable.tv/videos/miab-599/",
+    "retry_count": 2,
+    "last_error": "Upload failed - no successful uploads",
+    "last_attempt": "2026-01-22T01:19:40.068905"
+  },
+  {
+    "source_url": "https://jable.tv/videos/snos-102/",
+    "retry_count": 2,
+    "last_error": "Upload failed - no successful uploads",
+    "last_attempt": "2026-01-22T01:31:44.844193"
+  },
+  {
+    "source_url": "https://jable.tv/videos/snos-069/",
+    "retry_count": 2,
+    "last_error": "Upload failed - no successful uploads",
+    "last_attempt": "2026-01-22T01:45:25.579138"
+  },
+  {
+    "source_url": "https://jable.tv/videos/snos-046/",
+    "retry_count": 2,
+    "last_error": "Upload failed - no successful uploads",
+    "last_attempt": "2026-01-22T01:57:27.274794"
+  },
+  {
+    "source_url": "https://jable.tv/videos/miab-574/",
+    "retry_count": 2,
+    "last_error": "Upload failed - no successful uploads",
+    "last_attempt": "2026-01-22T02:21:21.380397"
+  },
+  {
+    "source_url": "https://jable.tv/videos/miab-563/",
+    "retry_count": 2,
+    "last_error": "Upload failed - no successful uploads",
+    "last_attempt": "2026-01-22T02:37:30.581681"
+  },
+  {
+    "source_url": "https://jable.tv/videos/fpre-216/",
+    "retry_count": 1,
+    "last_error": "Upload failed - no successful uploads",
+    "last_attempt": "2026-01-22T02:43:56.772150"
+  }
+]
