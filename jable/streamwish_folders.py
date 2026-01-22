@@ -63,9 +63,11 @@ def get_or_create_parent_folder(api_key):
     try:
         folders = list_folders(api_key)
         for folder in folders:
-            if folder.get('name') == PARENT_FOLDER_NAME:
+            server_name = folder.get('name', '').strip()
+            # Case-insensitive matching
+            if server_name.lower() == PARENT_FOLDER_NAME.lower():
                 folder_id = str(folder.get('fld_id'))
-                print(f"   [Folder] ✅ Found existing parent folder: {folder_id}")
+                print(f"   [Folder] ✅ Found existing parent folder: {folder_id} (name: '{server_name}')")
                 cache[cache_key] = folder_id
                 save_folder_cache(cache)
                 return folder_id
@@ -97,11 +99,13 @@ def get_or_create_parent_folder(api_key):
                     print(f"   [Folder] Parent folder already exists, fetching...")
                     folders = list_folders(api_key)
                     for folder in folders:
-                        if folder.get('name') == PARENT_FOLDER_NAME:
+                        server_name = folder.get('name', '').strip()
+                        # Case-insensitive matching
+                        if server_name.lower() == PARENT_FOLDER_NAME.lower():
                             folder_id = str(folder.get('fld_id'))
                             cache[cache_key] = folder_id
                             save_folder_cache(cache)
-                            print(f"   [Folder] ✅ Found parent folder ID: {folder_id}")
+                            print(f"   [Folder] ✅ Found parent folder ID: {folder_id} (name: '{server_name}')")
                             return folder_id
         
         print(f"   [Folder] ⚠️ Failed to create parent folder: {r.text[:100]}")
@@ -188,14 +192,17 @@ def _get_or_create_single_folder(folder_name, api_key, parent_id=None):
     try:
         folders = list_folders(api_key)
         for folder in folders:
-            server_folder_name = folder.get('name', '')
+            server_folder_name = folder.get('name', '').strip()
             server_parent_id = str(folder.get('parent_id', '0'))
             folder_id = str(folder.get('fld_id'))
             
-            # Match by name and parent_id
+            # Match by name and parent_id (case-insensitive and whitespace-normalized)
             expected_parent = str(parent_id) if parent_id else '0'
-            if server_folder_name == folder_name and server_parent_id == expected_parent:
-                print(f"   [Folder] ✅ Found existing folder: {folder_id}")
+            name_match = server_folder_name.lower() == folder_name.lower().strip()
+            parent_match = server_parent_id == expected_parent
+            
+            if name_match and parent_match:
+                print(f"   [Folder] ✅ Found existing folder: {folder_id} (name: '{server_folder_name}')")
                 cache[cache_key] = folder_id
                 save_folder_cache(cache)
                 return folder_id
@@ -235,15 +242,19 @@ def _get_or_create_single_folder(folder_name, api_key, parent_id=None):
                     # Refresh folder list and find it
                     folders = list_folders(api_key)
                     for folder in folders:
-                        server_folder_name = folder.get('name', '')
+                        server_folder_name = folder.get('name', '').strip()
                         server_parent_id = str(folder.get('parent_id', '0'))
                         expected_parent = str(parent_id) if parent_id else '0'
                         
-                        if server_folder_name == folder_name and server_parent_id == expected_parent:
+                        # Case-insensitive and whitespace-normalized matching
+                        name_match = server_folder_name.lower() == folder_name.lower().strip()
+                        parent_match = server_parent_id == expected_parent
+                        
+                        if name_match and parent_match:
                             folder_id = str(folder.get('fld_id'))
                             cache[cache_key] = folder_id
                             save_folder_cache(cache)
-                            print(f"   [Folder] ✅ Found folder ID: {folder_id}")
+                            print(f"   [Folder] ✅ Found folder ID: {folder_id} (name: '{server_folder_name}')")
                             return folder_id
                 print(f"   [Folder] ⚠️ API returned: {result.get('status')} - {error_msg}")
         else:
