@@ -1952,15 +1952,24 @@ def main():
     log("Workflow: Scrape → Download → Upload → Save → Delete → Next")
     
     # Check existing database
-    existing_videos = load_json_safe(DB_FILE, [])
-    log(f"\n📊 Database status:")
-    log(f"   Already processed: {len(existing_videos)} videos")
-    log(f"   Database file: {DB_FILE}")
-    
-    # Check failed videos
-    failed_videos = load_json_safe(FAILED_DB_FILE, [])
-    if failed_videos:
-        log(f"   Failed videos: {len(failed_videos)} (will retry up to {MAX_RETRIES} times)")
+    if DATABASE_MANAGER_AVAILABLE:
+        existing_videos = db_manager.get_all_videos()
+        failed_videos = db_manager.get_failed_videos()
+        log(f"\n📊 Database status:")
+        log(f"   Already processed: {len(existing_videos)} videos")
+        log(f"   Database: Centralized database manager")
+        if failed_videos:
+            log(f"   Failed videos: {len(failed_videos)} (will retry up to {MAX_RETRIES} times)")
+    else:
+        existing_videos = load_json_safe(DB_FILE, [])
+        log(f"\n📊 Database status:")
+        log(f"   Already processed: {len(existing_videos)} videos")
+        log(f"   Database file: {DB_FILE}")
+        
+        # Check failed videos
+        failed_videos = load_json_safe(FAILED_DB_FILE, [])
+        if failed_videos:
+            log(f"   Failed videos: {len(failed_videos)} (will retry up to {MAX_RETRIES} times)")
     
     start = time.time()
     success = 0
