@@ -276,6 +276,16 @@ def upload_to_lulustream(file_path, code, title, folder_name=None, allow_small_f
                     all_textareas = re.findall(r'<textarea name=["\']([^"\']+)["\']>([^<]*)</textarea>', response_text)
                     for field_name, field_value in all_textareas:
                         field_value = field_value.strip()
+                        
+                        # Check for error messages in st (status) field
+                        if field_name == 'st' and field_value:
+                            if 'too short' in field_value.lower():
+                                print(f"[LuluStream] ❌ Video rejected: {field_value}")
+                                return {'service': 'LuluStream', 'success': False, 'error': 'Video too short'}
+                            elif 'error' in field_value.lower() or ':0:0:' in field_value:
+                                print(f"[LuluStream] ❌ Upload error: {field_value}")
+                                return {'service': 'LuluStream', 'success': False, 'error': field_value}
+                        
                         # Look for alphanumeric strings that could be file codes
                         if field_value and re.match(r'^[a-zA-Z0-9]{10,}$', field_value):
                             if field_name not in ['op', 'sess_id', 'st']:  # Skip known non-code fields
