@@ -1000,14 +1000,27 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
                             server_size = file_info_verify.get('size', 0)
                         
                         server_size_gb = int(server_size) / (1024**3) if server_size else 0
+                        server_size_mb = int(server_size) / (1024**2) if server_size else 0
                         print(f"[StreamWish] ✓ Server confirms file size: {server_size_gb:.2f} GB ({server_size:,} bytes)")
                         
-                        if server_size_gb < 0.1:
-                            print(f"[StreamWish] ❌ WARNING: Server shows very small file size!")
-                            print(f"[StreamWish] ❌ Upload may have failed silently")
-                            verification_passed = False
+                        # Check file size based on whether it's a preview or full video
+                        if allow_small_files:
+                            # Preview file - expect 5-100 MB
+                            if server_size_mb < 5:
+                                print(f"[StreamWish] ❌ WARNING: Preview file too small ({server_size_mb:.1f} MB)!")
+                                print(f"[StreamWish] ❌ Upload may have failed silently")
+                                verification_passed = False
+                            else:
+                                print(f"[StreamWish] ✓ Preview file size valid ({server_size_mb:.1f} MB)")
+                                verification_passed = True
                         else:
-                            verification_passed = True
+                            # Full video - expect > 100 MB
+                            if server_size_gb < 0.1:
+                                print(f"[StreamWish] ❌ WARNING: Server shows very small file size!")
+                                print(f"[StreamWish] ❌ Upload may have failed silently")
+                                verification_passed = False
+                            else:
+                                verification_passed = True
                     else:
                         print(f"[StreamWish] ❌ Verification failed: {verify_data.get('msg', 'Unknown error')}")
                         verification_passed = False
