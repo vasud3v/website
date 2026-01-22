@@ -1,14 +1,16 @@
 {
-  "total_videos": 1,
-  "total_size_bytes": 1342225243,
+  "total_videos": 2,
+  "total_size_bytes": 3114937865,
   "by_hosting": {
-    "streamwish": 1
+    "streamwish": 2
   },
   "by_category": {
-    "Roleplay": 1
+    "Roleplay": 2,
+    "Chinese Subtitle": 1,
+    "Pantyhose": 1
   },
   "by_model": {
     "浜辺やよい": 1
   },
-  "last_updated": "2026-01-22T18:24:01.344509"
+  "last_updated": "2026-01-22T19:28:25.805698"
 }
