@@ -1852,12 +1852,10 @@ def process_one_video(scraper, url, num, total):
                     log(f"✅ Saved Jable data to database")
                 else:
                     log(f"❌ Failed to save Jable data")
-        else:
-            log("❌ Save failed!")
-            log("   This video will NOT be committed to database")
-    except Exception as e:
-        log(f"❌ Save exception: {e}")
-        import traceback
+                    
+        except Exception as e:
+            log(f"❌ Save exception: {e}")
+            import traceback
             traceback.print_exc()
         
         # STEP 6: Delete video file
