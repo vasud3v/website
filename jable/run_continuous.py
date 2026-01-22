@@ -34,6 +34,9 @@ from upload_thumbnail import upload_thumbnail_to_streamwish
 from set_streamwish_thumbnail import set_streamwish_thumbnail
 from set_thumbnail_advanced import set_streamwish_thumbnail_advanced
 
+# Import utilities first (always needed)
+from utils import load_json_safe, save_json_safe, normalize_url
+
 # Import centralized database manager
 try:
     from database_manager import db_manager
@@ -43,7 +46,6 @@ except ImportError as e:
     DATABASE_MANAGER_AVAILABLE = False
     print(f"⚠️ Database manager not available: {e}")
     print("⚠️ Falling back to legacy database handling")
-    from utils import load_json_safe, save_json_safe, normalize_url
 
 # Import advanced preview generation
 try:
