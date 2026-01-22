@@ -1,12 +1,13 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useTheme } from '../context/ThemeContext';
 
 export default function Navbar() {
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
-    const [isDarkMode, setIsDarkMode] = useState(true);
     const [isScrolled, setIsScrolled] = useState(false);
+    const { theme, toggleTheme } = useTheme();
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -24,20 +25,19 @@ export default function Navbar() {
         }
     };
 
-    const toggleTheme = () => {
-        setIsDarkMode(!isDarkMode);
-        document.documentElement.classList.toggle('light');
-    };
+    const isDarkMode = theme === 'dark';
 
     return (
         <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-            isScrolled ? 'bg-black/95 backdrop-blur-xl shadow-2xl border-b border-zinc-800/50' : 'bg-black shadow-lg'
+            isScrolled 
+                ? 'bg-white/95 dark:bg-black/95 backdrop-blur-xl shadow-2xl border-b border-zinc-200/50 dark:border-zinc-800/50' 
+                : 'bg-white dark:bg-black shadow-lg'
         }`}>
             <div className="flex items-center h-14 px-6 max-w-[1920px] mx-auto">
                 {/* Left Section - Menu & Logo */}
                 <div className="flex items-center gap-4 w-64">
-                    <button className="p-2 hover:bg-zinc-800 rounded-lg transition-all duration-200 active:scale-95 group">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white group-hover:text-pink-500 transition-colors">
+                    <button className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-all duration-200 active:scale-95 group">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-900 dark:text-white group-hover:text-pink-500 transition-colors">
                             <line x1="3" y1="12" x2="21" y2="12"></line>
                             <line x1="3" y1="6" x2="21" y2="6"></line>
                             <line x1="3" y1="18" x2="21" y2="18"></line>
@@ -59,7 +59,7 @@ export default function Navbar() {
                         className="p-2.5 hover:bg-white/10 rounded-lg transition-all duration-200 group relative backdrop-blur-sm"
                         title="Home"
                     >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-300 group-hover:text-white transition-all duration-200 group-hover:scale-110 drop-shadow-lg">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-300 group-hover:text-white transition-all duration-200 group-hover:scale-110 drop-shadow-lg">
                             <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
                             <polyline points="9 22 9 12 15 12 15 22"></polyline>
                         </svg>
@@ -72,7 +72,7 @@ export default function Navbar() {
                         className="p-2.5 hover:bg-white/10 rounded-lg transition-all duration-200 group relative backdrop-blur-sm"
                         title="Categories"
                     >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-300 group-hover:text-white transition-all duration-200 group-hover:scale-110 drop-shadow-lg">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-300 group-hover:text-white transition-all duration-200 group-hover:scale-110 drop-shadow-lg">
                             <rect x="3" y="3" width="7" height="7"></rect>
                             <rect x="14" y="3" width="7" height="7"></rect>
                             <rect x="14" y="14" width="7" height="7"></rect>
@@ -88,6 +88,7 @@ export default function Navbar() {
                         }`}></div>
                         <Search 
                             size={16} 
+                            strokeWidth={1.5}
                             className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none transition-all duration-200 z-10 drop-shadow-lg ${
                                 isSearchFocused ? 'text-pink-400 scale-110' : 'text-zinc-300'
                             }`} 
@@ -113,7 +114,7 @@ export default function Navbar() {
                         className="p-2.5 hover:bg-white/10 rounded-lg transition-all duration-200 group relative backdrop-blur-sm"
                         title="Trending"
                     >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-300 group-hover:text-white transition-all duration-200 group-hover:scale-110 drop-shadow-lg">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-300 group-hover:text-white transition-all duration-200 group-hover:scale-110 drop-shadow-lg">
                             <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
                             <polyline points="16 7 22 7 22 13"></polyline>
                         </svg>
@@ -126,7 +127,7 @@ export default function Navbar() {
                         className="p-2.5 hover:bg-white/10 rounded-lg transition-all duration-200 group relative backdrop-blur-sm"
                         title="Favorites"
                     >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-300 group-hover:text-pink-400 transition-all duration-200 group-hover:scale-110 group-hover:fill-pink-500/30 drop-shadow-lg group-hover:drop-shadow-[0_0_8px_rgba(244,114,182,0.6)]">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-300 group-hover:text-pink-400 transition-all duration-200 group-hover:scale-110 group-hover:fill-pink-500/30 drop-shadow-lg group-hover:drop-shadow-[0_0_8px_rgba(244,114,182,0.6)]">
                             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                         </svg>
                         <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-0 h-0.5 bg-gradient-to-r from-transparent via-pink-400 to-transparent group-hover:w-8 transition-all duration-300 shadow-lg shadow-pink-400/50"></span>
@@ -150,7 +151,7 @@ export default function Navbar() {
                                 viewBox="0 0 24 24" 
                                 fill="none" 
                                 stroke="currentColor" 
-                                strokeWidth="2.5" 
+                                strokeWidth="1.5" 
                                 strokeLinecap="round" 
                                 strokeLinejoin="round" 
                                 className={`absolute inset-0 text-zinc-300 group-hover:text-yellow-300 transition-all duration-500 drop-shadow-lg group-hover:drop-shadow-[0_0_12px_rgba(253,224,71,0.8)] ${
@@ -174,7 +175,7 @@ export default function Navbar() {
                                 viewBox="0 0 24 24" 
                                 fill="none" 
                                 stroke="currentColor" 
-                                strokeWidth="2.5" 
+                                strokeWidth="1.5" 
                                 strokeLinecap="round" 
                                 strokeLinejoin="round" 
                                 className={`absolute inset-0 text-zinc-300 group-hover:text-blue-300 transition-all duration-500 drop-shadow-lg group-hover:drop-shadow-[0_0_12px_rgba(147,197,253,0.8)] ${
@@ -191,7 +192,7 @@ export default function Navbar() {
                         className="p-2.5 hover:bg-white/10 rounded-lg transition-all duration-200 group active:scale-95 relative backdrop-blur-sm"
                         title="Notifications"
                     >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-300 group-hover:text-white transition-all duration-200 group-hover:scale-110 group-hover:rotate-12 drop-shadow-lg">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-300 group-hover:text-white transition-all duration-200 group-hover:scale-110 group-hover:rotate-12 drop-shadow-lg">
                             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                             <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
                         </svg>
@@ -203,7 +204,7 @@ export default function Navbar() {
                         className="p-2.5 hover:bg-white/10 rounded-lg transition-all duration-200 group active:scale-95 backdrop-blur-sm"
                         title="Bookmarks"
                     >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-300 group-hover:text-white transition-all duration-200 group-hover:scale-110 group-hover:-translate-y-0.5 drop-shadow-lg">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-300 group-hover:text-white transition-all duration-200 group-hover:scale-110 group-hover:-translate-y-0.5 drop-shadow-lg">
                             <path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
                         </svg>
                     </button>
@@ -213,7 +214,7 @@ export default function Navbar() {
                         className="p-2.5 hover:bg-white/10 rounded-lg transition-all duration-200 group active:scale-95 backdrop-blur-sm"
                         title="Change Language"
                     >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-300 group-hover:text-white transition-all duration-200 group-hover:scale-110 drop-shadow-lg">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-300 group-hover:text-white transition-all duration-200 group-hover:scale-110 drop-shadow-lg">
                             <path d="m5 8 6 6"></path>
                             <path d="m4 14 6-6 2-3"></path>
                             <path d="M2 5h12"></path>
@@ -229,7 +230,7 @@ export default function Navbar() {
                         title="Profile"
                     >
                         <div className="absolute inset-0 bg-gradient-to-br from-pink-500/0 to-red-600/0 group-hover:from-pink-500/30 group-hover:to-red-600/30 transition-all duration-300"></div>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-200 group-hover:text-white transition-all duration-200 relative z-10 group-hover:scale-110 drop-shadow-lg">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-200 group-hover:text-white transition-all duration-200 relative z-10 group-hover:scale-110 drop-shadow-lg">
                             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                             <circle cx="12" cy="7" r="4"></circle>
                         </svg>

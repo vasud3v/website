@@ -384,11 +384,8 @@ class ComprehensiveDetector:
         ]
         
         try:
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=300)
+            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
             print(f"[ComprehensiveDetector] ✓ Clips concatenated successfully")
-        except subprocess.TimeoutExpired:
-            print(f"[ComprehensiveDetector] ✗ Concatenation timeout (>5 min)")
-            return {'success': False, 'error': 'Concatenation timeout'}
         except subprocess.CalledProcessError as e:
             print(f"[ComprehensiveDetector] ✗ Concatenation failed: {e}")
             if e.stderr:
@@ -429,11 +426,8 @@ class ComprehensiveDetector:
         ]
         
         try:
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=600)
+            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
             print(f"[ComprehensiveDetector] ✓ Preview created with {speed}x speed and high quality")
-        except subprocess.TimeoutExpired:
-            print(f"[ComprehensiveDetector] ✗ Speed filter timeout (>10 min)")
-            return {'success': False, 'error': 'Speed filter timeout'}
         except subprocess.CalledProcessError as e:
             print(f"[ComprehensiveDetector] ✗ Speed filter failed: {e}")
             if e.stderr:

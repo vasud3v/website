@@ -258,8 +258,7 @@ class ClipExtractor:
             
             result = subprocess.run(
                 cmd,
-                capture_output=True,
-                timeout=300
+                capture_output=True
             )
             
             # Cleanup concat file
