@@ -22,8 +22,10 @@ except ImportError:
     FILELOCK_AVAILABLE = False
     print("⚠️ filelock library not available, using basic locking")
 
-# Central database location
-DATABASE_DIR = "database"
+# Central database location - use absolute path to project root
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# database_manager.py is in project root, so SCRIPT_DIR is already project root
+DATABASE_DIR = os.path.join(SCRIPT_DIR, "database")
 COMBINED_DB = os.path.join(DATABASE_DIR, "combined_videos.json")
 PROGRESS_DB = os.path.join(DATABASE_DIR, "progress_tracking.json")
 FAILED_DB = os.path.join(DATABASE_DIR, "failed_videos.json")
