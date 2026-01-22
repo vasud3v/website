@@ -832,7 +832,7 @@ def process_one_video(scraper, url, num, total):
                 # Create wrapper function for preview upload with multi-host fallback
                 def upload_preview_with_fallback(file_path, code, title, folder_name, allow_small_files=False):
                     """Wrapper to use upload_all for preview with multi-host fallback"""
-                    result = upload_all(file_path, code, title)
+                    result = upload_all(file_path, code, title, allow_small_files=allow_small_files)
                     # Return first successful upload or last failed attempt
                     if result.get('successful'):
                         return result['successful'][0]

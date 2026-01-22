@@ -1092,10 +1092,17 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
     return {'service': 'StreamWish', 'success': False, 'error': 'All retries failed'}
 
 
-def upload_all(file_path, code, title, video_data=None):
+def upload_all(file_path, code, title, video_data=None, allow_small_files=False):
     """
     Main upload function - tries all hosting services with automatic fallback
     Priority: StreamWish → LuluStream → Streamtape
+    
+    Args:
+        file_path: Path to video file
+        code: Video code
+        title: Video title
+        video_data: Optional video metadata
+        allow_small_files: Allow files < 50MB (for previews)
     """
     print(f"\n╔══════════════════════════════════════════════════════════╗")
     print(f"║         VIDEO UPLOAD (Multi-Host with Fallback)          ║")
@@ -1115,7 +1122,7 @@ def upload_all(file_path, code, title, video_data=None):
     print(f"\n{'='*60}")
     print(f"ATTEMPT 1: StreamWish (Primary)")
     print(f"{'='*60}")
-    streamwish_result = upload_to_streamwish(file_path, code, title, folder_name)
+    streamwish_result = upload_to_streamwish(file_path, code, title, folder_name, allow_small_files)
     all_results.append(streamwish_result)
     
     # Check if StreamWish succeeded
@@ -1159,7 +1166,7 @@ def upload_all(file_path, code, title, video_data=None):
     print(f"\n{'='*60}")
     print(f"ATTEMPT 2: LuluStream (First Fallback)")
     print(f"{'='*60}")
-    lulustream_result = upload_to_lulustream(file_path, code, title, folder_name)
+    lulustream_result = upload_to_lulustream(file_path, code, title, folder_name, allow_small_files)
     all_results.append(lulustream_result)
     
     # Check if LuluStream succeeded
@@ -1196,7 +1203,7 @@ def upload_all(file_path, code, title, video_data=None):
     print(f"\n{'='*60}")
     print(f"ATTEMPT 3: Streamtape (Final Fallback)")
     print(f"{'='*60}")
-    streamtape_result = upload_to_streamtape(file_path, code, title, folder_name)
+    streamtape_result = upload_to_streamtape(file_path, code, title, folder_name, allow_small_files)
     all_results.append(streamtape_result)
     
     total_time = time.time() - start_time
