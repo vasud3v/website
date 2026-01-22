@@ -9,7 +9,7 @@ permissions:
 
 concurrency:
   group: scraper-24-7
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 on:
   schedule:
