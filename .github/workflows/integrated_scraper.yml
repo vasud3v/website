@@ -165,8 +165,10 @@ jobs:
       
       - name: Create directories
         run: |
-          mkdir -p jable/temp_downloads javdatabase/database database
-          [ ! -f database/combined_videos.json ] && echo "[]" > database/combined_videos.json
+          mkdir -p jable/temp_downloads
+          mkdir -p javdatabase/database
+          mkdir -p database
+          [ ! -f database/combined_videos.json ] && echo "[]" > database/combined_videos.json || true
       
       - name: Validate API keys
         continue-on-error: true
