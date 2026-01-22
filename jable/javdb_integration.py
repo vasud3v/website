@@ -52,8 +52,10 @@ def enrich_with_javdb(video_data: dict, headless: bool = True) -> bool:
         return False
     
     try:
-        # Use centralized database path
-        pipeline = IntegratedPipeline(combined_db_path="database/combined_videos.json")
+        # Use centralized database path (absolute path to project root)
+        project_root = Path(__file__).parent.parent
+        combined_db_path = project_root / "database" / "combined_videos.json"
+        pipeline = IntegratedPipeline(combined_db_path=str(combined_db_path))
         
         # Process the video
         result = pipeline.process_video(video_data, headless=headless)

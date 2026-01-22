@@ -18,13 +18,19 @@ from utils import FileLock
 class DiskSpaceManager:
     """Atomic disk space reservation to prevent race conditions"""
     
-    def __init__(self, reservation_file: str = "database/disk_reservations.json"):
+    def __init__(self, reservation_file: str = None):
         """
         Initialize disk space manager
         
         Args:
-            reservation_file: Path to JSON file storing reservations
+            reservation_file: Path to JSON file storing reservations (defaults to project_root/database/disk_reservations.json)
         """
+        if reservation_file is None:
+            # Use absolute path to project root database
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(script_dir)
+            reservation_file = os.path.join(project_root, "database", "disk_reservations.json")
+        
         self.reservation_file = reservation_file
         self.lock_file = reservation_file + ".lock"
         

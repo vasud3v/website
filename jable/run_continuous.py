@@ -519,8 +519,8 @@ def commit_database():
             # Create local backup
             try:
                 import shutil
-                backup_path = f"database/backup_{int(time.time())}.tar.gz"
-                shutil.make_archive(backup_path.replace('.tar.gz', ''), 'gztar', 'database')
+                backup_path = os.path.join(DATABASE_DIR, f"backup_{int(time.time())}.tar.gz")
+                shutil.make_archive(backup_path.replace('.tar.gz', ''), 'gztar', DATABASE_DIR)
                 log(f"   [commit] 💾 Saved local backup: {backup_path}")
             except Exception as e:
                 log(f"   [commit] ⚠️ Could not create backup: {e}")
@@ -1660,7 +1660,7 @@ def process_one_video(scraper, url, num, total):
                     log(f"   {fallback_used or 'Fallback'}: Failed")
                     
                     # Save rate limit info
-                    rate_limit_file = "database/rate_limit.json"
+                    rate_limit_file = os.path.join(DATABASE_DIR, "rate_limit.json")
                     try:
                         import json
                         with open(rate_limit_file, 'w') as f:
@@ -1813,7 +1813,7 @@ def process_one_video(scraper, url, num, total):
                         
                         if success:
                             log(f"✅ JAVDatabase enrichment successful")
-                            log(f"   Combined data saved to database/combined_videos.json")
+                            log(f"   Combined data saved to {os.path.join(DATABASE_DIR, 'combined_videos.json')}")
                         else:
                             log(f"⚠️ JAVDatabase enrichment failed, using Jable data only")
                             
@@ -1922,7 +1922,7 @@ def main():
         return
     
     # Check if we're in a rate limit period
-    rate_limit_file = "database/rate_limit.json"
+    rate_limit_file = os.path.join(DATABASE_DIR, "rate_limit.json")
     if os.path.exists(rate_limit_file):
         try:
             import json
