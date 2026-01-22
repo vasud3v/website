@@ -6,7 +6,10 @@ import json
 import os
 from datetime import datetime
 
-DB_FILE = "database/videos_complete.json"
+# Use absolute path to project root database
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+DB_FILE = os.path.join(PROJECT_ROOT, "database", "videos_complete.json")
 
 def load_database():
     """Load database"""

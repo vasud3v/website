@@ -33,8 +33,14 @@ from merge_single import merge_and_validate
 class IntegratedPipeline:
     """Integrated pipeline for processing single video"""
     
-    def __init__(self, combined_db_path: str = "database/combined_videos.json"):
+    def __init__(self, combined_db_path: str = None):
         """Initialize pipeline with centralized database path"""
+        if combined_db_path is None:
+            # Use absolute path to project root database
+            script_dir = Path(__file__).parent
+            project_root = script_dir.parent
+            combined_db_path = str(project_root / "database" / "combined_videos.json")
+        
         self.combined_db_path = combined_db_path
         self.use_db_manager = DATABASE_MANAGER_AVAILABLE
         

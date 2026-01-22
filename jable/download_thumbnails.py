@@ -6,7 +6,10 @@ import os
 import requests
 from pathlib import Path
 
-THUMBNAIL_DIR = "database/thumbnails"
+# Use absolute path to project root database
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+THUMBNAIL_DIR = os.path.join(PROJECT_ROOT, "database", "thumbnails")
 
 def download_thumbnail(thumbnail_url, video_code):
     """

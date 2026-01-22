@@ -7,7 +7,10 @@ import os
 import json
 import requests
 
-FOLDER_CACHE_FILE = "database/streamwish_folders.json"
+# Use absolute path to project root database
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+FOLDER_CACHE_FILE = os.path.join(PROJECT_ROOT, "database", "streamwish_folders.json")
 PARENT_FOLDER_NAME = "Jable Scrapes"
 
 def load_folder_cache():
