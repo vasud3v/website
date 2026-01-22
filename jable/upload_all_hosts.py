@@ -357,6 +357,7 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
                 if 'limit' in error_msg.lower() or 'quota' in error_msg.lower() or 'exceeded' in error_msg.lower():
                     print(f"[StreamWish] 🚫 UPLOAD LIMIT DETECTED!")
                     print(f"[StreamWish] Error message: {error_msg}")
+                    print(f"[StreamWish] Immediately switching to LuluStream fallback...")
                     
                     # Calculate wait time (StreamWish limits usually reset after 24 hours)
                     wait_seconds = 24 * 3600  # 24 hours default
@@ -371,13 +372,15 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
                         wait_until = time.time() + wait_seconds
                         print(f"[StreamWish] Detected {hours} hour wait period")
                     
+                    # Return immediately - don't retry, switch to LuluStream
                     return {
                         'service': 'StreamWish',
                         'success': False,
                         'error': 'RATE_LIMIT',
                         'error_msg': error_msg,
                         'wait_until': wait_until,
-                        'wait_seconds': wait_seconds
+                        'wait_seconds': wait_seconds,
+                        'skip_retry': True  # Signal to skip retries
                     }
                 
                 if attempt < max_retries - 1:
@@ -534,6 +537,7 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
                 # Check for rate limit in response
                 if 'limit' in upload_response.text.lower() or 'quota' in upload_response.text.lower():
                     print(f"[StreamWish] 🚫 UPLOAD LIMIT DETECTED in response!")
+                    print(f"[StreamWish] Immediately switching to LuluStream fallback...")
                     wait_seconds = 24 * 3600
                     wait_until = time.time() + wait_seconds
                     return {
@@ -542,7 +546,8 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
                         'error': 'RATE_LIMIT',
                         'error_msg': upload_response.text[:200],
                         'wait_until': wait_until,
-                        'wait_seconds': wait_seconds
+                        'wait_seconds': wait_seconds,
+                        'skip_retry': True
                     }
                 
                 if attempt < max_retries - 1:
@@ -560,6 +565,7 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
                 # Check for rate limit in raw response
                 if 'limit' in upload_response.text.lower() or 'quota' in upload_response.text.lower():
                     print(f"[StreamWish] 🚫 UPLOAD LIMIT DETECTED in raw response!")
+                    print(f"[StreamWish] Immediately switching to LuluStream fallback...")
                     wait_seconds = 24 * 3600
                     wait_until = time.time() + wait_seconds
                     return {
@@ -568,7 +574,8 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
                         'error': 'RATE_LIMIT',
                         'error_msg': upload_response.text[:200],
                         'wait_until': wait_until,
-                        'wait_seconds': wait_seconds
+                        'wait_seconds': wait_seconds,
+                        'skip_retry': True
                     }
                 
                 if attempt < max_retries - 1:
@@ -621,15 +628,18 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
                     print(f"[StreamWish] 🚫 DAILY UPLOAD QUOTA EXCEEDED!")
                     print(f"[StreamWish] Status message: {status}")
                     print(f"[StreamWish] The file was uploaded but rejected by StreamWish")
+                    print(f"[StreamWish] Immediately switching to LuluStream fallback...")
                     wait_seconds = 24 * 3600  # 24 hours
                     wait_until = time.time() + wait_seconds
+                    # Return immediately - don't retry, switch to LuluStream
                     return {
                         'service': 'StreamWish',
                         'success': False,
                         'error': 'QUOTA_EXCEEDED',
                         'error_msg': status,
                         'wait_until': wait_until,
-                        'wait_seconds': wait_seconds
+                        'wait_seconds': wait_seconds,
+                        'skip_retry': True  # Signal to skip retries
                     }
             
             if not filecode:
