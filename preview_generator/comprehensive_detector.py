@@ -330,7 +330,7 @@ class ComprehensiveDetector:
         clip_files = extractor.extract_multiple_clips(
             timestamp_tuples,
             resolution=resolution,
-            crf=18,  # MAXIMUM quality for source clips (near-lossless)
+            crf=20,  # High quality for source clips (was 18, faster encoding)
             parallel=True
         )
         
@@ -375,10 +375,10 @@ class ComprehensiveDetector:
             '-safe', '0',
             '-i', concat_file,
             '-c:v', 'libx264',  # Re-encode to ensure compatibility
-            '-preset', 'ultrafast',  # Fast for intermediate file
-            '-crf', '18',  # Maintain quality
+            '-preset', 'fast',  # Fast for intermediate file (was ultrafast)
+            '-crf', '20',  # Maintain quality
             '-c:a', 'aac',
-            '-b:a', '320k',
+            '-b:a', '256k',
             '-y',
             temp_concat
         ]
@@ -405,8 +405,8 @@ class ComprehensiveDetector:
             except:
                 pass
         
-        # Now apply speed filter with MAXIMUM QUALITY re-encoding
-        print(f"[ComprehensiveDetector] Applying {speed}x speed with MAXIMUM quality encoding...")
+        # Now apply speed filter with HIGH QUALITY re-encoding (optimized for CI/CD)
+        print(f"[ComprehensiveDetector] Applying {speed}x speed with high quality encoding...")
         
         cmd = [
             'ffmpeg',
@@ -415,14 +415,14 @@ class ComprehensiveDetector:
             '-map', '[v]',
             '-map', '[a]',
             '-c:v', 'libx264',
-            '-preset', 'veryslow',  # MAXIMUM quality (slowest but best)
-            '-crf', '18',  # NEAR-LOSSLESS quality (18 = visually lossless)
+            '-preset', 'medium',  # Balanced speed/quality (was veryslow)
+            '-crf', '20',  # Excellent quality (was 18, slightly faster)
             '-profile:v', 'high',  # H.264 high profile
             '-level', '4.1',
             '-pix_fmt', 'yuv420p',
             '-movflags', '+faststart',  # Web optimization
             '-c:a', 'aac',
-            '-b:a', '320k',  # Maximum audio bitrate
+            '-b:a', '256k',  # High audio bitrate (was 320k)
             '-ar', '48000',  # 48kHz audio
             '-y',
             output_path
@@ -430,7 +430,7 @@ class ComprehensiveDetector:
         
         try:
             result = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=600)
-            print(f"[ComprehensiveDetector] ✓ Preview created with {speed}x speed and MAXIMUM quality")
+            print(f"[ComprehensiveDetector] ✓ Preview created with {speed}x speed and high quality")
         except subprocess.TimeoutExpired:
             print(f"[ComprehensiveDetector] ✗ Speed filter timeout (>10 min)")
             return {'success': False, 'error': 'Speed filter timeout'}

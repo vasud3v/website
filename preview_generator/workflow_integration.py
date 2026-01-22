@@ -53,7 +53,7 @@ class WorkflowIntegration:
         print("=" * 60)
         print("Strategy: Skip 3min intro → Capture EVERY scene → 1.5x speed")
         print("Dynamic: 1 clip every 80s = MAXIMUM COVERAGE")
-        print("Quality: CRF 18 (near-lossless) + 320k audio")
+        print("Quality: CRF 20 (excellent) + 256k audio")
         print("=" * 60)
         
         result = {
@@ -84,7 +84,7 @@ class WorkflowIntegration:
             print(f"   Analyzing remaining content for EVERY sex scene")
             print(f"   Dynamic clips: Auto-calculated (1 every 80s)")
             print(f"   Speed: 1.5x for optimal preview length")
-            print(f"   Quality: CRF 18 (near-lossless) + 320k audio")
+            print(f"   Quality: CRF 20 (excellent) + 256k audio")
             
             preview_output = os.path.join(self.temp_dir, f"{self.video_code}_preview.mp4")
             gif_output = os.path.join(self.temp_dir, f"{self.video_code}_preview.gif") if create_gif else None
