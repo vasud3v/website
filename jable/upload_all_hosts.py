@@ -1116,7 +1116,7 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
     return {'service': 'StreamWish', 'success': False, 'error': 'All retries failed'}
 
 
-def upload_all(file_path, code, title, video_data=None, allow_small_files=False):
+def upload_all(file_path, code, title, video_data=None, allow_small_files=False, folder_name=None):
     """
     Main upload function - tries all hosting services with automatic fallback
     Priority: StreamWish → LuluStream → Streamtape
@@ -1127,17 +1127,24 @@ def upload_all(file_path, code, title, video_data=None, allow_small_files=False)
         title: Video title
         video_data: Optional video metadata
         allow_small_files: Allow files < 50MB (for previews)
+        folder_name: Optional folder name (default: JAV_VIDEOS/{code})
     """
     print(f"\n╔══════════════════════════════════════════════════════════╗")
     print(f"║         VIDEO UPLOAD (Multi-Host with Fallback)          ║")
     print(f"╚══════════════════════════════════════════════════════════╝")
     
-    # Create nested folder structure: parent_folder/video_code/
-    parent_folder = "JAV_VIDEOS"  # Parent folder name
-    folder_name = f"{parent_folder}/{code}"  # Nested path
+    # Use provided folder_name or create default nested structure
+    if not folder_name:
+        parent_folder = "JAV_VIDEOS"  # Parent folder name
+        folder_name = f"{parent_folder}/{code}"  # Nested path
+    
     print(f"📁 Folder structure: {folder_name}")
-    print(f"   Parent: {parent_folder}")
-    print(f"   Video folder: {code}")
+    if '/' in folder_name:
+        parts = folder_name.split('/')
+        print(f"   Parent: {parts[0]}")
+        print(f"   Video folder: {'/'.join(parts[1:])}")
+    else:
+        print(f"   Folder: {folder_name}")
     
     start_time = time.time()
     all_results = []

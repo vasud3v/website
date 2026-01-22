@@ -36,8 +36,8 @@ COMPLETE_FILE = "videos_complete.json"
 # Note: GitHub Actions has 6-hour timeout, so unlimited may not finish all videos
 MAX_VIDEOS_PER_RUN = int(os.getenv('MAX_VIDEOS', '999999'))  # Effectively unlimited
 
-# Time limit (5 hours 30 minutes to be safe)
-TIME_LIMIT_SECONDS = 5.5 * 3600
+# Time limit (5 hours 15 minutes - 45min gap before workflow timeout)
+TIME_LIMIT_SECONDS = 5.25 * 3600
 
 def log(msg, end='\n'):
     """Simple logging"""
@@ -395,7 +395,16 @@ def main():
                         processed.add(v.get('source_url'))
         
         # Filter unprocessed (check by source_url since code isn't available yet)
-        to_process = [v for v in videos if v.get('source_url') not in processed]
+        # IMPORTANT: Deduplicate to avoid processing same URL multiple times
+        seen_urls = set()
+        to_process = []
+        for v in videos:
+            url = v.get('source_url')
+            if url and url not in processed and url not in seen_urls:
+                to_process.append(v)
+                seen_urls.add(url)
+        
+        log(f"   Filtered: {len(videos)} total → {len(to_process)} unique unprocessed")
         
         if not to_process:
             log("✅ All discovered videos processed!")

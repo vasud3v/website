@@ -48,7 +48,8 @@ class HLSDownloaderV2:
             # Add 10% buffer
             required_with_buffer = required_bytes * 1.1
             return available > required_with_buffer, available, required_with_buffer
-        except:
+        except Exception as e:
+            print(f"   ⚠️ Could not check disk space: {e}")
             return True, 0, 0  # Assume OK if can't check
     
     def get_key(self, key_uri, base_url):
@@ -127,7 +128,8 @@ class HLSDownloaderV2:
                             if fresh_playlist.segments and index < len(fresh_playlist.segments):
                                 fresh_seg = fresh_playlist.segments[index]
                                 url = base_url + fresh_seg.uri if not fresh_seg.uri.startswith('http') else fresh_seg.uri
-                        except:
+                        except Exception as e:
+                            print(f"   ⚠️ URL refresh failed: {e}")
                             pass
                 
                 response = self.session.get(url, timeout=30)
@@ -174,7 +176,8 @@ class HLSDownloaderV2:
                     'total': total_count,
                     'timestamp': time.time()
                 }, f)
-        except:
+        except Exception as e:
+            print(f"   ⚠️ Could not save progress: {e}")
             pass
     
     def load_progress(self, temp_dir):
@@ -184,7 +187,8 @@ class HLSDownloaderV2:
             if os.path.exists(progress_file):
                 with open(progress_file, 'r') as f:
                     return json.load(f)
-        except:
+        except Exception as e:
+            print(f"   ⚠️ Could not load progress: {e}")
             pass
         return None
     

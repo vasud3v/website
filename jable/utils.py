@@ -135,7 +135,8 @@ class FileLock:
                             # Remove stale lock
                             try:
                                 os.remove(self.lockfile)
-                            except:
+                            except Exception as e:
+                                print(f"⚠️ Could not remove stale lock: {e}")
                                 pass
                     
                     if time.time() - start_time > self.timeout:
@@ -176,7 +177,8 @@ class FileLock:
             try:
                 if os.path.exists(self.lockfile):
                     os.remove(self.lockfile)
-            except:
+            except Exception as e:
+                print(f"⚠️ Could not release lock: {e}")
                 pass
         else:
             # Unix: Release fcntl lock
@@ -184,7 +186,8 @@ class FileLock:
                 try:
                     fcntl.flock(self.lock_fd.fileno(), fcntl.LOCK_UN)
                     self.lock_fd.close()
-                except:
+                except Exception as e:
+                    print(f"⚠️ Could not release fcntl lock: {e}")
                     pass
                 finally:
                     self.lock_fd = None
@@ -192,7 +195,8 @@ class FileLock:
                 # Remove lock file
                 try:
                     os.remove(self.lockfile)
-                except:
+                except Exception as e:
+                    print(f"⚠️ Could not remove lock file: {e}")
                     pass
     
     def __enter__(self):
@@ -230,7 +234,8 @@ def load_json_safe(filepath, default=None):
             try:
                 with open(backup, 'r', encoding='utf-8') as f:
                     return json.load(f)
-            except:
+            except Exception as backup_error:
+                print(f"⚠️ Backup also failed: {backup_error}")
                 pass
     except Exception as e:
         print(f"⚠️ Error loading {filepath}: {e}")
@@ -265,7 +270,8 @@ def save_json_safe(filepath, data, use_lock=True):
                 backup = filepath + '.backup'
                 try:
                     shutil.copy2(filepath, backup)
-                except:
+                except Exception as backup_error:
+                    print(f"⚠️ Could not create backup: {backup_error}")
                     pass
             
             # Write to temp file first (atomic write)
@@ -291,7 +297,8 @@ def save_json_safe(filepath, data, use_lock=True):
         if os.path.exists(temp_file):
             try:
                 os.remove(temp_file)
-            except:
+            except Exception as cleanup_error:
+                print(f"⚠️ Could not remove temp file: {cleanup_error}")
                 pass
         return False
 
@@ -465,5 +472,6 @@ def remove_process_lock(lock_file):
     try:
         if lock_file and os.path.exists(lock_file):
             os.remove(lock_file)
-    except:
+    except Exception as e:
+        print(f"⚠️ Could not remove lock file: {e}")
         pass

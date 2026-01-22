@@ -1,6 +1,7 @@
 """
 Integrated pipeline to be called from Jable scraper
 Handles JAVDatabase scraping + merging + saving for single video
+Uses centralized database manager in root/database folder
 """
 
 import json
@@ -13,7 +14,17 @@ from datetime import datetime
 from typing import Optional
 
 # Add parent directory to path for imports
+parent_path = Path(__file__).parent.parent
+sys.path.insert(0, str(parent_path))
 sys.path.insert(0, str(Path(__file__).parent))
+
+# Import centralized database manager
+try:
+    from database_manager import db_manager
+    DATABASE_MANAGER_AVAILABLE = True
+except ImportError:
+    DATABASE_MANAGER_AVAILABLE = False
+    print("⚠️ Database manager not available, using legacy database handling")
 
 from scrape_single import scrape_single_video
 from merge_single import merge_and_validate
@@ -22,131 +33,80 @@ from merge_single import merge_and_validate
 class IntegratedPipeline:
     """Integrated pipeline for processing single video"""
     
-    def __init__(self, combined_db_path: str = "../database/combined_videos.json"):
+    def __init__(self, combined_db_path: str = "database/combined_videos.json"):
+        """Initialize pipeline with centralized database path"""
         self.combined_db_path = combined_db_path
-        self.error_log_path = "database/errors.json"
-        self.stats_path = "database/stats.json"
+        self.use_db_manager = DATABASE_MANAGER_AVAILABLE
         
-        # Ensure directories exist
-        Path(self.combined_db_path).parent.mkdir(parents=True, exist_ok=True)
-        Path(self.error_log_path).parent.mkdir(parents=True, exist_ok=True)
+        if not self.use_db_manager:
+            # Legacy: Ensure directories exist
+            Path(self.combined_db_path).parent.mkdir(parents=True, exist_ok=True)
+        else:
+            print("✓ Using centralized database manager")
     
     def load_combined_database(self) -> list:
-        """Load existing combined database with error handling"""
+        """Load existing combined database"""
+        if self.use_db_manager:
+            return db_manager.get_all_videos()
+        
+        # Legacy fallback
         try:
             if os.path.exists(self.combined_db_path):
                 with open(self.combined_db_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     if isinstance(data, list):
                         return data
-                    print(f"⚠️ Invalid database format, starting fresh")
-                    # Backup corrupted file
-                    backup_path = f"{self.combined_db_path}.backup.{int(time.time())}"
-                    shutil.copy(self.combined_db_path, backup_path)
-                    print(f"  Backed up to: {backup_path}")
-            return []
-        except json.JSONDecodeError as e:
-            print(f"⚠️ JSON decode error: {e}")
-            # Backup corrupted file
-            if os.path.exists(self.combined_db_path):
-                backup_path = f"{self.combined_db_path}.backup.{int(time.time())}"
-                shutil.copy(self.combined_db_path, backup_path)
-                print(f"  Backed up corrupted file to: {backup_path}")
             return []
         except Exception as e:
             print(f"⚠️ Error loading database: {e}")
             return []
     
     def save_combined_database(self, data: list) -> bool:
-        """Save combined database with atomic write and file locking"""
+        """Save combined database"""
+        if self.use_db_manager:
+            # With database manager, we save individual videos
+            # This method is not used directly
+            return True
+        
+        # Legacy fallback
         try:
-            # Write to temporary file first
             temp_path = f"{self.combined_db_path}.tmp"
+            with open(temp_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
             
-            # Use file locking to prevent race conditions (cross-platform)
-            lock_path = f"{self.combined_db_path}.lock"
-            lock_file = None
+            if os.path.exists(self.combined_db_path):
+                backup_path = f"{self.combined_db_path}.bak"
+                shutil.copy(self.combined_db_path, backup_path)
             
-            try:
-                # Acquire lock (simple file-based lock for cross-platform compatibility)
-                max_wait = 30  # seconds
-                wait_time = 0
-                while os.path.exists(lock_path) and wait_time < max_wait:
-                    time.sleep(0.1)
-                    wait_time += 0.1
-                
-                if wait_time >= max_wait:
-                    print(f"⚠️ Lock timeout, proceeding anyway...")
-                
-                # Create lock file
-                lock_file = open(lock_path, 'w')
-                lock_file.write(str(os.getpid()))
-                lock_file.flush()
-                
-                # Write data
-                with open(temp_path, 'w', encoding='utf-8') as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
-                
-                # Backup existing file
-                if os.path.exists(self.combined_db_path):
-                    backup_path = f"{self.combined_db_path}.bak"
-                    shutil.copy(self.combined_db_path, backup_path)
-                
-                # Atomic rename
-                shutil.move(temp_path, self.combined_db_path)
-                
-                return True
-                
-            finally:
-                # Release lock
-                if lock_file:
-                    lock_file.close()
-                    try:
-                        os.remove(lock_path)
-                    except:
-                        pass
-            
+            shutil.move(temp_path, self.combined_db_path)
+            return True
         except Exception as e:
             print(f"❌ Error saving database: {e}")
             return False
     
     def is_already_processed(self, video_code: str) -> bool:
         """Check if video already exists in combined database"""
+        if self.use_db_manager:
+            return db_manager.is_processed(code=video_code)
+        
+        # Legacy fallback
         existing = self.load_combined_database()
         return any(v.get("code") == video_code.upper() for v in existing)
     
     def log_error(self, video_code: str, error: str, error_type: str = "unknown"):
-        """Log error to error file"""
-        try:
-            errors = []
-            if os.path.exists(self.error_log_path):
-                with open(self.error_log_path, 'r', encoding='utf-8') as f:
-                    errors = json.load(f)
-            
-            errors.append({
-                "code": video_code,
-                "error": error,
-                "error_type": error_type,
-                "timestamp": datetime.now().isoformat()
-            })
-            
-            with open(self.error_log_path, 'w', encoding='utf-8') as f:
-                json.dump(errors, f, indent=2, ensure_ascii=False)
-                
-        except Exception as e:
-            print(f"⚠️ Could not log error: {e}")
+        """Log error"""
+        if self.use_db_manager:
+            db_manager.mark_as_failed(code=video_code, error=error)
+        else:
+            # Legacy error logging
+            print(f"❌ Error for {video_code}: {error}")
     
     def update_stats(self, success: bool, javdb_available: bool):
         """Update processing statistics"""
-        try:
-            stats = {
-                "total_processed": 0,
-                "successful": 0,
-                "failed": 0,
-                "javdb_available": 0,
-                "javdb_unavailable": 0,
-                "last_updated": None
-            }
+        if self.use_db_manager:
+            db_manager.update_stats()
+            db_manager.update_progress()
+        # Legacy stats handling removed
             
             if os.path.exists(self.stats_path):
                 with open(self.stats_path, 'r', encoding='utf-8') as f:

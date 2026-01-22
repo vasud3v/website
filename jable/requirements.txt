@@ -9,3 +9,5 @@ requests-toolbelt
 urllib3
 pykakasi
 numpy
+filelock
+psutil

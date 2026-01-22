@@ -2,6 +2,7 @@
 """
 Continuous Video Scraper - Complete Workflow Per Video
 For each video: Scrape metadata → Download → Upload → Get embed URLs → Save → Delete → Next
+Uses centralized database manager for all data operations
 """
 import os
 import sys
@@ -11,6 +12,9 @@ from datetime import datetime
 print("=" * 60)
 print("CONTINUOUS SCRAPER STARTING...")
 print("=" * 60)
+
+# Add parent directory to path for database_manager
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Load environment
 if os.path.exists('.env'):
@@ -23,11 +27,23 @@ from jable_scraper import JableScraper
 from download_with_decrypt_v2 import HLSDownloaderV2 as HLSDownloader
 from upload_all_hosts import upload_all
 from auto_download import convert_to_mp4
-from utils import sanitize_filename, load_json_safe, save_json_safe, check_disk_space, verify_video_file, cleanup_temp_files, normalize_url, create_process_lock, remove_process_lock
+from utils import sanitize_filename, check_disk_space, verify_video_file, cleanup_temp_files, create_process_lock, remove_process_lock
+from disk_space_manager import disk_manager
 from download_thumbnails import download_thumbnail
 from upload_thumbnail import upload_thumbnail_to_streamwish
 from set_streamwish_thumbnail import set_streamwish_thumbnail
 from set_thumbnail_advanced import set_streamwish_thumbnail_advanced
+
+# Import centralized database manager
+try:
+    from database_manager import db_manager
+    DATABASE_MANAGER_AVAILABLE = True
+    print("✓ Using centralized database manager")
+except ImportError as e:
+    DATABASE_MANAGER_AVAILABLE = False
+    print(f"⚠️ Database manager not available: {e}")
+    print("⚠️ Falling back to legacy database handling")
+    from utils import load_json_safe, save_json_safe, normalize_url
 
 # Import advanced preview generation
 try:
@@ -59,19 +75,364 @@ except ImportError as e:
     print(f"⚠️ JAVDatabase integration not available: {e}")
 
 TEMP_DIR = "temp_downloads"
-DB_FILE = "database/videos_complete.json"
-FAILED_DB_FILE = "database/videos_failed.json"
-TIME_LIMIT = 5.5 * 3600
+# Use centralized database if available
+if DATABASE_MANAGER_AVAILABLE:
+    DB_FILE = None  # Not used with database manager
+    FAILED_DB_FILE = None  # Not used with database manager
+else:
+    # Legacy fallback
+    DB_FILE = "database/videos_complete.json"
+    FAILED_DB_FILE = "database/videos_failed.json"
+    
+TIME_LIMIT = 5.25 * 3600  # 5h 15m (315 minutes) - 45min gap before workflow timeout
 MAX_RETRIES = 3
 
 os.makedirs("database", exist_ok=True)
 os.makedirs(TEMP_DIR, exist_ok=True)
 
+class CleanupManager:
+    """Manage cleanup on normal exit and crashes"""
+    
+    def __init__(self, temp_dir: str):
+        """
+        Initialize cleanup manager
+        
+        Args:
+            temp_dir: Temporary directory path
+        """
+        import signal
+        import atexit
+        
+        self.temp_dir = temp_dir
+        self.current_video_code = None
+        self.browser = None
+        
+        # Register cleanup handlers
+        atexit.register(self.cleanup_all)
+        signal.signal(signal.SIGTERM, self.signal_handler)
+        signal.signal(signal.SIGINT, self.signal_handler)
+    
+    def signal_handler(self, signum, frame):
+        """Handle termination signals"""
+        log(f"⚠️ Received signal {signum}, cleaning up...")
+        self.cleanup_all()
+        sys.exit(1)
+    
+    def set_current_video(self, video_code: str):
+        """Set current video being processed"""
+        self.current_video_code = video_code
+    
+    def set_browser(self, browser):
+        """Set browser instance for cleanup"""
+        self.browser = browser
+    
+    def cleanup_all(self):
+        """Clean up all resources"""
+        # Close browser
+        if self.browser:
+            try:
+                self.browser.quit()
+                log("✓ Browser closed")
+            except:
+                pass
+        
+        # Clean up current video
+        if self.current_video_code:
+            cleanup_temp_files(self.current_video_code, self.temp_dir)
+            disk_manager.release_space(self.current_video_code)
+        
+        # Clean up orphaned files
+        self.cleanup_orphaned_files()
+    
+    def cleanup_orphaned_files(self):
+        """Remove orphaned temp files and segment folders"""
+        try:
+            # Remove old temp files (older than 2 hours)
+            cutoff_time = time.time() - (2 * 3600)
+            
+            if not os.path.exists(self.temp_dir):
+                return
+            
+            for item in os.listdir(self.temp_dir):
+                item_path = os.path.join(self.temp_dir, item)
+                
+                try:
+                    # Check modification time
+                    if os.path.getmtime(item_path) < cutoff_time:
+                        if os.path.isfile(item_path):
+                            os.remove(item_path)
+                            log(f"🗑️ Removed orphaned file: {item}")
+                        elif os.path.isdir(item_path):
+                            import shutil
+                            shutil.rmtree(item_path)
+                            log(f"🗑️ Removed orphaned directory: {item}")
+                except Exception as e:
+                    log(f"⚠️ Could not remove {item}: {e}")
+            
+            # Remove segment folders matching pattern
+            for item in os.listdir(self.temp_dir):
+                if item.endswith('_segments'):
+                    segment_path = os.path.join(self.temp_dir, item)
+                    try:
+                        import shutil
+                        shutil.rmtree(segment_path)
+                        log(f"🗑️ Removed segment folder: {item}")
+                    except Exception as e:
+                        log(f"⚠️ Could not remove segment folder: {e}")
+                        
+        except Exception as e:
+            log(f"⚠️ Cleanup error: {e}")
+
+class BrowserManager:
+    """Manage browser lifecycle to prevent memory leaks"""
+    
+    def __init__(self, restart_interval: int = 5):
+        """
+        Initialize browser manager
+        
+        Args:
+            restart_interval: Number of videos to process before restarting browser
+        """
+        self.scraper = None
+        self.videos_processed = 0
+        self.restart_interval = restart_interval
+    
+    def get_scraper(self):
+        """Get scraper, creating or restarting as needed"""
+        if self.scraper is None:
+            self._create_scraper()
+        elif self.videos_processed >= self.restart_interval:
+            log(f"🔄 Restarting browser after {self.videos_processed} videos")
+            self.close()
+            self._create_scraper()
+        
+        return self.scraper
+    
+    def _create_scraper(self):
+        """Create new scraper instance"""
+        try:
+            # Kill any orphaned browser processes first
+            self._kill_orphaned_browsers()
+            
+            from jable_scraper import JableScraper
+            self.scraper = JableScraper(headless=True)
+            self.videos_processed = 0
+            log("✅ Browser started")
+        except Exception as e:
+            log(f"❌ Failed to create browser: {e}")
+            raise
+    
+    def _kill_orphaned_browsers(self):
+        """Kill any orphaned browser processes"""
+        try:
+            import psutil
+            
+            # Look for chrome/chromium processes
+            killed = 0
+            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+                try:
+                    name = proc.info['name'].lower()
+                    cmdline = ' '.join(proc.info['cmdline'] or []).lower()
+                    
+                    # Check if it's a browser process related to selenium
+                    if ('chrome' in name or 'chromium' in name) and ('--test-type' in cmdline or '--headless' in cmdline):
+                        proc.kill()
+                        killed += 1
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+            
+            if killed > 0:
+                log(f"🗑️ Killed {killed} orphaned browser processes")
+        except ImportError:
+            # psutil not available, skip
+            pass
+        except Exception as e:
+            log(f"⚠️ Could not kill orphaned browsers: {e}")
+    
+    def close(self):
+        """Close browser and verify process termination"""
+        if self.scraper:
+            try:
+                # Close browser
+                self.scraper.close()
+                
+                # Verify process is dead
+                if hasattr(self.scraper, 'driver') and self.scraper.driver:
+                    try:
+                        import psutil
+                        pid = self.scraper.driver.service.process.pid
+                        
+                        # Wait for process to die
+                        for _ in range(10):
+                            if not psutil.pid_exists(pid):
+                                break
+                            time.sleep(0.5)
+                        
+                        # Force kill if still alive
+                        if psutil.pid_exists(pid):
+                            import os
+                            import signal
+                            os.kill(pid, signal.SIGKILL)
+                            log("⚠️ Force killed browser process")
+                    except ImportError:
+                        # psutil not available, just wait a bit
+                        time.sleep(2)
+                    except Exception as e:
+                        log(f"⚠️ Could not verify browser termination: {e}")
+                
+                log("✓ Browser closed")
+            except Exception as e:
+                log(f"⚠️ Browser close error: {e}")
+            finally:
+                self.scraper = None
+    
+    def increment_counter(self):
+        """Increment videos processed counter"""
+        self.videos_processed += 1
+    
+    def __del__(self):
+        """Cleanup on deletion"""
+        self.close()
+
+class DiscoveryBackoff:
+    """Exponential backoff for discovery failures"""
+    
+    def __init__(self):
+        self.failure_count = 0
+        self.max_failures = 10
+        self.backoff_schedule = {
+            3: 60,    # After 3 failures: wait 60s
+            5: 300,   # After 5 failures: wait 5min
+            7: 900,   # After 7 failures: wait 15min
+            10: None  # After 10 failures: exit
+        }
+    
+    def record_failure(self) -> bool:
+        """
+        Record a discovery failure.
+        Returns True if should continue, False if should exit.
+        """
+        self.failure_count += 1
+        log(f"⚠️ Discovery failure #{self.failure_count}")
+        
+        # Check if should exit
+        if self.failure_count >= self.max_failures:
+            log(f"❌ Too many discovery failures ({self.failure_count}), exiting")
+            return False
+        
+        # Check if should wait
+        for threshold, wait_time in self.backoff_schedule.items():
+            if self.failure_count == threshold and wait_time:
+                log(f"⏳ Waiting {wait_time}s before retry...")
+                time.sleep(wait_time)
+                break
+        
+        return True
+    
+    def record_success(self):
+        """Record a successful discovery (reset counter)"""
+        if self.failure_count > 0:
+            log(f"✅ Discovery recovered after {self.failure_count} failures")
+        self.failure_count = 0
+
+class JAVDatabaseClient:
+    """JAVDatabase client with availability tracking"""
+    
+    def __init__(self):
+        self.consecutive_failures = 0
+        self.max_failures_before_skip = 5
+        self.is_available = True
+    
+    def enrich_video(self, jable_data: dict, max_retries: int = 2) -> bool:
+        """
+        Enrich video with JAVDatabase data.
+        Returns True if successful, False otherwise.
+        """
+        # Skip if consistently failing
+        if not self.is_available:
+            log("⏭️ Skipping JAVDatabase (marked unavailable)")
+            return False
+        
+        # Check if JAVDatabase integration is available
+        if not JAVDB_INTEGRATION_AVAILABLE:
+            log("⏭️ JAVDatabase integration not available")
+            return False
+        
+        for attempt in range(1, max_retries + 1):
+            try:
+                success = enrich_with_javdb(jable_data, headless=True)
+                
+                if success:
+                    self.consecutive_failures = 0
+                    log(f"✅ JAVDatabase enrichment successful")
+                    return True
+                else:
+                    log(f"⚠️ JAVDatabase enrichment failed (attempt {attempt}/{max_retries})")
+                    
+                    if attempt < max_retries:
+                        wait_time = 2 ** attempt
+                        time.sleep(wait_time)
+                    
+            except Exception as e:
+                log(f"❌ JAVDatabase error (attempt {attempt}/{max_retries}): {e}")
+                
+                if attempt < max_retries:
+                    wait_time = 2 ** attempt
+                    time.sleep(wait_time)
+        
+        # All retries failed
+        self.consecutive_failures += 1
+        log(f"⚠️ JAVDatabase consecutive failures: {self.consecutive_failures}")
+        
+        # Mark as unavailable if too many failures
+        if self.consecutive_failures >= self.max_failures_before_skip:
+            self.is_available = False
+            log(f"❌ JAVDatabase marked unavailable after {self.consecutive_failures} failures")
+        
+        return False
+
+def mask_credentials(text: str) -> str:
+    """Mask sensitive credentials in log output"""
+    # Get tokens from environment
+    github_token = os.getenv('GITHUB_TOKEN', '')
+    streamwish_key = os.getenv('STREAMWISH_API_KEY', '')
+    lulustream_key = os.getenv('LULUSTREAM_API_KEY', '')
+    streamtape_key = os.getenv('STREAMTAPE_API_KEY', '')
+    
+    # Mask each token
+    for token in [github_token, streamwish_key, lulustream_key, streamtape_key]:
+        if token and len(token) > 8:
+            text = text.replace(token, '***TOKEN***')
+    
+    # Mask common patterns
+    import re
+    
+    # Mask URLs with tokens: https://TOKEN@github.com
+    text = re.sub(r'https://[^@\s]+@github\.com', 'https://***TOKEN***@github.com', text)
+    
+    # Mask API keys in URLs: ?key=TOKEN
+    text = re.sub(r'[?&]key=[^&\s]+', '?key=***TOKEN***', text)
+    
+    # Mask API keys in URLs: &api_key=TOKEN
+    text = re.sub(r'[?&]api_key=[^&\s]+', '&api_key=***TOKEN***', text)
+    
+    return text
+
 def log(msg):
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
+    """Log with credential masking"""
+    masked_msg = mask_credentials(str(msg))
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {masked_msg}", flush=True)
 
 def initialize_database():
     """Initialize database files if they don't exist - Creates empty databases"""
+    if DATABASE_MANAGER_AVAILABLE:
+        # Database manager handles initialization
+        log("✓ Using centralized database manager")
+        db_manager.ensure_structure()
+        db_manager.print_status()
+        return
+    
+    # Legacy initialization
     import json
     
     # Ensure database directory exists
@@ -130,6 +491,37 @@ def initialize_database():
     log("   Database will be populated as videos are scraped with full metadata")
 
 def commit_database():
+    """Commit and push database after each video - Enhanced with retry logic"""
+    max_retries = 3
+    
+    for attempt in range(1, max_retries + 1):
+        log(f"   [commit] Attempt {attempt}/{max_retries}")
+        
+        result = _commit_database_attempt()
+        
+        if result:
+            log(f"   [commit] ✅ Commit and push successful on attempt {attempt}")
+            return True
+        
+        if attempt < max_retries:
+            wait_time = 2 ** attempt  # Exponential backoff: 2, 4, 8 seconds
+            log(f"   [commit] ⚠️ Attempt {attempt} failed, retrying in {wait_time}s...")
+            time.sleep(wait_time)
+        else:
+            log(f"   [commit] ❌ All {max_retries} attempts failed")
+            # Create local backup
+            try:
+                import shutil
+                backup_path = f"database/backup_{int(time.time())}.tar.gz"
+                shutil.make_archive(backup_path.replace('.tar.gz', ''), 'gztar', 'database')
+                log(f"   [commit] 💾 Saved local backup: {backup_path}")
+            except Exception as e:
+                log(f"   [commit] ⚠️ Could not create backup: {e}")
+            return False
+    
+    return False
+
+def _commit_database_attempt():
     """Commit and push database after each video - Enhanced with better diagnostics"""
     try:
         import subprocess
@@ -196,9 +588,11 @@ def commit_database():
         
         # Check which files actually exist and have changes
         files_to_add = [
-            'database/videos_complete.json',
-            'database/videos_failed.json',
-            'database/streamwish_folders.json'
+            'database/combined_videos.json',
+            'database/progress_tracking.json',
+            'database/failed_videos.json',
+            'database/hosting_status.json',
+            'database/stats.json'
         ]
         added_files = []
         
@@ -350,6 +744,21 @@ def commit_database():
                 log(f"   [commit]   Error output:")
                 for line in result.stderr.strip().split('\n'):
                     log(f"   [commit]     {line}")
+                
+                # Check if it's a conflict/non-fast-forward
+                error_text = result.stderr.lower()
+                if "rejected" in error_text or "non-fast-forward" in error_text or "conflict" in error_text:
+                    log(f"   [commit] 🔄 Conflict detected, will retry with pull-rebase")
+                    # Pull with rebase to resolve conflicts
+                    try:
+                        pull_result = subprocess.run(['git', 'pull', '--rebase', 'origin', current_branch],
+                                                    capture_output=True, text=True, timeout=60)
+                        if pull_result.returncode == 0:
+                            log(f"   [commit] ✓ Pull-rebase successful, retry will attempt push")
+                        else:
+                            log(f"   [commit] ⚠️ Pull-rebase failed: {pull_result.stderr}")
+                    except Exception as e:
+                        log(f"   [commit] ⚠️ Pull-rebase exception: {e}")
             
             if result.stdout:
                 log(f"   [commit]   Standard output:")
@@ -383,17 +792,6 @@ def commit_database():
             if result.stdout:
                 log(f"   [commit]   Branch status: {result.stdout.strip()}")
             
-            # If in GitHub Actions and push failed, try force push (last resort)
-            if is_github_actions:
-                log(f"   [commit] Attempting force push (GitHub Actions only)...")
-                result = subprocess.run(['git', 'push', '--force', 'origin', current_branch], 
-                                       capture_output=True, text=True, timeout=120)
-                if result.returncode == 0:
-                    log(f"   [commit] ✅ Force push successful!")
-                    return True
-                else:
-                    log(f"   [commit] ❌ Force push also failed: {result.stderr}")
-            
             return False
             
     except subprocess.TimeoutExpired as e:
@@ -410,6 +808,10 @@ def commit_database():
 
 def is_processed(url):
     """Check if video already processed successfully"""
+    if DATABASE_MANAGER_AVAILABLE:
+        return db_manager.is_processed(url=url)
+    
+    # Legacy fallback
     try:
         normalized_url = normalize_url(url)
         videos = load_json_safe(DB_FILE, [])
@@ -434,24 +836,36 @@ def is_processed(url):
                     hosting = v.get('hosting', {})
                     if hosting and len(hosting) > 0:
                         return True
-    except:
+    except Exception as e:
+        log(f"⚠️ Error checking if processed: {e}")
         pass
     return False
 
 def get_retry_count(url):
     """Get number of times this video has been retried"""
+    if DATABASE_MANAGER_AVAILABLE:
+        return db_manager.get_failed_count(url=url)
+    
+    # Legacy fallback
     try:
         normalized_url = normalize_url(url)
         failed_videos = load_json_safe(FAILED_DB_FILE, [])
         for v in failed_videos:
             if normalize_url(v.get('source_url', '')) == normalized_url:
                 return v.get('retry_count', 0)
-    except:
+    except Exception as e:
+        log(f"⚠️ Error getting retry count: {e}")
         pass
     return 0
 
 def mark_as_failed(url, error_msg):
     """Mark video as failed with retry count"""
+    if DATABASE_MANAGER_AVAILABLE:
+        retry_count = db_manager.get_failed_count(url=url)
+        db_manager.mark_as_failed(url=url, error=error_msg, retry_count=retry_count)
+        return
+    
+    # Legacy fallback
     try:
         normalized_url = normalize_url(url)
         failed_videos = load_json_safe(FAILED_DB_FILE, [])
@@ -479,20 +893,172 @@ def mark_as_failed(url, error_msg):
         log(f"⚠️ Could not mark as failed: {e}")
 
 def save_video(video_data, upload_results, thumbnail_hosted_url=None, preview_result=None):
-    """Save complete video metadata with embed URLs - Enhanced version with detailed logging"""
+    """Save complete video metadata with embed URLs - Uses centralized database manager"""
     try:
         log(f"   [save_video] ========== SAVE VIDEO START ==========")
         log(f"   [save_video] Video code: {video_data.code}")
         log(f"   [save_video] Video title: {video_data.title}")
         
-        # Ensure database directory exists (if DB_FILE has a directory)
+        # Build comprehensive entry with all metadata
+        entry = {
+            # Basic info
+            'code': video_data.code,
+            'title': video_data.title,
+            'source_url': video_data.source_url,
+            
+            # Media info
+            'thumbnail_url': thumbnail_hosted_url or video_data.thumbnail_url,
+            'thumbnail_original': video_data.thumbnail_url,
+            'duration': video_data.duration,
+            'hd_quality': video_data.hd_quality if hasattr(video_data, 'hd_quality') else False,
+            
+            # Stats
+            'views': video_data.views,
+            'likes': video_data.likes,
+            
+            # Dates
+            'release_date': video_data.release_date,
+            'upload_time': video_data.upload_time if hasattr(video_data, 'upload_time') else '',
+            'processed_at': datetime.now().isoformat(),
+            
+            # Categories and tags
+            'categories': video_data.categories if video_data.categories else [],
+            'models': video_data.models if video_data.models else [],
+            'tags': video_data.tags if video_data.tags else [],
+            
+            # Preview images
+            'preview_images': video_data.preview_images if hasattr(video_data, 'preview_images') else [],
+            
+            # Preview video (if generated)
+            'preview_video_url': preview_result.get('preview_video_url') if preview_result and preview_result.get('success') else None,
+            'preview_gif_url': preview_result.get('preview_gif_url') if preview_result and preview_result.get('success') else None,
+            'preview_duration': preview_result.get('preview_duration', 0) if preview_result and preview_result.get('success') else 0,
+            'preview_clips': preview_result.get('num_clips', 0) if preview_result and preview_result.get('success') else 0,
+            'preview_file_size_mb': preview_result.get('preview_file_size_mb', 0) if preview_result and preview_result.get('success') else 0,
+            'preview_generated': preview_result.get('success', False) if preview_result else False,
+            
+            # Hosting info
+            'hosting': {},
+            
+            # Processing metadata
+            'file_size': None,
+            'upload_folder': None
+        }
+        
+        log(f"   [save_video] Built entry with {len(entry)} fields")
+        
+        # Validate upload_results structure
+        if not upload_results or not isinstance(upload_results, dict):
+            log(f"   [save_video] ❌ ERROR: Invalid upload_results!")
+            return False
+        
+        successful_uploads = upload_results.get('successful', [])
+        log(f"   [save_video] Processing {len(successful_uploads)} successful uploads")
+        
+        if len(successful_uploads) == 0:
+            log(f"   [save_video] ❌ ERROR: No successful uploads!")
+            return False
+        
+        # Add embed URLs from uploads
+        for idx, result in enumerate(successful_uploads):
+            service = result.get('service', 'unknown').lower()
+            embed_url = result.get('embed_url', '')
+            watch_url = result.get('watch_url', '')
+            filecode = result.get('filecode', '')
+            download_url = result.get('download_url', '')
+            direct_url = result.get('direct_url', '')
+            api_url = result.get('api_url', '')
+            
+            log(f"   [save_video] Upload {idx+1}: {service}")
+            log(f"   [save_video]   Embed URL: {embed_url}")
+            
+            entry['hosting'][service] = {
+                'embed_url': embed_url,
+                'watch_url': watch_url,
+                'download_url': download_url,
+                'direct_url': direct_url,
+                'api_url': api_url,
+                'filecode': filecode,
+                'upload_time': result.get('time', 0),
+                'uploaded_at': datetime.now().isoformat()
+            }
+            
+            # Store file size if available
+            if 'file_size' in result and not entry['file_size']:
+                entry['file_size'] = result['file_size']
+            
+            # Store folder name if available
+            if 'folder' in result and not entry['upload_folder']:
+                entry['upload_folder'] = result['folder']
+        
+        log(f"   [save_video] Entry now has {len(entry['hosting'])} hosting services")
+        
+        # Validate entry has required fields
+        if not entry['code'] or not entry['hosting']:
+            log(f"   [save_video] ❌ ERROR: Missing required fields!")
+            return False
+        
+        log(f"   [save_video] ✓ Entry validation passed")
+        
+        # Use database manager if available
+        if DATABASE_MANAGER_AVAILABLE:
+            log(f"   [save_video] Using centralized database manager")
+            result = db_manager.add_or_update_video(entry)
+            log(f"   [save_video] Database manager result: {result}")
+            
+            if result:
+                log(f"   [save_video] ✅ Saved to centralized database")
+                # Show stats
+                progress = db_manager.get_progress()
+                log(f"   [save_video] Total videos in database: {progress.get('total_videos', 0)}")
+                log(f"   [save_video] Total processed: {progress.get('total_processed', 0)}")
+            
+            log(f"   [save_video] ========== SAVE VIDEO END ==========")
+            return result
+        
+        # Legacy fallback (should not be used)
+        log(f"   [save_video] ⚠️ Using legacy database handling")
+        
+        # Ensure database directory exists
         db_dir = os.path.dirname(DB_FILE)
         if db_dir and not os.path.exists(db_dir):
             os.makedirs(db_dir, exist_ok=True)
-            log(f"   [save_video] Created directory: {db_dir}")
         
-        log(f"   [save_video] Loading existing database from {DB_FILE}")
         videos = load_json_safe(DB_FILE, [])
+        
+        # Update or append
+        found = False
+        for i, v in enumerate(videos):
+            if v.get('code') == entry['code']:
+                videos[i] = entry
+                found = True
+                break
+        
+        if not found:
+            videos.append(entry)
+        
+        # Sort and deduplicate
+        videos.sort(key=lambda x: x.get('processed_at', ''), reverse=True)
+        seen_codes = set()
+        unique_videos = []
+        for video in videos:
+            code = video.get('code')
+            if code and code not in seen_codes:
+                seen_codes.add(code)
+                unique_videos.append(video)
+        
+        result = save_json_safe(DB_FILE, unique_videos, use_lock=True)
+        log(f"   [save_video] ========== SAVE VIDEO END ==========")
+        return result
+        
+    except Exception as e:
+        log(f"   [save_video] ❌ EXCEPTION in save_video: {e}")
+        import traceback
+        log(f"   [save_video] Traceback:")
+        for line in traceback.format_exc().split('\n'):
+            if line:
+                log(f"   [save_video]   {line}")
+        return False
         log(f"   [save_video] Current database has {len(videos)} videos")
         
         # Build comprehensive entry with all metadata
@@ -718,6 +1284,12 @@ def process_one_video(scraper, url, num, total):
     error_msg = ""
     thumbnail_path = None  # Track thumbnail path
     
+    def cleanup_and_release(video_code):
+        """Helper to cleanup temp files and release disk reservation"""
+        if video_code:
+            cleanup_temp_files(video_code, TEMP_DIR)
+            disk_manager.release_space(video_code)
+    
     try:
         # Check retry count
         retry_count = get_retry_count(url)
@@ -752,6 +1324,14 @@ def process_one_video(scraper, url, num, total):
             mark_as_failed(url, error_msg)
             return False
         
+        # Reserve disk space atomically (estimate 3GB for download)
+        estimated_size_gb = 3.0
+        if not disk_manager.reserve_space(estimated_size_gb, code):
+            error_msg = f"Could not reserve {estimated_size_gb}GB disk space"
+            log(f"❌ {error_msg}")
+            mark_as_failed(url, error_msg)
+            return False
+        
         # STEP 2: Download video with browser restart on high failure rate
         log("\n📥 Step 2: Downloading video...")
         ts_file = f"{TEMP_DIR}/{code}.ts"
@@ -771,7 +1351,8 @@ def process_one_video(scraper, url, num, total):
                     try:
                         os.remove(ts_file)
                         log(f"   🗑️ Removed partial download")
-                    except:
+                    except Exception as e:
+                        log(f"   ⚠️ Could not remove partial download: {e}")
                         pass
                 
                 downloader = HLSDownloader(8)  # 8 workers for stability
@@ -808,6 +1389,8 @@ def process_one_video(scraper, url, num, total):
                             log(f"   ✅ Browser restarted - starting fresh download")
                         except Exception as e:
                             log(f"   ⚠️ Browser restart warning: {e}")
+                            # Don't pass here - we need to know if browser restart failed
+                            raise
                         
                         # Wait a bit more before retry
                         time.sleep(5)
@@ -830,7 +1413,8 @@ def process_one_video(scraper, url, num, total):
                         if hasattr(scraper, 'driver') and scraper.driver:
                             scraper.driver.quit()
                             log(f"   ✓ Browser closed")
-                    except:
+                    except Exception as e:
+                        log(f"   ⚠️ Browser close error: {e}")
                         pass
                     
                     # Wait and restart
@@ -838,8 +1422,10 @@ def process_one_video(scraper, url, num, total):
                     try:
                         scraper.init_driver()
                         log(f"   ✅ Browser restarted")
-                    except:
-                        pass
+                    except Exception as e:
+                        log(f"   ❌ Browser restart failed: {e}")
+                        # Don't pass - this is critical
+                        raise
                     
                     time.sleep(5)
                 else:
@@ -857,7 +1443,7 @@ def process_one_video(scraper, url, num, total):
         if not has_space:
             error_msg = f"Low disk space before conversion: {free_gb:.1f}GB"
             log(f"❌ {error_msg}")
-            cleanup_temp_files(code, TEMP_DIR)
+            cleanup_and_release(code)
             mark_as_failed(url, error_msg)
             return False
         
@@ -867,14 +1453,14 @@ def process_one_video(scraper, url, num, total):
             if not convert_to_mp4(ts_file, mp4_file):
                 error_msg = "Conversion failed"
                 log(f"❌ {error_msg}")
-                cleanup_temp_files(code, TEMP_DIR)
+                cleanup_and_release(code)
                 mark_as_failed(url, error_msg)
                 return False
             log("✅ Converted")
         except Exception as e:
             error_msg = f"Conversion exception: {str(e)[:100]}"
             log(f"❌ {error_msg}")
-            cleanup_temp_files(code, TEMP_DIR)
+            cleanup_and_release(code)
             mark_as_failed(url, error_msg)
             return False
         
@@ -888,7 +1474,8 @@ def process_one_video(scraper, url, num, total):
                 # Create wrapper function for preview upload with multi-host fallback
                 def upload_preview_with_fallback(file_path, code, title, folder_name, allow_small_files=False):
                     """Wrapper to use upload_all for preview with multi-host fallback"""
-                    result = upload_all(file_path, code, title, allow_small_files=allow_small_files)
+                    # Pass folder_name to upload_all so preview goes to same folder as main video
+                    result = upload_all(file_path, code, title, allow_small_files=allow_small_files, folder_name=folder_name)
                     # Return first successful upload or last failed attempt
                     if result.get('successful'):
                         return result['successful'][0]
@@ -959,7 +1546,8 @@ def process_one_video(scraper, url, num, total):
                     # Cleanup
                     try:
                         os.remove(preview_file)
-                    except:
+                    except Exception as e:
+                        log(f"   ⚠️ Could not remove preview file: {e}")
                         pass
                 else:
                     log(f"⚠️ Preview creation failed")
@@ -973,7 +1561,7 @@ def process_one_video(scraper, url, num, total):
         if not has_space:
             error_msg = f"Low disk space before upload: {free_gb:.1f}GB"
             log(f"❌ {error_msg}")
-            cleanup_temp_files(code, TEMP_DIR)
+            cleanup_and_release(code)
             mark_as_failed(url, error_msg)
             return False
         
@@ -984,7 +1572,7 @@ def process_one_video(scraper, url, num, total):
             if not os.path.exists(mp4_file):
                 error_msg = "MP4 file not found before upload"
                 log(f"❌ {error_msg}")
-                cleanup_temp_files(code, TEMP_DIR)
+                cleanup_and_release(code)
                 mark_as_failed(url, error_msg)
                 return False
             
@@ -994,7 +1582,7 @@ def process_one_video(scraper, url, num, total):
             if mp4_size_gb < 0.1:  # Less than 100 MB
                 error_msg = f"MP4 file too small ({mp4_size_gb:.2f} GB) - likely incomplete"
                 log(f"❌ {error_msg}")
-                cleanup_temp_files(code, TEMP_DIR)
+                cleanup_and_release(code)
                 mark_as_failed(url, error_msg)
                 return False
             
@@ -1009,7 +1597,7 @@ def process_one_video(scraper, url, num, total):
             if not upload_results:
                 error_msg = "Upload failed - upload_all returned None"
                 log(f"❌ {error_msg}")
-                cleanup_temp_files(code, TEMP_DIR)
+                cleanup_and_release(code)
                 mark_as_failed(url, error_msg)
                 return False
             
@@ -1081,7 +1669,7 @@ def process_one_video(scraper, url, num, total):
                         log(f"   ⚠️ Could not save rate limit info: {e}")
                     
                     # Clean up current video
-                    cleanup_temp_files(code, TEMP_DIR)
+                    cleanup_and_release(code)
                     
                     # Return special code to stop workflow
                     return 'RATE_LIMIT'
@@ -1089,7 +1677,7 @@ def process_one_video(scraper, url, num, total):
             if not upload_results.get('successful'):
                 error_msg = "Upload failed - no successful uploads"
                 log(f"❌ {error_msg}")
-                cleanup_temp_files(code, TEMP_DIR)
+                cleanup_and_release(code)
                 mark_as_failed(url, error_msg)
                 return False
             
@@ -1113,7 +1701,7 @@ def process_one_video(scraper, url, num, total):
             log(f"❌ {error_msg}")
             import traceback
             traceback.print_exc()
-            cleanup_temp_files(code, TEMP_DIR)
+            cleanup_and_release(code)
             mark_as_failed(url, error_msg)
             return False
         
@@ -1237,7 +1825,7 @@ def process_one_video(scraper, url, num, total):
         
         # STEP 6: Delete video file
         log("\n🗑️ Step 6: Cleaning up...")
-        cleanup_temp_files(code, TEMP_DIR)
+        cleanup_and_release(code)
         
         log("✅ Deleted video file")
         
@@ -1252,7 +1840,7 @@ def process_one_video(scraper, url, num, total):
         
         # Cleanup on any exception
         if code:
-            cleanup_temp_files(code, TEMP_DIR)
+            cleanup_and_release(code)
         
         # Clean up thumbnail if it exists locally
         if 'thumbnail_local' in locals() and thumbnail_local and os.path.exists(thumbnail_local):
@@ -1377,10 +1965,14 @@ def main():
     failed = 0
     skipped = 0
     
-    scraper = None
+    # Use BrowserManager to handle browser lifecycle
+    browser_manager = BrowserManager(restart_interval=5)
+    
+    # Use DiscoveryBackoff to handle repeated failures
+    discovery_backoff = DiscoveryBackoff()
     
     try:
-        scraper = JableScraper(headless=True)
+        scraper = browser_manager.get_scraper()
         
         page = 1
         while True:
@@ -1400,12 +1992,18 @@ def main():
                 links = scraper.get_video_links_from_page(url)
             except Exception as e:
                 log(f"❌ Page load failed: {e}")
-                # Try to recover browser
+                
+                # Record failure and check if should continue
+                if not discovery_backoff.record_failure():
+                    log("❌ Stopping due to repeated discovery failures")
+                    break
+                
+                # Try to recover browser using BrowserManager
                 log("🔄 Attempting to restart browser...")
                 try:
-                    scraper.close()
+                    browser_manager.close()
                     time.sleep(5)
-                    scraper = JableScraper(headless=True)
+                    scraper = browser_manager.get_scraper()
                     log("✅ Browser restarted")
                     continue
                 except Exception as e2:
@@ -1414,13 +2012,29 @@ def main():
             
             if not links:
                 log("✅ No more videos")
+                
+                # Record failure for empty results
+                if not discovery_backoff.record_failure():
+                    log("❌ Stopping due to repeated empty results")
                 break
+            
+            # Success - reset failure counter
+            discovery_backoff.record_success()
             
             log(f"✅ Found {len(links)} videos")
             
             for i, video_url in enumerate(links, 1):
                 # Check time limit BEFORE starting new video (not during)
-                if time.time() - start > TIME_LIMIT:
+                # Ensure at least 30 minutes remain before workflow timeout
+                time_elapsed = time.time() - start
+                time_remaining = TIME_LIMIT - time_elapsed
+                
+                if time_remaining < 1800:  # Less than 30 minutes (1800 seconds)
+                    log(f"\n⏰ Time limit approaching ({time_remaining/60:.1f} minutes remaining)")
+                    log(f"   Stopping before next video to allow cleanup time")
+                    break
+                
+                if time_elapsed > TIME_LIMIT:
                     log(f"\n⏰ Time limit reached, stopping before next video")
                     break
                 
@@ -1457,31 +2071,18 @@ def main():
                 
                 if video_success:
                     success += 1
-                    # Close browser after successful video to free memory
-                    log("\n🔄 Closing browser to free memory...")
-                    try:
-                        scraper.close()
-                        log("✅ Browser closed")
-                    except Exception as e:
-                        log(f"⚠️ Browser close warning: {e}")
+                    browser_manager.increment_counter()
                     
-                    # Start fresh browser for next video
-                    log("🔄 Starting fresh browser for next video...")
-                    try:
-                        scraper = JableScraper(headless=True)
-                        log("✅ Fresh browser ready")
-                    except Exception as e:
-                        log(f"❌ Failed to restart browser: {e}")
-                        log("Stopping workflow")
-                        break
+                    # BrowserManager will automatically restart browser after N videos
+                    scraper = browser_manager.get_scraper()
                 else:
                     failed += 1
-                    # Also restart browser after failure to ensure clean state
+                    # Restart browser after failure to ensure clean state
                     log("\n🔄 Restarting browser after failure...")
                     try:
-                        scraper.close()
+                        browser_manager.close()
                         time.sleep(2)
-                        scraper = JableScraper(headless=True)
+                        scraper = browser_manager.get_scraper()
                         log("✅ Browser restarted")
                     except Exception as e:
                         log(f"⚠️ Browser restart warning: {e}")
@@ -1499,15 +2100,15 @@ def main():
             # Restart browser between pages for fresh state
             log("\n🔄 Restarting browser for next page...")
             try:
-                scraper.close()
+                browser_manager.close()
                 time.sleep(3)
-                scraper = JableScraper(headless=True)
+                scraper = browser_manager.get_scraper()
                 log("✅ Browser ready for next page")
             except Exception as e:
                 log(f"⚠️ Browser restart warning: {e}")
                 # Try to continue anyway
                 try:
-                    scraper = JableScraper(headless=True)
+                    scraper = browser_manager.get_scraper()
                 except:
                     log("❌ Cannot continue without browser")
                     break
@@ -1522,12 +2123,7 @@ def main():
         traceback.print_exc()
     finally:
         # Always close browser and remove lock
-        if scraper:
-            try:
-                scraper.close()
-            except:
-                pass
-        
+        browser_manager.close()
         remove_process_lock(lock_file)
     
     total_time = time.time() - start
