@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Advanced Preview Generator with Motion Detection
-Main orchestrator for creating smart video previews
-Optimized for adult content - finds high-motion scenes
+Advanced Preview Generator for Adult Content
+Uses multi-factor analysis: motion, skin detection, audio, brightness
+Optimized to find the most interesting scenes
 """
 import os
 import sys
-from motion_detector import MotionDetector
+from adult_scene_detector import AdultSceneDetector
 from clip_extractor import ClipExtractor
 
 class PreviewGenerator:
@@ -14,7 +14,7 @@ class PreviewGenerator:
         self.video_path = video_path
         self.output_dir = output_dir or os.path.dirname(os.path.abspath(video_path)) or '.'
         
-        self.detector = MotionDetector(video_path)
+        self.detector = AdultSceneDetector(video_path)
         self.extractor = ClipExtractor(video_path, self.output_dir)
     
     def generate_preview(
@@ -82,21 +82,22 @@ class PreviewGenerator:
             
             print(f"✓ Video: {info['duration']:.1f}s, {info['width']}x{info['height']}, {info['fps']:.1f}fps")
             
-            # Step 2: Motion-based scene detection (finds high-activity scenes)
-            print("\n[2/5] Detecting high-motion scenes (parallel analysis)...")
-            timestamps = self.detector.find_high_motion_scenes(
+            # Step 2: Advanced multi-factor scene detection
+            print("\n[2/5] Detecting best scenes (multi-factor analysis)...")
+            print("         Analyzing: Motion + Skin Tones + Audio + Brightness")
+            timestamps = self.detector.find_best_scenes(
                 num_clips=num_clips,
-                sample_size=min(50, num_clips * 5)  # Analyze 5x more samples than needed
+                sample_size=min(60, num_clips * 6)  # Analyze 6x more samples than needed
             )
             
             if not timestamps or len(timestamps) < num_clips:
-                print(f"⚠️ Only found {len(timestamps)} scenes, using diverse sampling...")
-                timestamps = self.detector.find_diverse_high_motion_scenes(num_clips=num_clips)
+                print(f"⚠️ Only found {len(timestamps)} scenes")
+                # Fallback shouldn't happen with advanced detector
             
             # Convert timestamps to (timestamp, duration) tuples
             timestamps = [(t, clip_duration) for t in timestamps]
             
-            print(f"✓ Selected {len(timestamps)} high-motion timestamps")
+            print(f"✓ Selected {len(timestamps)} best scenes")
             
             # Step 3: Extract clips
             print("\n[3/5] Extracting clips...")
