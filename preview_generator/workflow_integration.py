@@ -113,7 +113,8 @@ class WorkflowIntegration:
                 preview_output,
                 self.video_code,
                 preview_title,
-                folder_name
+                folder_name,
+                allow_small_files=True  # Allow small files for previews
             )
             
             if upload_result and upload_result.get('success'):
@@ -141,7 +142,8 @@ class WorkflowIntegration:
                         preview_result['gif_path'],
                         self.video_code,
                         gif_title,
-                        folder_name
+                        folder_name,
+                        allow_small_files=True  # Allow small files for GIF
                     )
                     
                     if gif_upload_result and gif_upload_result.get('success'):

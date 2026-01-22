@@ -14,7 +14,7 @@ LULUSTREAM_API_KEY = os.getenv('LULUSTREAM_API_KEY')
 STREAMWISH_API_KEY = os.getenv('STREAMWISH_API_KEY')
 
 
-def upload_to_lulustream(file_path, code, title, folder_name=None):
+def upload_to_lulustream(file_path, code, title, folder_name=None, allow_small_files=False):
     """
     Upload to LuluStream as fallback
     
@@ -44,7 +44,8 @@ def upload_to_lulustream(file_path, code, title, folder_name=None):
     print(f"[LuluStream] Size: {file_size_gb:.2f} GB ({file_size:,} bytes)")
     
     # Verify file is not too small
-    if file_size_mb < 50:
+    # Skip check for previews (allow_small_files=True)
+    if not allow_small_files and file_size_mb < 50:
         print(f"[LuluStream] ❌ File too small ({file_size_mb:.1f} MB) - likely incomplete")
         return {'service': 'LuluStream', 'success': False, 'error': 'File too small'}
     
@@ -239,7 +240,7 @@ def upload_to_lulustream(file_path, code, title, folder_name=None):
         return {'service': 'LuluStream', 'success': False, 'error': str(e)}
 
 
-def upload_to_streamwish(file_path, code, title, folder_name=None):
+def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_files=False):
     """
     Upload full video file to StreamWish with verification
     Handles upload limits by pausing workflow until limit resets
@@ -271,7 +272,8 @@ def upload_to_streamwish(file_path, code, title, folder_name=None):
     print(f"[StreamWish] Size: {file_size_gb:.2f} GB ({file_size:,} bytes)")
     
     # Verify file is not too small (likely preview/incomplete)
-    if file_size_mb < 50:
+    # Skip check for previews (allow_small_files=True)
+    if not allow_small_files and file_size_mb < 50:
         print(f"[StreamWish] ❌ File too small ({file_size_mb:.1f} MB) - likely incomplete")
         return {'service': 'StreamWish', 'success': False, 'error': 'File too small'}
     
