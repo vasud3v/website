@@ -54,8 +54,11 @@ temp_downloads/
 
 # Video files (don't commit large files)
 *.mp4
-*.ts
 *.m3u8
+# Only ignore video .ts files (MPEG transport stream), not TypeScript
+*.ts
+!frontend/**/*.ts
+!**/*.tsx
 
 # Database backups
 *.backup
