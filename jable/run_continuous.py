@@ -1733,7 +1733,10 @@ def process_one_video(scraper, url, num, total):
                 log("✅ Saved to database")
                 
                 # Verify it was saved
-                videos = load_json_safe(DB_FILE, [])
+                if DATABASE_MANAGER_AVAILABLE:
+                    videos = db_manager.get_all_videos()
+                else:
+                    videos = load_json_safe(DB_FILE, [])
                 log(f"   Database now has {len(videos)} videos")
                 
                 # Show the saved entry
