@@ -369,6 +369,10 @@ class DatabaseManager:
             pass
         return 0
     
+    def get_failed_videos(self) -> List[Dict]:
+        """Get all failed videos"""
+        return self._read_json_locked(FAILED_DB, [])
+    
     def update_progress(self):
         """Update progress tracking"""
         try:
