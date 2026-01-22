@@ -192,8 +192,11 @@ def upload_to_lulustream(file_path, code, title, folder_name=None, allow_small_f
         upload_time = time.time() - upload_start
         print(f"[LuluStream] ✓ Upload completed in {int(upload_time//60)}m {int(upload_time%60)}s")
         
-        # Parse response
+        # Parse response - LuluStream can return JSON or HTML
         if upload_response.status_code == 200:
+            response_text = upload_response.text
+            
+            # Try JSON first
             try:
                 response_data = upload_response.json()
                 
@@ -223,12 +226,113 @@ def upload_to_lulustream(file_path, code, title, folder_name=None, allow_small_f
                             'file_size': file_size
                         }
                     else:
-                        print(f"[LuluStream] ❌ No filecode in response")
+                        print(f"[LuluStream] ❌ No filecode in JSON response")
                 else:
                     print(f"[LuluStream] ❌ Upload failed: {response_data.get('message', 'Unknown error')}")
-            except Exception as e:
-                print(f"[LuluStream] ❌ Failed to parse response: {e}")
-                print(f"[LuluStream] Response: {upload_response.text[:200]}")
+            except:
+                # Not JSON, try parsing HTML response
+                print(f"[LuluStream] Response is HTML, parsing...")
+                
+                # LuluStream returns HTML form with file info
+                # Example response format:
+                # <Form name='F1' action='https://lulustream.com/' target='_parent' method='POST'>
+                # <textarea name="op">upload_result</textarea>
+                # <textarea name="sess_id"></textarea>
+                # <textarea name="fn">FILENAME</textarea>
+                # <textarea name="st">OK</textarea>
+                # <textarea name="file_code">ABC123</textarea>
+                
+                import re
+                
+                filecode = None
+                
+                # Pattern 1: Direct file_code field (most reliable)
+                code_match = re.search(r'<textarea name=["\']file_code["\']>([^<]+)</textarea>', response_text, re.IGNORECASE)
+                if code_match:
+                    filecode = code_match.group(1).strip()
+                    print(f"[LuluStream] Extracted file_code from HTML: {filecode}")
+                
+                # Pattern 2: Look for URL in action or anywhere in response
+                if not filecode:
+                    url_match = re.search(r'https?://lulustream\.com/(?:e/|v/)?([a-zA-Z0-9]{10,})', response_text)
+                    if url_match:
+                        filecode = url_match.group(1)
+                        print(f"[LuluStream] Extracted code from URL: {filecode}")
+                
+                # Pattern 3: Check if filename itself is the code (sometimes LuluStream does this)
+                if not filecode:
+                    fn_match = re.search(r'<textarea name=["\']fn["\']>([^<]+)</textarea>', response_text)
+                    if fn_match:
+                        fn_value = fn_match.group(1).strip()
+                        # Remove extension and check if it looks like a code
+                        fn_clean = fn_value.replace('.mp4', '').replace('.avi', '').replace('.mkv', '')
+                        # If it's alphanumeric and reasonable length, might be the code
+                        if re.match(r'^[a-zA-Z0-9]{10,}$', fn_clean):
+                            filecode = fn_clean
+                            print(f"[LuluStream] Using filename as code: {filecode}")
+                
+                # Pattern 4: Parse the entire form and look for any field that looks like a file code
+                if not filecode:
+                    all_textareas = re.findall(r'<textarea name=["\']([^"\']+)["\']>([^<]*)</textarea>', response_text)
+                    for field_name, field_value in all_textareas:
+                        field_value = field_value.strip()
+                        # Look for alphanumeric strings that could be file codes
+                        if field_value and re.match(r'^[a-zA-Z0-9]{10,}$', field_value):
+                            if field_name not in ['op', 'sess_id', 'st']:  # Skip known non-code fields
+                                filecode = field_value
+                                print(f"[LuluStream] Found potential code in field '{field_name}': {filecode}")
+                                break
+                
+                # Pattern 5: If still no code, try querying LuluStream API for recent uploads
+                if not filecode:
+                    print(f"[LuluStream] Could not parse code from HTML, querying API...")
+                    try:
+                        # Get list of recent files
+                        list_response = requests.get(
+                            "https://lulustream.com/api/file/list",
+                            params={'key': LULUSTREAM_API_KEY, 'per_page': 10},
+                            timeout=30
+                        )
+                        if list_response.status_code == 200:
+                            list_data = list_response.json()
+                            if list_data.get('status') == 'success':
+                                files = list_data.get('result', {}).get('files', [])
+                                # Look for our file by name
+                                base_name = os.path.basename(file_path)
+                                for file_info in files:
+                                    if file_info.get('title', '').startswith(code) or file_info.get('name', '') == base_name:
+                                        filecode = file_info.get('file_code') or file_info.get('filecode')
+                                        if filecode:
+                                            print(f"[LuluStream] Found file in API list: {filecode}")
+                                            break
+                    except Exception as e:
+                        print(f"[LuluStream] API query failed: {str(e)[:100]}")
+                
+                if filecode:
+                    print(f"\n[LuluStream] ═══════════════════════════════════════")
+                    print(f"[LuluStream] ✅ UPLOAD SUCCESSFUL! (HTML response)")
+                    print(f"[LuluStream] ═══════════════════════════════════════")
+                    print(f"[LuluStream] File code: {filecode}")
+                    print(f"[LuluStream] Embed URL: https://lulustream.com/e/{filecode}")
+                    print(f"[LuluStream] Watch URL: https://lulustream.com/{filecode}")
+                    print(f"[LuluStream] Upload time: {int(upload_time//60)}m {int(upload_time%60)}s")
+                    print(f"[LuluStream] File size uploaded: {file_size_gb:.2f} GB")
+                    if folder_name:
+                        print(f"[LuluStream] Folder: {folder_name}")
+                    
+                    return {
+                        'service': 'LuluStream',
+                        'success': True,
+                        'filecode': filecode,
+                        'embed_url': f"https://lulustream.com/e/{filecode}",
+                        'watch_url': f"https://lulustream.com/{filecode}",
+                        'time': upload_time,
+                        'folder': folder_name,
+                        'file_size': file_size
+                    }
+                else:
+                    print(f"[LuluStream] ❌ Could not extract file code from HTML")
+                    print(f"[LuluStream] HTML preview: {response_text[:500]}")
         else:
             print(f"[LuluStream] ❌ Upload failed: HTTP {upload_response.status_code}")
             print(f"[LuluStream] Response: {upload_response.text[:200]}")
