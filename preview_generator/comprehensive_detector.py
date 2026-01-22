@@ -97,8 +97,8 @@ class ComprehensiveDetector:
         if max_clips is None:
             # Calculate clips needed for full coverage (1 every 80 seconds)
             max_clips = max(30, int(effective_duration / 80))  # Minimum 30 clips
-            # Cap at reasonable maximum for preview length (max 2 minutes)
-            max_clips = min(max_clips, 90)  # Max 90 clips = ~120s preview at 1.5x
+            # Cap at 60 clips max to prevent timeout (max 80s preview at 1.5x)
+            max_clips = min(max_clips, 60)  # Was 90, reduced for performance
         
         # Ensure we have at least some clips
         if max_clips < 10:
@@ -330,7 +330,7 @@ class ComprehensiveDetector:
         clip_files = extractor.extract_multiple_clips(
             timestamp_tuples,
             resolution=resolution,
-            crf=20,  # High quality for source clips (was 18, faster encoding)
+            crf=23,  # Balanced quality/speed (was 20)
             parallel=True
         )
         
@@ -374,11 +374,11 @@ class ComprehensiveDetector:
             '-f', 'concat',
             '-safe', '0',
             '-i', concat_file,
-            '-c:v', 'libx264',  # Re-encode to ensure compatibility
-            '-preset', 'fast',  # Fast for intermediate file (was ultrafast)
-            '-crf', '20',  # Maintain quality
+            '-c:v', 'libx264',
+            '-preset', 'ultrafast',  # Fastest for intermediate (was fast)
+            '-crf', '23',  # Slightly lower quality for speed
             '-c:a', 'aac',
-            '-b:a', '256k',
+            '-b:a', '192k',  # Lower bitrate for speed
             '-y',
             temp_concat
         ]
@@ -415,15 +415,15 @@ class ComprehensiveDetector:
             '-map', '[v]',
             '-map', '[a]',
             '-c:v', 'libx264',
-            '-preset', 'medium',  # Balanced speed/quality (was veryslow)
-            '-crf', '20',  # Excellent quality (was 18, slightly faster)
-            '-profile:v', 'high',  # H.264 high profile
+            '-preset', 'fast',  # Faster preset (was medium)
+            '-crf', '21',  # Good quality (was 20, slightly faster)
+            '-profile:v', 'high',
             '-level', '4.1',
             '-pix_fmt', 'yuv420p',
-            '-movflags', '+faststart',  # Web optimization
+            '-movflags', '+faststart',
             '-c:a', 'aac',
-            '-b:a', '256k',  # High audio bitrate (was 320k)
-            '-ar', '48000',  # 48kHz audio
+            '-b:a', '192k',  # Lower bitrate for speed (was 256k)
+            '-ar', '48000',
             '-y',
             output_path
         ]
