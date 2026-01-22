@@ -86,6 +86,29 @@ def initialize_database():
     
     if db_exists and failed_db_exists:
         log("✓ Database files already exist")
+        
+        # Clean up duplicates if any exist
+        try:
+            videos = load_json_safe(DB_FILE, [])
+            original_count = len(videos)
+            
+            # Remove duplicates (keep first occurrence which should be newest)
+            seen_codes = set()
+            unique_videos = []
+            for video in videos:
+                code = video.get('code')
+                if code and code not in seen_codes:
+                    seen_codes.add(code)
+                    unique_videos.append(video)
+            
+            if len(unique_videos) < original_count:
+                duplicates_removed = original_count - len(unique_videos)
+                log(f"⚠️ Found {duplicates_removed} duplicate entries, cleaning up...")
+                save_json_safe(DB_FILE, unique_videos, use_lock=True)
+                log(f"✓ Cleaned database: {original_count} → {len(unique_videos)} videos")
+        except Exception as e:
+            log(f"⚠️ Could not clean duplicates: {e}")
+        
         return
     
     log("⚠️ Database files missing, initializing...")
@@ -390,12 +413,27 @@ def is_processed(url):
     try:
         normalized_url = normalize_url(url)
         videos = load_json_safe(DB_FILE, [])
+        
+        # Check by URL first
         for v in videos:
             if normalize_url(v.get('source_url', '')) == normalized_url:
                 # Check if hosting data exists and is not empty
                 hosting = v.get('hosting', {})
                 if hosting and len(hosting) > 0:
                     return True
+        
+        # Also check by code (in case URL changed but code is same)
+        # Extract code from URL
+        import re
+        code_match = re.search(r'/videos/([^/]+)/?', url)
+        if code_match:
+            url_code = code_match.group(1).upper().replace('-', '_')
+            for v in videos:
+                video_code = v.get('code', '').upper().replace('-', '_')
+                if video_code == url_code:
+                    hosting = v.get('hosting', {})
+                    if hosting and len(hosting) > 0:
+                        return True
     except:
         pass
     return False
