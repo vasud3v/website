@@ -165,8 +165,7 @@ jobs:
       
       - name: Create directories
         run: |
-          mkdir -p jable/temp_downloads jable/database javdatabase/database database
-          [ ! -f jable/database/videos_complete.json ] && echo "[]" > jable/database/videos_complete.json
+          mkdir -p jable/temp_downloads javdatabase/database database
           [ ! -f database/combined_videos.json ] && echo "[]" > database/combined_videos.json
       
       - name: Validate API keys
@@ -200,7 +199,6 @@ jobs:
         run: |
           echo "Integration Statistics"
           [ -f javdatabase/database/stats.json ] && cat javdatabase/database/stats.json | jq '.'
-          ls -lh jable/database/*.json 2>/dev/null || true
           ls -lh database/*.json 2>/dev/null || true
       
       - name: Emergency cleanup
@@ -215,7 +213,7 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          git add jable/database/ javdatabase/database/ database/ *.log jable/*.log 2>/dev/null || true
+          git add javdatabase/database/ database/ *.log jable/*.log 2>/dev/null || true
           
           if ! git diff --staged --quiet; then
             git commit -m "Auto-update: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
@@ -230,7 +228,6 @@ jobs:
           path: |
             *.log
             jable/*.log
-            jable/database/
             javdatabase/database/
             database/
           retention-days: 7
