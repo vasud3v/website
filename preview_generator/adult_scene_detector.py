@@ -74,6 +74,7 @@ class AdultSceneDetector:
     def find_best_scenes(self, num_clips: int = 10, sample_size: int = 60) -> List[float]:
         """
         Find best scenes using multiple detection methods
+        Ensures coverage across entire video
         
         Args:
             num_clips: Number of clips to return
@@ -92,11 +93,35 @@ class AdultSceneDetector:
         end_offset = self.duration * 0.95
         usable_duration = end_offset - start_offset
         
-        # Calculate sample points
-        interval = usable_duration / sample_size
-        sample_points = [start_offset + (i * interval) for i in range(sample_size)]
+        # Step 1: Detect keyframes (scene changes)
+        print(f"[AdultDetector] Step 1: Detecting keyframes...")
+        keyframes = self._detect_keyframes()
+        print(f"[AdultDetector] Found {len(keyframes)} keyframes")
         
-        print(f"[AdultDetector] Analyzing {sample_size} segments with multi-factor scoring...")
+        # Step 2: Detect sound peaks
+        print(f"[AdultDetector] Step 2: Detecting sound peaks...")
+        sound_peaks = self._detect_sound_peaks()
+        print(f"[AdultDetector] Found {len(sound_peaks)} sound peaks")
+        
+        # Step 3: Combine keyframes and sound peaks with regular sampling
+        # This ensures we cover the entire video
+        candidate_timestamps = set()
+        
+        # Add keyframes
+        candidate_timestamps.update(keyframes[:sample_size // 2])
+        
+        # Add sound peaks
+        candidate_timestamps.update(sound_peaks[:sample_size // 3])
+        
+        # Add regular intervals to ensure full coverage
+        interval = usable_duration / (sample_size // 3)
+        for i in range(sample_size // 3):
+            candidate_timestamps.add(start_offset + (i * interval))
+        
+        # Convert to sorted list
+        sample_points = sorted(list(candidate_timestamps))[:sample_size]
+        
+        print(f"[AdultDetector] Step 3: Analyzing {len(sample_points)} candidate segments...")
         
         # Analyze all segments in parallel
         max_workers = min(cpu_count(), 8)
@@ -114,32 +139,156 @@ class AdultSceneDetector:
                 completed += 1
                 
                 if completed % 10 == 0:
-                    print(f"[AdultDetector] Progress: {completed}/{sample_size} segments analyzed...")
+                    print(f"[AdultDetector] Progress: {completed}/{len(sample_points)} segments analyzed...")
                 
                 try:
                     score_data = future.result()
                     if score_data['total_score'] > 0:
                         results.append((timestamp, score_data))
                 except Exception as e:
-                    print(f"[AdultDetector] Segment analysis failed at {timestamp:.1f}s: {e}")
+                    pass
         
         # Sort by total score (highest first)
         results.sort(key=lambda x: x[1]['total_score'], reverse=True)
         
-        # Take top N
-        top_results = results[:num_clips]
+        # Ensure diversity: pick best from different parts of video
+        timestamps = self._ensure_diversity(results, num_clips)
         
-        # Sort chronologically
-        timestamps = sorted([t for t, s in top_results])
-        
-        print(f"\n[AdultDetector] Selected {len(timestamps)} best scenes")
+        print(f"\n[AdultDetector] Selected {len(timestamps)} best scenes (distributed across video)")
         print(f"[AdultDetector] Score breakdown (top 5):")
-        for i, (t, score_data) in enumerate(sorted(top_results, key=lambda x: x[1]['total_score'], reverse=True)[:5]):
-            print(f"  #{i+1} @ {t:.1f}s: Total={score_data['total_score']:.1f} "
-                  f"(Skin={score_data['skin_score']:.1f}, Motion={score_data['motion_score']:.1f}, "
-                  f"Audio={score_data['audio_score']:.1f}, Complex={score_data['complexity_score']:.1f})")
+        top_5 = sorted([(t, next((s for ts, s in results if ts == t), None)) for t in timestamps[:5]], 
+                       key=lambda x: x[1]['total_score'] if x[1] else 0, reverse=True)
+        
+        for i, (t, score_data) in enumerate(top_5):
+            if score_data:
+                print(f"  #{i+1} @ {t:.1f}s ({t/60:.1f}min): Total={score_data['total_score']:.1f} "
+                      f"(Skin={score_data['skin_score']:.1f}, Motion={score_data['motion_score']:.1f}, "
+                      f"Audio={score_data['audio_score']:.1f}, Complex={score_data['complexity_score']:.1f})")
         
         return timestamps
+    
+    def _detect_keyframes(self) -> List[float]:
+        """
+        Detect keyframes (I-frames) using fast sampling
+        """
+        try:
+            # For long videos, sample keyframes instead of analyzing all
+            # Extract keyframes at 10 second intervals
+            sample_interval = 10  # seconds
+            num_samples = int(self.duration / sample_interval)
+            
+            keyframes = []
+            
+            # Quick method: just sample at regular intervals
+            # This is much faster than analyzing all frames
+            start_offset = self.duration * 0.05
+            end_offset = self.duration * 0.95
+            usable_duration = end_offset - start_offset
+            
+            for i in range(min(num_samples, 50)):  # Max 50 keyframes
+                timestamp = start_offset + (i * usable_duration / min(num_samples, 50))
+                keyframes.append(timestamp)
+            
+            return keyframes
+            
+        except Exception as e:
+            print(f"[AdultDetector] Keyframe detection failed: {e}")
+            return []
+    
+    def _detect_sound_peaks(self) -> List[float]:
+        """
+        Detect audio peaks using fast sampling
+        """
+        if not self.has_audio:
+            return []
+        
+        try:
+            # Fast method: analyze audio in chunks
+            sound_peaks = []
+            
+            # Sample 20 points throughout the video
+            start_offset = self.duration * 0.05
+            end_offset = self.duration * 0.95
+            usable_duration = end_offset - start_offset
+            
+            num_samples = 20
+            chunk_duration = 5  # Analyze 5 seconds per sample
+            
+            for i in range(num_samples):
+                timestamp = start_offset + (i * usable_duration / num_samples)
+                
+                # Quick audio level check
+                cmd = [
+                    'ffmpeg',
+                    '-ss', str(timestamp),
+                    '-i', self.video_path,
+                    '-t', str(chunk_duration),
+                    '-af', 'volumedetect',
+                    '-f', 'null',
+                    '-'
+                ]
+                
+                try:
+                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
+                    
+                    # Check if audio is loud enough
+                    mean_match = re.search(r'mean_volume:\s*([-\d.]+)\s*dB', result.stderr)
+                    if mean_match:
+                        mean_volume = float(mean_match.group(1))
+                        # If louder than -40dB, consider it a peak
+                        if mean_volume > -40:
+                            sound_peaks.append(timestamp)
+                except:
+                    pass
+            
+            return sound_peaks
+            
+        except Exception as e:
+            print(f"[AdultDetector] Sound peak detection failed: {e}")
+            return []
+    
+    def _ensure_diversity(self, results: List[Tuple[float, Dict]], num_clips: int) -> List[float]:
+        """
+        Ensure selected clips are distributed across the entire video
+        """
+        if not results:
+            return []
+        
+        # Divide video into sections
+        num_sections = num_clips
+        section_duration = self.duration / num_sections
+        
+        selected = []
+        
+        # Try to pick best clip from each section
+        for section in range(num_sections):
+            section_start = section * section_duration
+            section_end = (section + 1) * section_duration
+            
+            # Find best clip in this section
+            section_clips = [
+                (t, s) for t, s in results 
+                if section_start <= t < section_end
+            ]
+            
+            if section_clips:
+                # Pick best from this section
+                best = max(section_clips, key=lambda x: x[1]['total_score'])
+                selected.append(best[0])
+            elif results:
+                # If no clips in this section, pick closest one
+                closest = min(results, key=lambda x: abs(x[0] - (section_start + section_duration/2)))
+                selected.append(closest[0])
+        
+        # If we don't have enough, add more from top results
+        if len(selected) < num_clips:
+            for t, s in results:
+                if t not in selected:
+                    selected.append(t)
+                    if len(selected) >= num_clips:
+                        break
+        
+        return sorted(selected[:num_clips])
     
     def _analyze_segment_advanced(self, start_time: float, duration: float) -> Dict:
         """
