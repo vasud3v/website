@@ -1777,87 +1777,87 @@ def process_one_video(scraper, url, num, total):
                     # Build hosting dict in correct format (service_name: data)
                     hosting_dict = {}
                     file_size_from_upload = None
-                        upload_folder_from_upload = None
-                        
-                        if upload_results and upload_results.get('successful'):
-                            for result in upload_results['successful']:
-                                service = result.get('service', 'unknown').lower()
-                                hosting_dict[service] = {
-                                    'embed_url': result.get('embed_url', ''),
-                                    'watch_url': result.get('watch_url', ''),
-                                    'download_url': result.get('download_url', ''),
-                                    'direct_url': result.get('direct_url', ''),
-                                    'api_url': result.get('api_url', ''),
-                                    'filecode': result.get('filecode', ''),
-                                    'upload_time': result.get('time', 0),
-                                    'uploaded_at': dt.now().isoformat()
-                                }
-                                # Get file size and folder from first result
-                                if not file_size_from_upload and result.get('file_size'):
-                                    file_size_from_upload = result.get('file_size')
-                                if not upload_folder_from_upload and result.get('folder'):
-                                    upload_folder_from_upload = result.get('folder')
-                        
-                        # Build Jable data structure for enrichment
-                        jable_data = {
-                            "code": video_data.code,
-                            "title": video_data.title,
-                            "source_url": video_data.source_url,
-                            "thumbnail_url": thumbnail_url,
-                            "duration": video_data.duration,
-                            "hd_quality": video_data.hd_quality if hasattr(video_data, 'hd_quality') else False,
-                            "views": video_data.views,
-                            "likes": video_data.likes,
-                            "release_date": video_data.release_date,
-                            "upload_time": video_data.upload_time if hasattr(video_data, 'upload_time') else '',
-                            "processed_at": dt.now().isoformat(),
-                            "categories": video_data.categories if video_data.categories else [],
-                            "models": video_data.models if video_data.models else [],
-                            "tags": video_data.tags if video_data.tags else [],
-                            "preview_images": video_data.preview_images if hasattr(video_data, 'preview_images') else [],
-                            "hosting": hosting_dict,
-                            "file_size": file_size_from_upload,
-                            "upload_folder": upload_folder_from_upload or video_data.code
-                        }
-                        
-                        log(f"   Calling JAVDatabase enrichment for {video_data.code}...")
-                        success = enrich_with_javdb(jable_data, headless=True)
-                        
-                        if success:
-                            log(f"✅ JAVDatabase enrichment successful")
-                            log(f"   Combined data saved to {os.path.join(DATABASE_DIR, 'combined_videos.json')}")
-                        else:
-                            log(f"⚠️ JAVDatabase enrichment failed, saving Jable data only...")
-                            # Fallback: save Jable data without JAVDatabase enrichment
-                            if save_video(video_data, upload_results, thumbnail_url, preview_result):
-                                log(f"✅ Saved Jable data to database")
-                            else:
-                                log(f"❌ Failed to save Jable data")
-                            
-                    except Exception as e:
-                        log(f"❌ JAVDatabase enrichment error: {e}")
-                        log(f"   Saving Jable data only...")
-                        # Fallback: save Jable data without JAVDatabase enrichment
-                        try:
-                            if save_video(video_data, upload_results, thumbnail_url, preview_result):
-                                log(f"✅ Saved Jable data to database")
-                            else:
-                                log(f"❌ Failed to save Jable data")
-                        except Exception as save_error:
-                            log(f"❌ Save error: {save_error}")
-                else:
-                    log("\n⏭️ JAVDatabase enrichment not available, saving Jable data only...")
-                    # Save Jable data without JAVDatabase enrichment
-                    if save_video(video_data, upload_results, thumbnail_url, preview_result):
-                        log(f"✅ Saved Jable data to database")
+                    upload_folder_from_upload = None
+                    
+                    if upload_results and upload_results.get('successful'):
+                        for result in upload_results['successful']:
+                            service = result.get('service', 'unknown').lower()
+                            hosting_dict[service] = {
+                                'embed_url': result.get('embed_url', ''),
+                                'watch_url': result.get('watch_url', ''),
+                                'download_url': result.get('download_url', ''),
+                                'direct_url': result.get('direct_url', ''),
+                                'api_url': result.get('api_url', ''),
+                                'filecode': result.get('filecode', ''),
+                                'upload_time': result.get('time', 0),
+                                'uploaded_at': dt.now().isoformat()
+                            }
+                            # Get file size and folder from first result
+                            if not file_size_from_upload and result.get('file_size'):
+                                file_size_from_upload = result.get('file_size')
+                            if not upload_folder_from_upload and result.get('folder'):
+                                upload_folder_from_upload = result.get('folder')
+                    
+                    # Build Jable data structure for enrichment
+                    jable_data = {
+                        "code": video_data.code,
+                        "title": video_data.title,
+                        "source_url": video_data.source_url,
+                        "thumbnail_url": thumbnail_url,
+                        "duration": video_data.duration,
+                        "hd_quality": video_data.hd_quality if hasattr(video_data, 'hd_quality') else False,
+                        "views": video_data.views,
+                        "likes": video_data.likes,
+                        "release_date": video_data.release_date,
+                        "upload_time": video_data.upload_time if hasattr(video_data, 'upload_time') else '',
+                        "processed_at": dt.now().isoformat(),
+                        "categories": video_data.categories if video_data.categories else [],
+                        "models": video_data.models if video_data.models else [],
+                        "tags": video_data.tags if video_data.tags else [],
+                        "preview_images": video_data.preview_images if hasattr(video_data, 'preview_images') else [],
+                        "hosting": hosting_dict,
+                        "file_size": file_size_from_upload,
+                        "upload_folder": upload_folder_from_upload or video_data.code
+                    }
+                    
+                    log(f"   Calling JAVDatabase enrichment for {video_data.code}...")
+                    success = enrich_with_javdb(jable_data, headless=True)
+                    
+                    if success:
+                        log(f"✅ JAVDatabase enrichment successful")
+                        log(f"   Combined data saved to {os.path.join(DATABASE_DIR, 'combined_videos.json')}")
                     else:
-                        log(f"❌ Failed to save Jable data")
+                        log(f"⚠️ JAVDatabase enrichment failed, saving Jable data only...")
+                        # Fallback: save Jable data without JAVDatabase enrichment
+                        if save_video(video_data, upload_results, thumbnail_url, preview_result):
+                            log(f"✅ Saved Jable data to database")
+                        else:
+                            log(f"❌ Failed to save Jable data")
+                        
+                except Exception as e:
+                    log(f"❌ JAVDatabase enrichment error: {e}")
+                    log(f"   Saving Jable data only...")
+                    # Fallback: save Jable data without JAVDatabase enrichment
+                    try:
+                        if save_video(video_data, upload_results, thumbnail_url, preview_result):
+                            log(f"✅ Saved Jable data to database")
+                        else:
+                            log(f"❌ Failed to save Jable data")
+                    except Exception as save_error:
+                        log(f"❌ Save error: {save_error}")
             else:
-                log("❌ Save failed!")
-                log("   This video will NOT be committed to database")
-        except Exception as e:
-            log(f"❌ Save exception: {e}")
-            import traceback
+                log("\n⏭️ JAVDatabase enrichment not available, saving Jable data only...")
+                # Save Jable data without JAVDatabase enrichment
+                if save_video(video_data, upload_results, thumbnail_url, preview_result):
+                    log(f"✅ Saved Jable data to database")
+                else:
+                    log(f"❌ Failed to save Jable data")
+        else:
+            log("❌ Save failed!")
+            log("   This video will NOT be committed to database")
+    except Exception as e:
+        log(f"❌ Save exception: {e}")
+        import traceback
             traceback.print_exc()
         
         # STEP 6: Delete video file
