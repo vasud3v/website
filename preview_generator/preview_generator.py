@@ -20,10 +20,10 @@ class PreviewGenerator:
     def generate_preview(
         self,
         output_path: str = None,
-        num_clips: int = 10,
+        num_clips: int = 15,  # 15 clips × 3s = 45 seconds
         clip_duration: float = 3.0,
         resolution: str = "720",
-        crf: int = 28,
+        crf: int = 23,  # Better quality (lower = better, 23 is high quality)
         fps: int = 30,
         create_gif: bool = False,
         gif_width: int = 480,
