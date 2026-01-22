@@ -2,10 +2,10 @@
 """
 Advanced Adult Content Scene Detector
 Uses multiple detection methods to find the most interesting scenes:
-1. Motion intensity (high activity)
-2. Skin tone detection (more skin = more interesting)
-3. Audio analysis (moaning/sounds)
-4. Scene diversity (avoid repetitive scenes)
+- Skin tone detection
+- Motion intensity analysis
+- Audio level detection
+- Scene complexity
 """
 import subprocess
 import re
@@ -73,7 +73,7 @@ class AdultSceneDetector:
     
     def find_best_scenes(self, num_clips: int = 10, sample_size: int = 60) -> List[float]:
         """
-        Find the best adult scenes using multiple detection methods
+        Find best scenes using multiple detection methods
         
         Args:
             num_clips: Number of clips to return
@@ -85,10 +85,9 @@ class AdultSceneDetector:
         if not self.duration:
             self.get_video_info()
         
-        print(f"[AdultDetector] Analyzing video ({self.duration/60:.1f} minutes)...")
-        print(f"[AdultDetector] Using advanced multi-factor analysis...")
+        print(f"[AdultDetector] Analyzing video with advanced detection ({self.duration/60:.1f} minutes)...")
         
-        # Skip first and last 5% (intro/outro)
+        # Skip first and last 5%
         start_offset = self.duration * 0.05
         end_offset = self.duration * 0.95
         usable_duration = end_offset - start_offset
@@ -97,7 +96,7 @@ class AdultSceneDetector:
         interval = usable_duration / sample_size
         sample_points = [start_offset + (i * interval) for i in range(sample_size)]
         
-        print(f"[AdultDetector] Analyzing {sample_size} segments in parallel...")
+        print(f"[AdultDetector] Analyzing {sample_size} segments with multi-factor scoring...")
         
         # Analyze all segments in parallel
         max_workers = min(cpu_count(), 8)
@@ -127,65 +126,125 @@ class AdultSceneDetector:
         # Sort by total score (highest first)
         results.sort(key=lambda x: x[1]['total_score'], reverse=True)
         
-        # Apply diversity filter to avoid similar scenes
-        diverse_results = self._apply_diversity_filter(results, num_clips)
+        # Take top N
+        top_results = results[:num_clips]
         
         # Sort chronologically
-        timestamps = sorted([t for t, s in diverse_results])
+        timestamps = sorted([t for t, s in top_results])
         
-        print(f"[AdultDetector] Selected {len(timestamps)} best scenes")
-        print(f"[AdultDetector] Score breakdown:")
-        for t, score_data in sorted(diverse_results, key=lambda x: x[0]):
-            print(f"  {t:.1f}s: Motion={score_data['motion']:.1f}, Skin={score_data['skin']:.1f}, "
-                  f"Audio={score_data['audio']:.1f}, Total={score_data['total_score']:.1f}")
+        print(f"\n[AdultDetector] Selected {len(timestamps)} best scenes")
+        print(f"[AdultDetector] Score breakdown (top 5):")
+        for i, (t, score_data) in enumerate(sorted(top_results, key=lambda x: x[1]['total_score'], reverse=True)[:5]):
+            print(f"  #{i+1} @ {t:.1f}s: Total={score_data['total_score']:.1f} "
+                  f"(Skin={score_data['skin_score']:.1f}, Motion={score_data['motion_score']:.1f}, "
+                  f"Audio={score_data['audio_score']:.1f}, Complex={score_data['complexity_score']:.1f})")
         
         return timestamps
     
     def _analyze_segment_advanced(self, start_time: float, duration: float) -> Dict:
         """
-        Advanced segment analysis using multiple factors
+        Advanced multi-factor analysis of a segment
+        Returns dict with individual scores and total
         """
         scores = {
-            'motion': 0.0,
-            'skin': 0.0,
-            'audio': 0.0,
-            'brightness': 0.0,
+            'skin_score': 0.0,
+            'motion_score': 0.0,
+            'audio_score': 0.0,
+            'complexity_score': 0.0,
             'total_score': 0.0
         }
         
         try:
-            # 1. Motion Analysis (40% weight)
+            # 1. Skin tone detection (most important for adult content)
+            skin_score = self._detect_skin_tone(start_time, duration)
+            scores['skin_score'] = skin_score
+            
+            # 2. Motion analysis
             motion_score = self._analyze_motion(start_time, duration)
-            scores['motion'] = motion_score
+            scores['motion_score'] = motion_score
             
-            # 2. Skin Tone Detection (30% weight)
-            skin_score = self._analyze_skin_tones(start_time, duration)
-            scores['skin'] = skin_score
-            
-            # 3. Audio Analysis (20% weight)
+            # 3. Audio level (if available)
             if self.has_audio:
                 audio_score = self._analyze_audio(start_time, duration)
-                scores['audio'] = audio_score
+                scores['audio_score'] = audio_score
             
-            # 4. Brightness Check (10% weight)
-            brightness_score = self._analyze_brightness(start_time, duration)
-            scores['brightness'] = brightness_score
+            # 4. Visual complexity
+            complexity_score = self._analyze_complexity(start_time, duration)
+            scores['complexity_score'] = complexity_score
             
             # Calculate weighted total score
+            # Skin tone is most important (40%), then motion (30%), audio (20%), complexity (10%)
             scores['total_score'] = (
-                motion_score * 0.4 +
-                skin_score * 0.3 +
-                scores['audio'] * 0.2 +
-                brightness_score * 0.1
+                skin_score * 0.4 +
+                motion_score * 0.3 +
+                audio_score * 0.2 +
+                complexity_score * 0.1
             )
             
+            return scores
+            
         except Exception as e:
-            pass
-        
-        return scores
+            return scores
+    
+    def _detect_skin_tone(self, start_time: float, duration: float) -> float:
+        """
+        Detect skin tone presence in segment
+        Higher score = more skin tones detected
+        """
+        try:
+            # Extract frames and analyze color distribution
+            # Skin tones are typically in YCbCr color space:
+            # Y: 80-255, Cb: 85-135, Cr: 135-180
+            cmd = [
+                'ffmpeg',
+                '-ss', str(start_time),
+                '-i', self.video_path,
+                '-t', str(duration),
+                '-vf', 'fps=2,scale=320:180',  # Sample 2 fps
+                '-f', 'rawvideo',
+                '-pix_fmt', 'rgb24',
+                'pipe:1'
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, timeout=6)
+            
+            if not result.stdout or len(result.stdout) < 1000:
+                return 0
+            
+            # Convert to numpy array
+            frame_data = np.frombuffer(result.stdout, dtype=np.uint8)
+            
+            # Reshape to RGB pixels
+            num_pixels = len(frame_data) // 3
+            pixels = frame_data.reshape((num_pixels, 3))
+            
+            # Detect skin tones using RGB approximation
+            # Skin tone detection in RGB space
+            r = pixels[:, 0].astype(float)
+            g = pixels[:, 1].astype(float)
+            b = pixels[:, 2].astype(float)
+            
+            # Skin tone conditions (simplified)
+            skin_mask = (
+                (r > 95) & (g > 40) & (b > 20) &
+                (r > g) & (r > b) &
+                (np.abs(r - g) > 15) &
+                (r - g > 15)
+            )
+            
+            # Calculate percentage of skin pixels
+            skin_percentage = np.sum(skin_mask) / len(skin_mask) * 100
+            
+            # Score based on skin percentage (0-100)
+            return min(skin_percentage * 2, 100)  # Amplify score
+            
+        except:
+            return 0
     
     def _analyze_motion(self, start_time: float, duration: float) -> float:
-        """Analyze motion intensity"""
+        """
+        Analyze motion intensity
+        """
         try:
             cmd = [
                 'ffmpeg',
@@ -204,70 +263,22 @@ class AdultSceneDetector:
                 return 0
             
             frame_data = np.frombuffer(result.stdout, dtype=np.uint8)
+            
             if len(frame_data) == 0:
                 return 0
             
-            # Calculate standard deviation (variation = motion)
+            # Calculate standard deviation (motion indicator)
             std_dev = np.std(frame_data)
-            return float(std_dev)
             
-        except:
-            return 0
-    
-    def _analyze_skin_tones(self, start_time: float, duration: float) -> float:
-        """
-        Detect skin tones in the scene
-        More skin = higher score (indicates nudity/activity)
-        """
-        try:
-            # Extract frames and analyze color distribution
-            cmd = [
-                'ffmpeg',
-                '-ss', str(start_time),
-                '-i', self.video_path,
-                '-t', str(duration),
-                '-vf', 'fps=1,scale=320:180',
-                '-f', 'rawvideo',
-                '-pix_fmt', 'rgb24',
-                'pipe:1'
-            ]
-            
-            result = subprocess.run(cmd, capture_output=True, timeout=6)
-            
-            if not result.stdout:
-                return 0
-            
-            # Convert to numpy array
-            frame_data = np.frombuffer(result.stdout, dtype=np.uint8)
-            if len(frame_data) < 320 * 180 * 3:
-                return 0
-            
-            # Reshape to RGB image
-            pixels = frame_data.reshape(-1, 3)
-            
-            # Skin tone detection (RGB ranges)
-            # Typical skin tones: R > 95, G > 40, B > 20, R > G, R > B
-            r, g, b = pixels[:, 0], pixels[:, 1], pixels[:, 2]
-            
-            skin_mask = (
-                (r > 95) & (g > 40) & (b > 20) &
-                (r > g) & (r > b) &
-                (np.abs(r.astype(int) - g.astype(int)) > 15)
-            )
-            
-            # Calculate percentage of skin pixels
-            skin_percentage = np.sum(skin_mask) / len(pixels) * 100
-            
-            # Score based on skin percentage (more skin = higher score)
-            return float(skin_percentage * 2)  # Scale up
+            # Normalize to 0-100
+            return min(std_dev * 1.5, 100)
             
         except:
             return 0
     
     def _analyze_audio(self, start_time: float, duration: float) -> float:
         """
-        Analyze audio intensity (volume/activity)
-        Higher audio activity often indicates interesting scenes
+        Analyze audio levels (moaning, talking, etc.)
         """
         try:
             cmd = [
@@ -283,26 +294,30 @@ class AdultSceneDetector:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=6)
             
             # Parse mean volume
-            mean_volume_match = re.search(r'mean_volume:\s*([-\d.]+)\s*dB', result.stderr)
-            max_volume_match = re.search(r'max_volume:\s*([-\d.]+)\s*dB', result.stderr)
+            mean_match = re.search(r'mean_volume:\s*([-\d.]+)\s*dB', result.stderr)
+            max_match = re.search(r'max_volume:\s*([-\d.]+)\s*dB', result.stderr)
             
-            if mean_volume_match and max_volume_match:
-                mean_vol = float(mean_volume_match.group(1))
-                max_vol = float(max_volume_match.group(1))
+            if mean_match and max_match:
+                mean_volume = float(mean_match.group(1))
+                max_volume = float(max_match.group(1))
                 
                 # Higher (less negative) = louder
-                # Convert to positive score
-                audio_score = (mean_vol + 60) + (max_vol + 60) * 0.5
-                return max(0, audio_score)
+                # Normalize to 0-100 scale
+                # -30 dB = loud (100), -60 dB = quiet (0)
+                mean_score = max(0, min(100, (mean_volume + 60) * 3.33))
+                max_score = max(0, min(100, (max_volume + 30) * 3.33))
+                
+                # Combine mean and max
+                return (mean_score * 0.6 + max_score * 0.4)
             
             return 0
             
         except:
             return 0
     
-    def _analyze_brightness(self, start_time: float, duration: float) -> float:
+    def _analyze_complexity(self, start_time: float, duration: float) -> float:
         """
-        Check brightness - avoid too dark or too bright scenes
+        Analyze visual complexity (more detail = more interesting)
         """
         try:
             cmd = [
@@ -322,57 +337,22 @@ class AdultSceneDetector:
                 return 0
             
             frame_data = np.frombuffer(result.stdout, dtype=np.uint8)
+            
             if len(frame_data) == 0:
                 return 0
             
-            mean_brightness = np.mean(frame_data)
+            # Calculate entropy (complexity measure)
+            hist, _ = np.histogram(frame_data, bins=256, range=(0, 256))
+            hist = hist / hist.sum()  # Normalize
+            hist = hist[hist > 0]  # Remove zeros
             
-            # Optimal brightness: 80-180 (well-lit scenes)
-            if 80 <= mean_brightness <= 180:
-                return 100.0
-            elif mean_brightness < 80:
-                # Too dark
-                return mean_brightness / 80 * 50
-            else:
-                # Too bright
-                return (255 - mean_brightness) / 75 * 50
+            entropy = -np.sum(hist * np.log2(hist))
+            
+            # Normalize to 0-100 (max entropy for 8-bit is 8)
+            return min(entropy * 12.5, 100)
             
         except:
-            return 50.0  # Default neutral score
-    
-    def _apply_diversity_filter(self, results: List[Tuple[float, Dict]], num_clips: int) -> List[Tuple[float, Dict]]:
-        """
-        Apply diversity filter to avoid selecting similar/adjacent scenes
-        """
-        if len(results) <= num_clips:
-            return results
-        
-        selected = []
-        min_gap = self.duration / (num_clips * 2)  # Minimum time gap between clips
-        
-        for timestamp, score_data in results:
-            # Check if this timestamp is far enough from already selected ones
-            is_diverse = True
-            for selected_timestamp, _ in selected:
-                if abs(timestamp - selected_timestamp) < min_gap:
-                    is_diverse = False
-                    break
-            
-            if is_diverse:
-                selected.append((timestamp, score_data))
-                
-                if len(selected) >= num_clips:
-                    break
-        
-        # If we don't have enough, fill with best remaining
-        if len(selected) < num_clips:
-            for timestamp, score_data in results:
-                if (timestamp, score_data) not in selected:
-                    selected.append((timestamp, score_data))
-                    if len(selected) >= num_clips:
-                        break
-        
-        return selected
+            return 0
 
 
 if __name__ == "__main__":
