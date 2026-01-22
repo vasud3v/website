@@ -185,10 +185,11 @@ class WorkflowIntegration:
             # Build result
             result.update({
                 'success': True,
-                'preview_file_size_mb': preview_result['file_size_mb'],
-                'preview_duration': preview_result['total_duration'],
-                'num_clips': preview_result['num_clips'],
-                'resolution': preview_result['resolution'],
+                'preview_file_size_mb': preview_result.get('file_size_mb', 0),
+                'preview_duration': preview_result.get('total_duration', 0),
+                'num_clips': preview_result.get('num_clips', 0),
+                'resolution': preview_result.get('resolution', resolution),
+                'speed': preview_result.get('speed', 1.5),
                 'error': None
             })
             

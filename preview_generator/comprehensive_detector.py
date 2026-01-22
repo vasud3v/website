@@ -468,7 +468,8 @@ class ComprehensiveDetector:
             'num_clips': len(timestamps),
             'total_duration': actual_duration,
             'file_size_mb': file_size,
-            'speed': speed
+            'speed': speed,
+            'resolution': resolution
         }
 
 
