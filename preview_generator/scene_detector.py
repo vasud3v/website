@@ -75,31 +75,41 @@ class SceneDetector:
             print(f"[SceneDetector] Error getting video info: {e}")
             return None
     
-    def detect_scenes(self, threshold: float = 0.4) -> List[Dict]:
+    def detect_scenes(self, threshold: float = 0.4, max_duration: int = 3600) -> List[Dict]:
         """
         Detect scene changes using FFmpeg
         
         Args:
             threshold: Scene change sensitivity (0.0-1.0, higher = less sensitive)
+            max_duration: Skip scene detection for videos longer than this (seconds)
         
         Returns:
             List of scenes with timestamps
         """
+        # Skip scene detection for very long videos (too slow)
+        if self.duration and self.duration > max_duration:
+            print(f"[SceneDetector] Video too long ({self.duration:.0f}s), skipping scene detection")
+            print(f"[SceneDetector] Will use motion analysis only")
+            return []
+        
         print(f"[SceneDetector] Detecting scenes (threshold={threshold})...")
         
         try:
-            # Use FFmpeg scene detection filter
+            # Use FFmpeg scene detection filter with timeout
             cmd = [
                 'ffmpeg', '-i', self.video_path,
                 '-filter:v', f"select='gt(scene,{threshold})',showinfo",
                 '-f', 'null', '-'
             ]
             
+            # Set timeout based on video duration (max 5 minutes for scene detection)
+            timeout = min(300, int(self.duration * 0.5)) if self.duration else 300
+            
             result = subprocess.run(
                 cmd, 
                 capture_output=True, 
                 text=True, 
-                timeout=300
+                timeout=timeout
             )
             
             # Parse scene timestamps from stderr
@@ -119,6 +129,9 @@ class SceneDetector:
             self.scenes = scenes
             return scenes
             
+        except subprocess.TimeoutExpired:
+            print(f"[SceneDetector] Scene detection timeout, using motion analysis only")
+            return []
         except Exception as e:
             print(f"[SceneDetector] Error detecting scenes: {e}")
             return []
@@ -180,13 +193,16 @@ class SceneDetector:
         return segments
     
     def _analyze_segment(self, index: int, start_time: float, duration: float) -> Dict:
-        """Analyze a single segment"""
+        """Analyze a single segment - optimized version"""
         try:
-            # Calculate motion vectors for this segment
+            # Use faster method: just count frames instead of full analysis
+            # Sample only 5 seconds from each segment for speed
+            sample_duration = min(5, duration)
+            
             cmd = [
                 'ffmpeg', '-ss', str(start_time),
                 '-i', self.video_path,
-                '-t', str(min(duration, 10)),  # Max 10s per segment
+                '-t', str(sample_duration),
                 '-vf', 'select=gt(scene\\,0.01),metadata=print:file=-',
                 '-an', '-f', 'null', '-'
             ]
@@ -195,7 +211,7 @@ class SceneDetector:
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=15  # Shorter timeout
             )
             
             # Count frame changes as motion indicator
@@ -208,20 +224,26 @@ class SceneDetector:
                 'motion_score': motion_score,
                 'type': 'motion_analysis'
             }
+        except subprocess.TimeoutExpired:
+            print(f"[SceneDetector] Segment {index} timeout, skipping")
+            return None
         except Exception as e:
             print(f"[SceneDetector] Error analyzing segment {index}: {e}")
             return None
     
     @staticmethod
     def _analyze_segment_worker(task):
-        """Worker function for parallel segment analysis"""
+        """Worker function for parallel segment analysis - optimized"""
         index, start_time, duration, video_path = task
         
         try:
+            # Sample only 5 seconds for speed
+            sample_duration = min(5, duration)
+            
             cmd = [
                 'ffmpeg', '-ss', str(start_time),
                 '-i', video_path,
-                '-t', str(min(duration, 10)),
+                '-t', str(sample_duration),
                 '-vf', 'select=gt(scene\\,0.01),metadata=print:file=-',
                 '-an', '-f', 'null', '-'
             ]
@@ -230,7 +252,7 @@ class SceneDetector:
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=15
             )
             
             motion_score = result.stderr.count('lavfi.scene_score')
@@ -245,6 +267,8 @@ class SceneDetector:
                 'motion_score': motion_score,
                 'type': 'motion_analysis'
             }
+        except subprocess.TimeoutExpired:
+            return None
         except Exception as e:
             print(f"[Worker] Error analyzing segment {index}: {e}")
             return None
@@ -279,13 +303,16 @@ class SceneDetector:
                 print(f"[SceneDetector] Video too short for any clips")
                 return []
         
-        # Strategy 1: Use scene detection if available
-        if not self.scenes:
-            self.detect_scenes(threshold=0.3)
+        # Strategy 1: Use scene detection if available (skip for long videos)
+        if not self.scenes and self.duration < 3600:  # Only for videos < 1 hour
+            self.detect_scenes(threshold=0.3, max_duration=3600)
+        elif self.duration >= 3600:
+            print(f"[SceneDetector] Skipping scene detection for long video ({self.duration/60:.0f} min)")
         
-        # Strategy 2: Analyze motion
-        num_segments = min(30, max(10, int(self.duration / 60)))
-        motion_segments = self.analyze_motion(num_segments=num_segments)
+        # Strategy 2: Analyze motion (faster, works for all videos)
+        num_segments = min(30, max(10, int(self.duration / 120)))  # 1 segment per 2 minutes
+        print(f"[SceneDetector] Analyzing {num_segments} segments for motion...")
+        motion_segments = self.analyze_motion(num_segments=num_segments, parallel=True)
         
         timestamps = []
         used_ranges = []  # Track used time ranges to avoid overlap
