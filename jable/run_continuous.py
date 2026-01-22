@@ -29,6 +29,15 @@ from upload_thumbnail import upload_thumbnail_to_streamwish
 from set_streamwish_thumbnail import set_streamwish_thumbnail
 from set_thumbnail_advanced import set_streamwish_thumbnail_advanced
 
+# Import preview creation
+try:
+    from create_video_preview import create_preview
+    PREVIEW_CREATION_AVAILABLE = True
+    print("✓ Preview creation available")
+except ImportError as e:
+    PREVIEW_CREATION_AVAILABLE = False
+    print(f"⚠️ Preview creation not available: {e}")
+
 print("All imports successful!")
 
 # Import JAVDatabase integration
@@ -422,7 +431,7 @@ def mark_as_failed(url, error_msg):
     except Exception as e:
         log(f"⚠️ Could not mark as failed: {e}")
 
-def save_video(video_data, upload_results, thumbnail_hosted_url=None):
+def save_video(video_data, upload_results, thumbnail_hosted_url=None, preview_url=None):
     """Save complete video metadata with embed URLs - Enhanced version with detailed logging"""
     try:
         log(f"   [save_video] ========== SAVE VIDEO START ==========")
@@ -469,6 +478,8 @@ def save_video(video_data, upload_results, thumbnail_hosted_url=None):
             # Preview images
             'preview_images': video_data.preview_images if hasattr(video_data, 'preview_images') else [],
             
+            # Preview video URL (if uploaded)
+            'preview_video_url': preview_url if preview_url else None,
             # Hosting info
             'hosting': {},
             
@@ -797,6 +808,25 @@ def process_one_video(scraper, url, num, total):
             mark_as_failed(url, error_msg)
             return False
         
+        # STEP 3.5: Create preview video
+        preview_file = None
+        if PREVIEW_CREATION_AVAILABLE:
+            log("\n🎬 Step 3.5: Creating preview video...")
+            try:
+                preview_file = f"{TEMP_DIR}/{code}_preview.mp4"
+                result = create_preview(mp4_file, preview_file, duration=15, num_clips=3)
+                if result and os.path.exists(result):
+                    preview_size_mb = os.path.getsize(result) / (1024 * 1024)
+                    log(f"✅ Preview created: {preview_size_mb:.1f} MB")
+                else:
+                    log(f"⚠️ Preview creation failed, continuing without preview")
+                    preview_file = None
+            except Exception as e:
+                log(f"⚠️ Preview creation error: {str(e)[:100]}")
+                preview_file = None
+        else:
+            log("\n⚠️ Step 3.5: Preview creation not available (skipping)")
+        
         # Check disk space before upload
         has_space, free_gb, _ = check_disk_space(min_free_gb=1)
         if not has_space:
@@ -947,6 +977,25 @@ def process_one_video(scraper, url, num, total):
             return False
         
         # STEP 5: Save metadata with embed URLs
+        # STEP 4.5: Upload preview video (if created)
+        preview_url = None
+        if preview_file and os.path.exists(preview_file):
+            log("\n📤 Step 4.5: Uploading preview video...")
+            try:
+                from upload_all_hosts import upload_to_streamwish
+                preview_folder = f"JAV_VIDEOS/{code}"
+                preview_title = f"{code} - PREVIEW"
+                
+                preview_result = upload_to_streamwish(preview_file, code, preview_title, preview_folder)
+                
+                if preview_result and preview_result.get('success'):
+                    preview_url = preview_result.get('embed_url')
+                    log(f"✅ Preview uploaded: {preview_url}")
+                else:
+                    log(f"⚠️ Preview upload failed, continuing without preview URL")
+            except Exception as e:
+                log(f"⚠️ Preview upload error: {str(e)[:100]}")
+        
         log("\n💾 Step 5: Saving to database...")
         try:
             log(f"   Video data code: {video_data.code}")
@@ -963,7 +1012,7 @@ def process_one_video(scraper, url, num, total):
                 log(f"   ⚠️ WARNING: No successful uploads to save!")
                 log(f"   Upload results full: {upload_results}")
             
-            if save_video(video_data, upload_results, thumbnail_url):
+            if save_video(video_data, upload_results, thumbnail_url, preview_url):
                 log("✅ Saved to database")
                 
                 # Verify it was saved
