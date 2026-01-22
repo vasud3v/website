@@ -8,6 +8,15 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    env_path = os.path.join(os.path.dirname(__file__), '.env')
+    if os.path.exists(env_path):
+        load_dotenv(env_path)
+except ImportError:
+    pass  # dotenv not installed, will use system environment variables
+
 def create_optimized_session():
     """Create a session with optimized settings"""
     session = requests.Session()
@@ -113,15 +122,16 @@ def upload_to_lulustream(file_path, code, title, folder_name=None):
         buffered_file = BufferedReader(file_path)
         
         # Prepare upload fields
+        # Note: LuluStream API uses 'key' parameter, not 'api_key'
         upload_fields = {
-            'api_key': LULUSTREAM_API_KEY,
+            'key': LULUSTREAM_API_KEY,
             'title': f"{code} - {title[:100]}",
             'file': (os.path.basename(file_path), buffered_file, 'video/mp4')
         }
         
         # Add folder if specified
         if folder_name:
-            upload_fields['folder'] = folder_name
+            upload_fields['fld_id'] = folder_name
             print(f"   📁 Folder: {folder_name}")
         
         encoder = MultipartEncoder(fields=upload_fields)
@@ -183,8 +193,8 @@ def upload_to_lulustream(file_path, code, title, folder_name=None):
         print("="*60)
         sys.stdout.flush()
         
-        # Reduce timeout to 300 seconds (5 minutes) for server response
-        # Most servers respond within 1-2 minutes after upload completes
+        # Use 2 hour timeout for large file uploads
+        # Large files can take significant time to upload and process
         print("   [DEBUG] Starting POST request...")
         sys.stdout.flush()
         
@@ -195,7 +205,7 @@ def upload_to_lulustream(file_path, code, title, folder_name=None):
                 'Content-Type': monitor.content_type,
                 'Connection': 'keep-alive'
             },
-            timeout=300  # 5 minutes instead of 2 hours
+            timeout=7200  # 2 hours for large files
         )
         
         print("   [DEBUG] POST request completed!")
@@ -221,21 +231,26 @@ def upload_to_lulustream(file_path, code, title, folder_name=None):
         print("\n⏳ Uploading (basic mode)...")
         print("   Install requests-toolbelt for progress: pip install requests-toolbelt")
         
+        data = {
+            'key': LULUSTREAM_API_KEY,
+            'title': f"{code} - {title[:100]}"
+        }
+        if folder_name:
+            data['fld_id'] = folder_name
+        
         with open(file_path, 'rb') as f:
             response = session.post(
                 server,
                 files={'file': (os.path.basename(file_path), f, 'video/mp4')},
-                data={
-                    'api_key': LULUSTREAM_API_KEY,
-                    'title': f"{code} - {title[:100]}"
-                },
-                timeout=300  # 5 minutes
+                data=data,
+                timeout=7200  # 2 hours for large files
             )
     
     except requests.exceptions.Timeout:
         print(f"\n❌ Upload timeout: Server took too long to respond")
         print(f"   The file may have been uploaded successfully but server didn't respond")
         print(f"   Check your Lulustream dashboard to verify")
+        print(f"   Tip: For very large files, consider increasing timeout or using FTP upload")
         return {'service': 'Lulustream', 'success': False, 'error': 'Timeout waiting for server response'}
     
     except Exception as e:

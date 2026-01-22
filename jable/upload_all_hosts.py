@@ -98,12 +98,12 @@ def upload_to_lulustream(file_path, code, title, folder_name=None, allow_small_f
         if use_multipart:
             # Prepare fields for multipart encoder
             fields = {
-                'api_key': LULUSTREAM_API_KEY,
+                'key': LULUSTREAM_API_KEY,
                 'title': upload_title,
             }
             
             if folder_name:
-                fields['folder'] = folder_name
+                fields['fld_id'] = folder_name
                 print(f"[LuluStream] ✓ Folder: {folder_name}")
             
             # Add file
@@ -173,14 +173,15 @@ def upload_to_lulustream(file_path, code, title, folder_name=None, allow_small_f
         else:
             # Fallback to standard upload
             print(f"[LuluStream] Using standard file upload...")
+            data = {
+                'key': LULUSTREAM_API_KEY,
+                'title': upload_title
+            }
+            if folder_name:
+                data['fld_id'] = folder_name
+            
             with open(file_path, 'rb') as video_file:
                 files = {'file': (os.path.basename(file_path), video_file, 'video/mp4')}
-                data = {
-                    'api_key': LULUSTREAM_API_KEY,
-                    'title': upload_title
-                }
-                if folder_name:
-                    data['folder'] = folder_name
                 
                 upload_response = requests.post(
                     upload_server,

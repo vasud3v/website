@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Advanced Preview Generator
+Advanced Preview Generator with Fast Parallel Scene Detection
 Main orchestrator for creating smart video previews
 """
 import os
 import sys
-from scene_detector import SceneDetector
+from fast_scene_detector import FastSceneDetector
 from clip_extractor import ClipExtractor
 
 class PreviewGenerator:
@@ -13,7 +13,7 @@ class PreviewGenerator:
         self.video_path = video_path
         self.output_dir = output_dir or os.path.dirname(os.path.abspath(video_path)) or '.'
         
-        self.detector = SceneDetector(video_path)
+        self.detector = FastSceneDetector(video_path)
         self.extractor = ClipExtractor(video_path, self.output_dir)
     
     def generate_preview(
@@ -81,18 +81,21 @@ class PreviewGenerator:
             
             print(f"✓ Video: {info['duration']:.1f}s, {info['width']}x{info['height']}, {info['fps']:.1f}fps")
             
-            # Step 2: Detect scenes and analyze motion
-            print("\n[2/5] Detecting scenes and analyzing motion...")
-            timestamps = self.detector.get_smart_timestamps(
+            # Step 2: Fast scene detection with parallel processing
+            print("\n[2/5] Detecting scenes (fast parallel mode)...")
+            timestamps = self.detector.detect_scenes_fast(
                 num_clips=num_clips,
-                clip_duration=clip_duration
+                threshold=0.3
             )
             
-            if not timestamps:
-                print("✗ No timestamps generated")
-                return result
+            if not timestamps or len(timestamps) < num_clips:
+                print(f"⚠️ Only found {len(timestamps)} scenes, using smart sampling...")
+                timestamps = self.detector.get_smart_timestamps(num_clips=num_clips)
             
-            print(f"✓ Generated {len(timestamps)} smart timestamps")
+            # Convert timestamps to (timestamp, duration) tuples
+            timestamps = [(t, clip_duration) for t in timestamps]
+            
+            print(f"✓ Selected {len(timestamps)} timestamps")
             
             # Step 3: Extract clips
             print("\n[3/5] Extracting clips...")
