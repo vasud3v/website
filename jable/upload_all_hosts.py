@@ -1,7 +1,7 @@
 """
-Upload video to StreamWish with LuluStream fallback - Rewritten for reliability
-Ensures full video is uploaded correctly
-Falls back to LuluStream when StreamWish hits upload limits
+Upload video to multiple hosting services with automatic fallback
+Priority: StreamWish → LuluStream → Streamtape
+Ensures full video is uploaded correctly with multiple fallback options
 """
 import os
 import sys
@@ -12,6 +12,8 @@ from streamwish_folders import get_or_create_folder
 # Load API keys at module level
 LULUSTREAM_API_KEY = os.getenv('LULUSTREAM_API_KEY')
 STREAMWISH_API_KEY = os.getenv('STREAMWISH_API_KEY')
+STREAMTAPE_LOGIN = os.getenv('STREAMTAPE_LOGIN')
+STREAMTAPE_API_KEY = os.getenv('STREAMTAPE_API_KEY')
 
 
 def upload_to_lulustream(file_path, code, title, folder_name=None, allow_small_files=False):
@@ -238,6 +240,191 @@ def upload_to_lulustream(file_path, code, title, folder_name=None, allow_small_f
         import traceback
         traceback.print_exc()
         return {'service': 'LuluStream', 'success': False, 'error': str(e)}
+
+
+def upload_to_streamtape(file_path, code, title, folder_name=None, allow_small_files=False):
+    """
+    Upload to Streamtape as second fallback
+    
+    Args:
+        file_path: Full path to MP4 file
+        code: Video code
+        title: Video title
+        folder_name: Optional folder name (not used by Streamtape)
+        allow_small_files: Allow files < 50MB (for previews)
+        
+    Returns:
+        Dict with success status and upload details
+    """
+    print(f"\n[Streamtape] ═══════════════════════════════════════")
+    print(f"[Streamtape] Starting fallback upload")
+    print(f"[Streamtape] ═══════════════════════════════════════")
+    
+    # Verify file exists and get size
+    if not os.path.exists(file_path):
+        print(f"[Streamtape] ❌ File not found: {file_path}")
+        return {'service': 'Streamtape', 'success': False, 'error': 'File not found'}
+    
+    file_size = os.path.getsize(file_path)
+    file_size_gb = file_size / (1024**3)
+    file_size_mb = file_size / (1024**2)
+    
+    print(f"[Streamtape] File: {os.path.basename(file_path)}")
+    print(f"[Streamtape] Size: {file_size_gb:.2f} GB ({file_size:,} bytes)")
+    
+    # Verify file is not too small
+    if not allow_small_files and file_size_mb < 50:
+        print(f"[Streamtape] ❌ File too small ({file_size_mb:.1f} MB) - likely incomplete")
+        return {'service': 'Streamtape', 'success': False, 'error': 'File too small'}
+    
+    # Check API credentials
+    if not STREAMTAPE_LOGIN or not STREAMTAPE_API_KEY:
+        print("[Streamtape] ❌ API credentials not set in environment")
+        return {'service': 'Streamtape', 'success': False, 'error': 'Missing credentials'}
+    
+    print(f"[Streamtape] Login: {STREAMTAPE_LOGIN[:10]}...")
+    
+    # Prepare title
+    if title.upper().startswith(code.upper()):
+        upload_title = title[:100]
+    else:
+        upload_title = f"{code} - {title[:100]}"
+    
+    # Get upload server
+    print(f"[Streamtape] Getting upload server...")
+    max_retries = 3
+    upload_url = None
+    
+    for attempt in range(max_retries):
+        try:
+            r = requests.get(
+                "https://api.streamtape.com/file/ul",
+                params={
+                    'login': STREAMTAPE_LOGIN,
+                    'key': STREAMTAPE_API_KEY
+                },
+                timeout=30
+            )
+            
+            if r.status_code == 403:
+                print(f"[Streamtape] ❌ Invalid API credentials")
+                return {'service': 'Streamtape', 'success': False, 'error': 'Invalid credentials'}
+            elif r.status_code == 509:
+                print(f"[Streamtape] ⚠️ Bandwidth limit exceeded")
+                if attempt < max_retries - 1:
+                    wait_time = (2 ** attempt) * 60
+                    print(f"[Streamtape] Retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+                    continue
+                return {'service': 'Streamtape', 'success': False, 'error': 'Bandwidth limit'}
+            elif r.status_code != 200:
+                print(f"[Streamtape] ❌ HTTP {r.status_code}")
+                if attempt < max_retries - 1:
+                    print(f"[Streamtape] Retrying in 5s...")
+                    time.sleep(5)
+                    continue
+                return {'service': 'Streamtape', 'success': False, 'error': f'HTTP {r.status_code}'}
+            
+            result = r.json()
+            
+            if result.get('status') != 200:
+                error_msg = result.get('msg', 'Unknown error')
+                print(f"[Streamtape] ❌ API Error: {error_msg}")
+                if attempt < max_retries - 1:
+                    print(f"[Streamtape] Retrying in 5s...")
+                    time.sleep(5)
+                    continue
+                return {'service': 'Streamtape', 'success': False, 'error': error_msg}
+            
+            upload_url = result['result']['url']
+            print(f"[Streamtape] ✓ Upload server: {upload_url}")
+            break
+            
+        except Exception as e:
+            print(f"[Streamtape] ❌ Error: {str(e)[:100]}")
+            if attempt < max_retries - 1:
+                print(f"[Streamtape] Retrying in 5s...")
+                time.sleep(5)
+                continue
+            return {'service': 'Streamtape', 'success': False, 'error': str(e)}
+    
+    if not upload_url:
+        return {'service': 'Streamtape', 'success': False, 'error': 'Could not get upload server'}
+    
+    # Upload file
+    upload_start = time.time()
+    print(f"[Streamtape] Uploading to {upload_url}")
+    print(f"[Streamtape] This will take several minutes...")
+    
+    max_upload_retries = 2
+    for upload_attempt in range(max_upload_retries):
+        try:
+            with open(file_path, 'rb') as f:
+                response = requests.post(
+                    upload_url,
+                    files={'file1': (os.path.basename(file_path), f, 'video/mp4')},
+                    timeout=7200
+                )
+            
+            upload_time = time.time() - upload_start
+            print(f"[Streamtape] ✓ Upload completed in {int(upload_time//60)}m {int(upload_time%60)}s")
+            
+            if response.status_code == 509:
+                print(f"[Streamtape] ⚠️ Bandwidth limit exceeded")
+                if upload_attempt < max_upload_retries - 1:
+                    print(f"[Streamtape] Retrying in 5 minutes...")
+                    time.sleep(300)
+                    continue
+                return {'service': 'Streamtape', 'success': False, 'error': 'Bandwidth limit'}
+            elif response.status_code != 200:
+                print(f"[Streamtape] ❌ HTTP {response.status_code}")
+                if upload_attempt < max_upload_retries - 1:
+                    print(f"[Streamtape] Retrying in 10s...")
+                    time.sleep(10)
+                    continue
+                return {'service': 'Streamtape', 'success': False, 'error': f'HTTP {response.status_code}'}
+            
+            result = response.json()
+            
+            if result.get('status') == 200:
+                file_id = result['result']['id']
+                
+                print(f"\n[Streamtape] ═══════════════════════════════════════")
+                print(f"[Streamtape] ✅ UPLOAD SUCCESSFUL!")
+                print(f"[Streamtape] ═══════════════════════════════════════")
+                print(f"[Streamtape] File ID: {file_id}")
+                print(f"[Streamtape] Embed URL: https://streamtape.com/e/{file_id}")
+                print(f"[Streamtape] Watch URL: https://streamtape.com/v/{file_id}")
+                print(f"[Streamtape] Upload time: {int(upload_time//60)}m {int(upload_time%60)}s")
+                print(f"[Streamtape] File size uploaded: {file_size_gb:.2f} GB")
+                
+                return {
+                    'service': 'Streamtape',
+                    'success': True,
+                    'filecode': file_id,
+                    'embed_url': f"https://streamtape.com/e/{file_id}",
+                    'watch_url': f"https://streamtape.com/v/{file_id}",
+                    'time': upload_time,
+                    'file_size': file_size
+                }
+            else:
+                error_msg = result.get('msg', 'Unknown error')
+                print(f"[Streamtape] ❌ Upload failed: {error_msg}")
+                if upload_attempt < max_upload_retries - 1:
+                    print(f"[Streamtape] Retrying in 10s...")
+                    time.sleep(10)
+                    continue
+                return {'service': 'Streamtape', 'success': False, 'error': error_msg}
+        
+        except Exception as e:
+            print(f"[Streamtape] ❌ Error: {str(e)[:100]}")
+            if upload_attempt < max_upload_retries - 1:
+                print(f"[Streamtape] Retrying in 30s...")
+                time.sleep(30)
+                continue
+            return {'service': 'Streamtape', 'success': False, 'error': str(e)}
+    
+    return {'service': 'Streamtape', 'success': False, 'error': 'All retries failed'}
 
 
 def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_files=False):
@@ -803,10 +990,11 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
 
 def upload_all(file_path, code, title, video_data=None):
     """
-    Main upload function - uploads to StreamWish, falls back to LuluStream if rate limited
+    Main upload function - tries all hosting services with automatic fallback
+    Priority: StreamWish → LuluStream → Streamtape
     """
     print(f"\n╔══════════════════════════════════════════════════════════╗")
-    print(f"║              VIDEO UPLOAD (StreamWish + LuluStream)      ║")
+    print(f"║         VIDEO UPLOAD (Multi-Host with Fallback)          ║")
     print(f"╚══════════════════════════════════════════════════════════╝")
     
     # Create nested folder structure: parent_folder/video_code/
@@ -817,100 +1005,140 @@ def upload_all(file_path, code, title, video_data=None):
     print(f"   Video folder: {code}")
     
     start_time = time.time()
+    all_results = []
     
+    # ATTEMPT 1: StreamWish (Primary)
     print(f"\n{'='*60}")
-    print(f"ATTEMPT 1: StreamWish")
+    print(f"ATTEMPT 1: StreamWish (Primary)")
     print(f"{'='*60}")
-    result = upload_to_streamwish(file_path, code, title, folder_name)
+    streamwish_result = upload_to_streamwish(file_path, code, title, folder_name)
+    all_results.append(streamwish_result)
+    
+    # Check if StreamWish succeeded
+    if streamwish_result.get('success'):
+        total_time = time.time() - start_time
+        print(f"\n{'='*60}")
+        print(f"UPLOAD SUMMARY")
+        print(f"{'='*60}")
+        print(f"Total time: {int(total_time//60)}m {int(total_time%60)}s")
+        print(f"✅ StreamWish (primary)")
+        print(f"   Embed: {streamwish_result['embed_url']}")
+        print(f"   Watch: {streamwish_result['watch_url']}")
+        print(f"   Time: {int(streamwish_result['time']//60)}m {int(streamwish_result['time']%60)}s")
+        print(f"{'='*60}")
+        
+        return {
+            'successful': [streamwish_result],
+            'failed': [],
+            'total_time': total_time,
+            'primary_service': 'StreamWish'
+        }
+    
+    # StreamWish failed - check if it's a rate limit
+    if streamwish_result.get('error') in ['RATE_LIMIT', 'QUOTA_EXCEEDED']:
+        print(f"\n{'='*60}")
+        print(f"🚫 STREAMWISH QUOTA EXCEEDED - TRYING FALLBACKS")
+        print(f"{'='*60}")
+        print(f"StreamWish error: {streamwish_result.get('error_msg', 'Upload quota exceeded')}")
+        
+        from datetime import datetime
+        if streamwish_result.get('wait_until'):
+            resume_time = datetime.fromtimestamp(streamwish_result['wait_until'])
+            print(f"StreamWish resume at: {resume_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    else:
+        print(f"\n{'='*60}")
+        print(f"⚠️ STREAMWISH FAILED - TRYING FALLBACKS")
+        print(f"{'='*60}")
+        print(f"StreamWish error: {streamwish_result.get('error', 'Unknown error')}")
+    
+    # ATTEMPT 2: LuluStream (First Fallback)
+    print(f"\n{'='*60}")
+    print(f"ATTEMPT 2: LuluStream (First Fallback)")
+    print(f"{'='*60}")
+    lulustream_result = upload_to_lulustream(file_path, code, title, folder_name)
+    all_results.append(lulustream_result)
+    
+    # Check if LuluStream succeeded
+    if lulustream_result.get('success'):
+        total_time = time.time() - start_time
+        print(f"\n{'='*60}")
+        print(f"UPLOAD SUMMARY")
+        print(f"{'='*60}")
+        print(f"Total time: {int(total_time//60)}m {int(total_time%60)}s")
+        print(f"❌ StreamWish: {streamwish_result.get('error', 'Failed')}")
+        print(f"✅ LuluStream (fallback)")
+        print(f"   Embed: {lulustream_result['embed_url']}")
+        print(f"   Watch: {lulustream_result['watch_url']}")
+        print(f"   Time: {int(lulustream_result['time']//60)}m {int(lulustream_result['time']%60)}s")
+        print(f"{'='*60}")
+        
+        return {
+            'successful': [lulustream_result],
+            'failed': [streamwish_result],
+            'total_time': total_time,
+            'fallback_used': 'LuluStream',
+            'rate_limited': streamwish_result.get('error') in ['RATE_LIMIT', 'QUOTA_EXCEEDED'],
+            'wait_until': streamwish_result.get('wait_until'),
+            'wait_seconds': streamwish_result.get('wait_seconds')
+        }
+    
+    # LuluStream also failed - try Streamtape
+    print(f"\n{'='*60}")
+    print(f"⚠️ LULUSTREAM FAILED - TRYING FINAL FALLBACK")
+    print(f"{'='*60}")
+    print(f"LuluStream error: {lulustream_result.get('error', 'Unknown error')}")
+    
+    # ATTEMPT 3: Streamtape (Second Fallback)
+    print(f"\n{'='*60}")
+    print(f"ATTEMPT 3: Streamtape (Final Fallback)")
+    print(f"{'='*60}")
+    streamtape_result = upload_to_streamtape(file_path, code, title, folder_name)
+    all_results.append(streamtape_result)
     
     total_time = time.time() - start_time
     
-    if result.get('error') in ['RATE_LIMIT', 'QUOTA_EXCEEDED']:
+    # Check if Streamtape succeeded
+    if streamtape_result.get('success'):
         print(f"\n{'='*60}")
-        print(f"🚫 STREAMWISH QUOTA EXCEEDED - TRYING LULUSTREAM FALLBACK")
+        print(f"UPLOAD SUMMARY")
         print(f"{'='*60}")
-        print(f"StreamWish error: {result.get('error_msg', 'Upload quota exceeded')}")
-        print(f"Wait time: {result.get('wait_seconds', 0) / 3600:.1f} hours")
-        
-        from datetime import datetime
-        if result.get('wait_until'):
-            resume_time = datetime.fromtimestamp(result['wait_until'])
-            print(f"StreamWish resume at: {resume_time.strftime('%Y-%m-%d %H:%M:%S')}")
-        
-        print(f"\n{'='*60}")
-        print(f"ATTEMPT 2: LuluStream (Fallback)")
+        print(f"Total time: {int(total_time//60)}m {int(total_time%60)}s")
+        print(f"❌ StreamWish: {streamwish_result.get('error', 'Failed')}")
+        print(f"❌ LuluStream: {lulustream_result.get('error', 'Failed')}")
+        print(f"✅ Streamtape (final fallback)")
+        print(f"   Embed: {streamtape_result['embed_url']}")
+        print(f"   Watch: {streamtape_result['watch_url']}")
+        print(f"   Time: {int(streamtape_result['time']//60)}m {int(streamtape_result['time']%60)}s")
         print(f"{'='*60}")
         
-        lulustream_result = upload_to_lulustream(file_path, code, title, folder_name)
-        
-        total_time = time.time() - start_time
-        
-        if lulustream_result.get('success'):
-            print(f"\n{'='*60}")
-            print(f"UPLOAD SUMMARY")
-            print(f"{'='*60}")
-            print(f"Total time: {int(total_time//60)}m {int(total_time%60)}s")
-            print(f"✅ LuluStream (fallback)")
-            print(f"   Embed: {lulustream_result['embed_url']}")
-            print(f"   Watch: {lulustream_result['watch_url']}")
-            print(f"   Time: {int(lulustream_result['time']//60)}m {int(lulustream_result['time']%60)}s")
-            print(f"{'='*60}")
-            
-            return {
-                'successful': [lulustream_result],
-                'failed': [result],
-                'total_time': total_time,
-                'rate_limited': True,
-                'wait_until': result.get('wait_until'),
-                'wait_seconds': result.get('wait_seconds'),
-                'error_msg': result.get('error_msg'),
-                'fallback_used': 'LuluStream'
-            }
-        else:
-            # Both failed
-            print(f"\n{'='*60}")
-            print(f"UPLOAD SUMMARY")
-            print(f"{'='*60}")
-            print(f"Total time: {int(total_time//60)}m {int(total_time%60)}s")
-            print(f"❌ StreamWish: Rate limited")
-            print(f"❌ LuluStream: {lulustream_result.get('error', 'Unknown error')}")
-            print(f"{'='*60}")
-            
-            return {
-                'successful': [],
-                'failed': [result, lulustream_result],
-                'total_time': total_time,
-                'rate_limited': True,
-                'wait_until': result.get('wait_until'),
-                'wait_seconds': result.get('wait_seconds'),
-                'error_msg': result.get('error_msg')
-            }
+        return {
+            'successful': [streamtape_result],
+            'failed': [streamwish_result, lulustream_result],
+            'total_time': total_time,
+            'fallback_used': 'Streamtape',
+            'rate_limited': streamwish_result.get('error') in ['RATE_LIMIT', 'QUOTA_EXCEEDED'],
+            'wait_until': streamwish_result.get('wait_until'),
+            'wait_seconds': streamwish_result.get('wait_seconds')
+        }
     
-    # Summary for normal StreamWish upload
+    # All three services failed
     print(f"\n{'='*60}")
-    print(f"UPLOAD SUMMARY")
+    print(f"❌ ALL UPLOAD SERVICES FAILED")
     print(f"{'='*60}")
     print(f"Total time: {int(total_time//60)}m {int(total_time%60)}s")
-    
-    successful = []
-    failed = []
-    
-    if result.get('success'):
-        successful.append(result)
-        print(f"✅ StreamWish")
-        print(f"   Embed: {result['embed_url']}")
-        print(f"   Watch: {result['watch_url']}")
-        print(f"   Time: {int(result['time']//60)}m {int(result['time']%60)}s")
-    else:
-        failed.append(result)
-        print(f"❌ StreamWish: {result.get('error', 'Unknown error')}")
-    
+    print(f"❌ StreamWish: {streamwish_result.get('error', 'Unknown error')}")
+    print(f"❌ LuluStream: {lulustream_result.get('error', 'Unknown error')}")
+    print(f"❌ Streamtape: {streamtape_result.get('error', 'Unknown error')}")
     print(f"{'='*60}")
     
     return {
-        'successful': successful,
-        'failed': failed,
-        'total_time': total_time
+        'successful': [],
+        'failed': all_results,
+        'total_time': total_time,
+        'all_failed': True,
+        'rate_limited': streamwish_result.get('error') in ['RATE_LIMIT', 'QUOTA_EXCEEDED'],
+        'wait_until': streamwish_result.get('wait_until'),
+        'wait_seconds': streamwish_result.get('wait_seconds')
     }
 
 
