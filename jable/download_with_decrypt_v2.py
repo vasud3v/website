@@ -486,14 +486,11 @@ class HLSDownloaderV2:
                 print(f"   ⚠️ Warning: Missing {missing}/{total} segments ({missing/total*100:.1f}%)")
                 sys.stdout.flush()
                 
-                # If too many segments missing, fail the download
-                if missing > total * 0.02:  # More than 2% missing (reduced from 10%)
-                    print(f"   ❌ Too many segments missing ({missing/total*100:.1f}%), download failed")
-                    sys.stdout.flush()
-                    return False
-                
-                print(f"   ⚠️ Continuing with partial download (acceptable loss)...")
+                # If ANY segments missing, fail the download (was 2% threshold)
+                # We need complete videos for quality
+                print(f"   ❌ Incomplete download ({missing} segments missing), download failed")
                 sys.stdout.flush()
+                return False
             
             # Merge
             print(f"\nMerging {downloaded} segments...")
