@@ -1986,6 +1986,34 @@ def main():
     log(f"Time limit: {TIME_LIMIT/3600:.1f} hours")
     log("Workflow: Scrape → Download → Upload → Save → Delete → Next")
     
+    # Process JAVDatabase retry queue first (if available)
+    if JAVDB_INTEGRATION_AVAILABLE:
+        try:
+            from javdatabase.integrated_pipeline import process_javdb_retry_queue, get_retry_queue_stats
+            
+            log(f"\n{'='*60}")
+            log("🔄 CHECKING JAVDATABASE RETRY QUEUE")
+            log(f"{'='*60}")
+            
+            stats = get_retry_queue_stats()
+            log(f"   Total in queue: {stats['total']}")
+            log(f"   Ready for retry: {stats['ready_for_retry']}")
+            log(f"   Pending: {stats['pending']}")
+            
+            if stats['ready_for_retry'] > 0:
+                log(f"\n   Processing up to 5 videos from retry queue...")
+                retry_results = process_javdb_retry_queue(max_videos=5, headless=True)
+                log(f"\n   Retry results:")
+                log(f"   - Processed: {retry_results['processed']}")
+                log(f"   - Success: {retry_results['success']}")
+                log(f"   - Failed: {retry_results['failed']}")
+            else:
+                log(f"   No videos ready for retry")
+            
+            log(f"{'='*60}\n")
+        except Exception as e:
+            log(f"⚠️ Error processing retry queue: {e}")
+    
     # Check existing database
     if DATABASE_MANAGER_AVAILABLE:
         existing_videos = db_manager.get_all_videos()

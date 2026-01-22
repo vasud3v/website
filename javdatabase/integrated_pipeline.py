@@ -2,6 +2,7 @@
 Integrated pipeline to be called from Jable scraper
 Handles JAVDatabase scraping + merging + saving for single video
 Uses centralized database manager in root/database folder
+Includes smart retry system for videos not found in JAVDatabase
 """
 
 import json
@@ -25,6 +26,14 @@ try:
 except ImportError:
     DATABASE_MANAGER_AVAILABLE = False
     print("⚠️ Database manager not available, using legacy database handling")
+
+# Import retry manager
+try:
+    from retry_manager import retry_manager
+    RETRY_MANAGER_AVAILABLE = True
+except ImportError:
+    RETRY_MANAGER_AVAILABLE = False
+    print("⚠️ Retry manager not available")
 
 from scrape_single import scrape_single_video
 from merge_single import merge_and_validate
@@ -161,7 +170,17 @@ class IntegratedPipeline:
                 print(f"     - Genres: {len(javdb_data.get('genres', []))}")
             else:
                 print(f"  ⚠️  Video not found on JAVDatabase")
-                print(f"     Will use Jable data only")
+                print(f"     This is normal for new releases (usually indexed within 2-7 days)")
+                print(f"     Will use Jable data only and retry later")
+                
+                # Add to retry queue for automatic retry after 2 days
+                if RETRY_MANAGER_AVAILABLE:
+                    print(f"\n📋 Adding to retry queue...")
+                    retry_manager.add_to_queue(video_code, jable_data, reason="not_found_in_javdb")
+                    
+                    # Show queue stats
+                    stats = retry_manager.get_queue_stats()
+                    print(f"   Retry queue: {stats['total']} videos ({stats['ready_for_retry']} ready, {stats['pending']} pending)")
                 
         except Exception as e:
             print(f"  ❌ JAVDatabase scraping failed: {e}")
@@ -224,9 +243,119 @@ class IntegratedPipeline:
         print(f"\n{'='*70}")
         print(f"✅ {video_code} processed successfully!")
         print(f"   JAVDatabase: {'✅ Available' if javdb_data else '⚠️  Not available'}")
+        
+        # If JAVDatabase data was found, remove from retry queue
+        if javdb_data and RETRY_MANAGER_AVAILABLE:
+            retry_manager.remove_from_queue(video_code)
+        
         print(f"{'='*70}\n")
         
         return merged_data
+    
+    def process_retry_queue(self, max_videos: int = 10, headless: bool = True) -> dict:
+        """
+        Process videos from retry queue that are ready for retry
+        
+        Args:
+            max_videos: Maximum number of videos to retry in this run
+            headless: Run browser in headless mode
+        
+        Returns:
+            dict: Statistics about retry processing
+        """
+        if not RETRY_MANAGER_AVAILABLE:
+            print("⚠️ Retry manager not available")
+            return {'processed': 0, 'success': 0, 'failed': 0}
+        
+        print(f"\n{'='*70}")
+        print(f"🔄 PROCESSING JAVDATABASE RETRY QUEUE")
+        print(f"{'='*70}")
+        
+        # Get videos ready for retry
+        ready_videos = retry_manager.get_videos_ready_for_retry()
+        
+        if not ready_videos:
+            print("   No videos ready for retry")
+            return {'processed': 0, 'success': 0, 'failed': 0}
+        
+        print(f"   Found {len(ready_videos)} videos ready for retry")
+        print(f"   Processing up to {max_videos} videos...")
+        
+        processed = 0
+        success = 0
+        failed = 0
+        
+        for item in ready_videos[:max_videos]:
+            video_code = item.get('code')
+            video_data = item.get('video_data', {})
+            retry_count = item.get('retry_count', 0)
+            
+            print(f"\n{'─'*70}")
+            print(f"🔄 Retry {retry_count + 1}/{retry_manager.max_retries}: {video_code}")
+            print(f"{'─'*70}")
+            
+            try:
+                # Try to scrape JAVDatabase again
+                javdb_data = scrape_single_video(video_code, headless=headless)
+                
+                if javdb_data:
+                    print(f"  ✅ JAVDatabase data found!")
+                    
+                    # Merge and save
+                    merged_data = merge_and_validate(video_data, javdb_data)
+                    
+                    if self.use_db_manager:
+                        if db_manager.add_or_update_video(merged_data):
+                            print(f"  ✅ Updated database with JAVDatabase data")
+                            retry_manager.update_retry_status(video_code, success=True, found_in_javdb=True)
+                            success += 1
+                        else:
+                            print(f"  ❌ Failed to update database")
+                            retry_manager.update_retry_status(video_code, success=False, found_in_javdb=True)
+                            failed += 1
+                    else:
+                        # Legacy save
+                        existing = self.load_combined_database()
+                        existing = [v for v in existing if v.get("code") != video_code]
+                        existing.append(merged_data)
+                        
+                        if self.save_combined_database(existing):
+                            print(f"  ✅ Updated database with JAVDatabase data")
+                            retry_manager.update_retry_status(video_code, success=True, found_in_javdb=True)
+                            success += 1
+                        else:
+                            print(f"  ❌ Failed to update database")
+                            retry_manager.update_retry_status(video_code, success=False, found_in_javdb=True)
+                            failed += 1
+                else:
+                    print(f"  ⚠️  Still not found in JAVDatabase")
+                    retry_manager.update_retry_status(video_code, success=False, found_in_javdb=False)
+                    failed += 1
+                
+            except Exception as e:
+                print(f"  ❌ Retry failed: {e}")
+                retry_manager.update_retry_status(video_code, success=False, found_in_javdb=False)
+                failed += 1
+            
+            processed += 1
+        
+        print(f"\n{'='*70}")
+        print(f"🔄 RETRY QUEUE PROCESSING COMPLETE")
+        print(f"{'='*70}")
+        print(f"   Processed: {processed}")
+        print(f"   Success: {success}")
+        print(f"   Failed: {failed}")
+        
+        # Show updated queue stats
+        stats = retry_manager.get_queue_stats()
+        print(f"\n   Updated queue stats:")
+        print(f"   - Total: {stats['total']}")
+        print(f"   - Ready: {stats['ready_for_retry']}")
+        print(f"   - Pending: {stats['pending']}")
+        print(f"   - Max retries: {stats['max_retries_reached']}")
+        print(f"{'='*70}\n")
+        
+        return {'processed': processed, 'success': success, 'failed': failed}
 
 
 def process_single_video_from_jable(jable_data: dict, headless: bool = True) -> bool:
@@ -243,6 +372,28 @@ def process_single_video_from_jable(jable_data: dict, headless: bool = True) -> 
     pipeline = IntegratedPipeline()
     result = pipeline.process_video(jable_data, headless=headless)
     return result is not None
+
+
+def process_javdb_retry_queue(max_videos: int = 10, headless: bool = True) -> dict:
+    """
+    Process JAVDatabase retry queue
+    
+    Args:
+        max_videos: Maximum number of videos to retry
+        headless: Run browser in headless mode
+    
+    Returns:
+        dict: Statistics about retry processing
+    """
+    pipeline = IntegratedPipeline()
+    return pipeline.process_retry_queue(max_videos=max_videos, headless=headless)
+
+
+def get_retry_queue_stats() -> dict:
+    """Get statistics about retry queue"""
+    if RETRY_MANAGER_AVAILABLE:
+        return retry_manager.get_queue_stats()
+    return {'total': 0, 'ready_for_retry': 0, 'pending': 0, 'max_retries_reached': 0}
 
 
 if __name__ == "__main__":
