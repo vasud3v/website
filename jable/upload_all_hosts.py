@@ -598,7 +598,7 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
         test_response = requests.get(
             "https://api.streamwish.com/api/account/info",
             params={'key': STREAMWISH_API_KEY},
-            timeout=10
+            timeout=30
         )
         if test_response.status_code == 200:
             test_data = test_response.json()
@@ -1036,7 +1036,7 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
             direct_access_passed = False
             try:
                 test_url = f"https://streamwish.com/{filecode}"
-                test_response = requests.head(test_url, timeout=10, allow_redirects=True)
+                test_response = requests.head(test_url, timeout=30, allow_redirects=True)
                 print(f"[StreamWish] Direct access test: HTTP {test_response.status_code}")
                 
                 if test_response.status_code == 403:

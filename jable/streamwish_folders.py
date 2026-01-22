@@ -5,6 +5,7 @@ Handles folder creation and caching with parent folder support
 """
 import os
 import json
+import time
 import requests
 
 # Use absolute path to project root database
@@ -79,41 +80,55 @@ def get_or_create_parent_folder(api_key):
     
     print(f"   [Folder] Creating new parent folder '{PARENT_FOLDER_NAME}'...")
     
-    try:
-        r = requests.get("https://api.streamwish.com/api/folder/create",
-                        params={
-                            'key': api_key,
-                            'name': PARENT_FOLDER_NAME
-                        }, timeout=10)
-        
-        if r.status_code == 200:
-            result = r.json()
-            if result.get('status') == 200:
-                folder_id = result.get('result', {}).get('fld_id')
-                if folder_id:
-                    folder_id = str(folder_id)
-                    cache[cache_key] = folder_id
-                    save_folder_cache(cache)
-                    print(f"   [Folder] ✅ Created parent folder with ID: {folder_id}")
-                    return folder_id
-            else:
-                error_msg = result.get('msg', 'Unknown error')
-                if 'already' in error_msg.lower() or 'exist' in error_msg.lower():
-                    print(f"   [Folder] Parent folder already exists, fetching...")
-                    folders = list_folders(api_key)
-                    for folder in folders:
-                        server_name = folder.get('name', '').strip()
-                        # Case-insensitive matching
-                        if server_name.lower() == PARENT_FOLDER_NAME.lower():
-                            folder_id = str(folder.get('fld_id'))
-                            cache[cache_key] = folder_id
-                            save_folder_cache(cache)
-                            print(f"   [Folder] ✅ Found parent folder ID: {folder_id} (name: '{server_name}')")
-                            return folder_id
-        
-        print(f"   [Folder] ⚠️ Failed to create parent folder: {r.text[:100]}")
-    except Exception as e:
-        print(f"   [Folder] ❌ Error creating parent folder: {e}")
+    # Retry logic for folder creation
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            r = requests.get("https://api.streamwish.com/api/folder/create",
+                            params={
+                                'key': api_key,
+                                'name': PARENT_FOLDER_NAME
+                            }, timeout=30)
+            
+            if r.status_code == 200:
+                result = r.json()
+                if result.get('status') == 200:
+                    folder_id = result.get('result', {}).get('fld_id')
+                    if folder_id:
+                        folder_id = str(folder_id)
+                        cache[cache_key] = folder_id
+                        save_folder_cache(cache)
+                        print(f"   [Folder] ✅ Created parent folder with ID: {folder_id}")
+                        return folder_id
+                else:
+                    error_msg = result.get('msg', 'Unknown error')
+                    if 'already' in error_msg.lower() or 'exist' in error_msg.lower():
+                        print(f"   [Folder] Parent folder already exists, fetching...")
+                        folders = list_folders(api_key)
+                        for folder in folders:
+                            server_name = folder.get('name', '').strip()
+                            # Case-insensitive matching
+                            if server_name.lower() == PARENT_FOLDER_NAME.lower():
+                                folder_id = str(folder.get('fld_id'))
+                                cache[cache_key] = folder_id
+                                save_folder_cache(cache)
+                                print(f"   [Folder] ✅ Found parent folder ID: {folder_id} (name: '{server_name}')")
+                                return folder_id
+            
+            print(f"   [Folder] ⚠️ Failed to create parent folder (attempt {attempt + 1}/{max_retries}): {r.text[:100]}")
+        except requests.exceptions.Timeout:
+            print(f"   [Folder] ⚠️ Timeout on attempt {attempt + 1}/{max_retries}")
+            if attempt < max_retries - 1:
+                wait_time = 5 * (attempt + 1)  # 5s, 10s, 15s
+                print(f"   [Folder] Retrying in {wait_time}s...")
+                time.sleep(wait_time)
+        except Exception as e:
+            print(f"   [Folder] ❌ Error on attempt {attempt + 1}/{max_retries}: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(5)
+    
+    print(f"   [Folder] ❌ Failed to create parent folder after {max_retries} attempts")
+    return None
     
     return None
 
@@ -225,7 +240,7 @@ def _get_or_create_single_folder(folder_name, api_key, parent_id=None):
             params['parent_id'] = str(parent_id)
         
         r = requests.get("https://api.streamwish.com/api/folder/create",
-                        params=params, timeout=10)
+                        params=params, timeout=30)
         
         if r.status_code == 200:
             result = r.json()
@@ -273,7 +288,7 @@ def list_folders(api_key):
     """List all folders"""
     try:
         r = requests.get("https://api.streamwish.com/api/folder/list",
-                        params={'key': api_key}, timeout=10)
+                        params={'key': api_key}, timeout=30)
         
         if r.status_code == 200:
             result = r.json()
