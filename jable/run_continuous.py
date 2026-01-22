@@ -532,6 +532,7 @@ def _commit_database_attempt():
     """Commit and push database after each video - Enhanced with better diagnostics"""
     try:
         import subprocess
+        import json
         
         log("   [commit] Starting database commit process...")
         
@@ -615,7 +616,8 @@ def _commit_database_attempt():
                     file_size = os.path.getsize(file)
                     log(f"   [commit]   {file}: {file_size} bytes")
                 
-                result = subprocess.run(['git', 'add', '-v', file], 
+                # Force add the file (use -f to override .gitignore if needed)
+                result = subprocess.run(['git', 'add', '-f', '-v', file], 
                                        capture_output=True, text=True, timeout=5)
                 if result.returncode == 0:
                     added_files.append(file)
@@ -634,6 +636,26 @@ def _commit_database_attempt():
         result = subprocess.run(['git', 'diff', '--staged', '--quiet'], 
                                capture_output=True, timeout=5)
         if result.returncode == 0:
+            # No staged changes detected by git
+            # But let's verify by checking file contents
+            log("   [commit] ℹ️ Git reports no staged changes")
+            log("   [commit] Checking database file contents...")
+            
+            # Check combined_videos.json
+            combined_path = os.path.join(PROJECT_ROOT, 'database', 'combined_videos.json')
+            if os.path.exists(combined_path):
+                try:
+                    with open(combined_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        log(f"   [commit]   combined_videos.json: {len(data)} videos")
+                        if len(data) > 0:
+                            latest = data[-1]
+                            log(f"   [commit]   Latest video: {latest.get('code', 'N/A')}")
+                except Exception as e:
+                    log(f"   [commit]   Error reading combined_videos.json: {e}")
+            
+            # If database has content but git sees no changes, it might be a timing issue
+            # Return False to avoid empty commits
             log("   [commit] ℹ️ No changes to commit (files unchanged)")
             return False
         
@@ -1759,14 +1781,6 @@ def process_one_video(scraper, url, num, total):
                     log("❌ Save failed!")
                     log("   This video will NOT be committed to database")
             
-            # Commit and push to git (if in GitHub Actions)
-            log("\n📤 Committing to git...")
-            commit_result = commit_database()
-            if commit_result:
-                log("✅ Committed and pushed to GitHub")
-            else:
-                log("⚠️ Commit failed or no changes")
-            
             # STEP 5.5: Enrich with JAVDatabase metadata
             if JAVDB_INTEGRATION_AVAILABLE:
                 log("\n🎭 Step 5.5: Enriching with JAVDatabase metadata...")
@@ -1857,6 +1871,14 @@ def process_one_video(scraper, url, num, total):
             log(f"❌ Save exception: {e}")
             import traceback
             traceback.print_exc()
+        
+        # Commit and push to git AFTER database is updated
+        log("\n📤 Committing to git...")
+        commit_result = commit_database()
+        if commit_result:
+            log("✅ Committed and pushed to GitHub")
+        else:
+            log("⚠️ Commit failed or no changes")
         
         # STEP 6: Delete video file
         log("\n🗑️ Step 6: Cleaning up...")
