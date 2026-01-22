@@ -76,20 +76,25 @@ except ImportError as e:
     JAVDB_INTEGRATION_AVAILABLE = False
     print(f"⚠️ JAVDatabase integration not available: {e}")
 
+# Get parent directory (project root) for database
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+DATABASE_DIR = os.path.join(PROJECT_ROOT, "database")
+
 TEMP_DIR = "temp_downloads"
 # Use centralized database if available
 if DATABASE_MANAGER_AVAILABLE:
     DB_FILE = None  # Not used with database manager
     FAILED_DB_FILE = None  # Not used with database manager
 else:
-    # Legacy fallback
-    DB_FILE = "database/videos_complete.json"
-    FAILED_DB_FILE = "database/videos_failed.json"
+    # Legacy fallback - use absolute paths
+    DB_FILE = os.path.join(DATABASE_DIR, "videos_complete.json")
+    FAILED_DB_FILE = os.path.join(DATABASE_DIR, "videos_failed.json")
     
 TIME_LIMIT = 5.25 * 3600  # 5h 15m (315 minutes) - 45min gap before workflow timeout
 MAX_RETRIES = 3
 
-os.makedirs("database", exist_ok=True)
+os.makedirs(DATABASE_DIR, exist_ok=True)
 os.makedirs(TEMP_DIR, exist_ok=True)
 
 class CleanupManager:
@@ -590,11 +595,11 @@ def _commit_database_attempt():
         
         # Check which files actually exist and have changes
         files_to_add = [
-            'database/combined_videos.json',
-            'database/progress_tracking.json',
-            'database/failed_videos.json',
-            'database/hosting_status.json',
-            'database/stats.json'
+            os.path.join(PROJECT_ROOT, 'database', 'combined_videos.json'),
+            os.path.join(PROJECT_ROOT, 'database', 'progress_tracking.json'),
+            os.path.join(PROJECT_ROOT, 'database', 'failed_videos.json'),
+            os.path.join(PROJECT_ROOT, 'database', 'hosting_status.json'),
+            os.path.join(PROJECT_ROOT, 'database', 'stats.json')
         ]
         added_files = []
         
@@ -1628,7 +1633,7 @@ def process_one_video(scraper, url, num, total):
                     log(f"   StreamWish will be available again at: {resume_time.strftime('%Y-%m-%d %H:%M:%S')}")
                     
                     # Save rate limit info but continue processing
-                    rate_limit_file = "database/rate_limit.json"
+                    rate_limit_file = os.path.join(DATABASE_DIR, "rate_limit.json")
                     try:
                         import json
                         with open(rate_limit_file, 'w') as f:
