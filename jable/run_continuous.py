@@ -1729,45 +1729,54 @@ def process_one_video(scraper, url, num, total):
                 log(f"   ⚠️ WARNING: No successful uploads to save!")
                 log(f"   Upload results full: {upload_results}")
             
-            if save_video(video_data, upload_results, thumbnail_url, preview_result):
-                log("✅ Saved to database")
-                
-                # Verify it was saved
-                if DATABASE_MANAGER_AVAILABLE:
-                    videos = db_manager.get_all_videos()
+            # Skip initial save if JAVDatabase enrichment is available
+            # JAVDatabase enrichment will handle the save with merged data
+            if JAVDB_INTEGRATION_AVAILABLE:
+                log("⏭️ Skipping initial save - JAVDatabase enrichment will save merged data")
+            else:
+                # No JAVDatabase - save now
+                if save_video(video_data, upload_results, thumbnail_url, preview_result):
+                    log("✅ Saved to database")
+                    
+                    # Verify it was saved
+                    if DATABASE_MANAGER_AVAILABLE:
+                        videos = db_manager.get_all_videos()
+                    else:
+                        videos = load_json_safe(DB_FILE, [])
+                    log(f"   Database now has {len(videos)} videos")
+                    
+                    # Show the saved entry
+                    for v in videos:
+                        if v.get('code') == video_data.code:
+                            log(f"   ✓ Found saved entry:")
+                            log(f"     Code: {v.get('code')}")
+                            log(f"     Title: {v.get('title', '')[:50]}")
+                            log(f"     Hosting services: {list(v.get('hosting', {}).keys())}")
+                            for service, data in v.get('hosting', {}).items():
+                                log(f"       {service}: {data.get('embed_url', 'N/A')}")
+                            break
                 else:
-                    videos = load_json_safe(DB_FILE, [])
-                log(f"   Database now has {len(videos)} videos")
-                
-                # Show the saved entry
-                for v in videos:
-                    if v.get('code') == video_data.code:
-                        log(f"   ✓ Found saved entry:")
-                        log(f"     Code: {v.get('code')}")
-                        log(f"     Title: {v.get('title', '')[:50]}")
-                        log(f"     Hosting services: {list(v.get('hosting', {}).keys())}")
-                        for service, data in v.get('hosting', {}).items():
-                            log(f"       {service}: {data.get('embed_url', 'N/A')}")
-                        break
-                
-                # Commit and push to git (if in GitHub Actions)
-                log("\n📤 Committing to git...")
-                commit_result = commit_database()
-                if commit_result:
-                    log("✅ Committed and pushed to GitHub")
-                else:
-                    log("⚠️ Commit failed or no changes")
-                
-                # STEP 5.5: Enrich with JAVDatabase metadata
-                if JAVDB_INTEGRATION_AVAILABLE:
-                    log("\n🎭 Step 5.5: Enriching with JAVDatabase metadata...")
-                    try:
-                        # Import datetime for this scope
-                        from datetime import datetime as dt
-                        
-                        # Build hosting dict in correct format (service_name: data)
-                        hosting_dict = {}
-                        file_size_from_upload = None
+                    log("❌ Save failed!")
+                    log("   This video will NOT be committed to database")
+            
+            # Commit and push to git (if in GitHub Actions)
+            log("\n📤 Committing to git...")
+            commit_result = commit_database()
+            if commit_result:
+                log("✅ Committed and pushed to GitHub")
+            else:
+                log("⚠️ Commit failed or no changes")
+            
+            # STEP 5.5: Enrich with JAVDatabase metadata
+            if JAVDB_INTEGRATION_AVAILABLE:
+                log("\n🎭 Step 5.5: Enriching with JAVDatabase metadata...")
+                try:
+                    # Import datetime for this scope
+                    from datetime import datetime as dt
+                    
+                    # Build hosting dict in correct format (service_name: data)
+                    hosting_dict = {}
+                    file_size_from_upload = None
                         upload_folder_from_upload = None
                         
                         if upload_results and upload_results.get('successful'):
@@ -1818,13 +1827,31 @@ def process_one_video(scraper, url, num, total):
                             log(f"✅ JAVDatabase enrichment successful")
                             log(f"   Combined data saved to {os.path.join(DATABASE_DIR, 'combined_videos.json')}")
                         else:
-                            log(f"⚠️ JAVDatabase enrichment failed, using Jable data only")
+                            log(f"⚠️ JAVDatabase enrichment failed, saving Jable data only...")
+                            # Fallback: save Jable data without JAVDatabase enrichment
+                            if save_video(video_data, upload_results, thumbnail_url, preview_result):
+                                log(f"✅ Saved Jable data to database")
+                            else:
+                                log(f"❌ Failed to save Jable data")
                             
                     except Exception as e:
                         log(f"❌ JAVDatabase enrichment error: {e}")
-                        log(f"   Continuing with Jable data only...")
+                        log(f"   Saving Jable data only...")
+                        # Fallback: save Jable data without JAVDatabase enrichment
+                        try:
+                            if save_video(video_data, upload_results, thumbnail_url, preview_result):
+                                log(f"✅ Saved Jable data to database")
+                            else:
+                                log(f"❌ Failed to save Jable data")
+                        except Exception as save_error:
+                            log(f"❌ Save error: {save_error}")
                 else:
-                    log("\n⏭️ Skipping JAVDatabase enrichment (not available)")
+                    log("\n⏭️ JAVDatabase enrichment not available, saving Jable data only...")
+                    # Save Jable data without JAVDatabase enrichment
+                    if save_video(video_data, upload_results, thumbnail_url, preview_result):
+                        log(f"✅ Saved Jable data to database")
+                    else:
+                        log(f"❌ Failed to save Jable data")
             else:
                 log("❌ Save failed!")
                 log("   This video will NOT be committed to database")
