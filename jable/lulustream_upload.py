@@ -51,7 +51,14 @@ def upload_to_lulustream(file_path, code, title, folder_name=None):
         title: Video title
         folder_name: Optional folder name for organization (e.g., "PPPE", "2026-01", etc.)
     """
-    print(f"\n📤 UPLOADING TO LULUSTREAM")
+    # Set UTF-8 encoding for Windows console
+    if sys.platform == 'win32':
+        try:
+            sys.stdout.reconfigure(encoding='utf-8')
+        except:
+            pass
+    
+    print(f"\n[UPLOAD] UPLOADING TO LULUSTREAM")
     print("="*60)
     
     # Load credentials from environment (at runtime, not import time)
@@ -193,9 +200,12 @@ def upload_to_lulustream(file_path, code, title, folder_name=None):
         print("="*60)
         sys.stdout.flush()
         
-        # Use 2 hour timeout for large file uploads
-        # Large files can take significant time to upload and process
-        print("   [DEBUG] Starting POST request...")
+        # Use reasonable timeout for upload + server processing
+        # Upload time + 5 minutes for server processing
+        estimated_upload_time = file_size / (1024 * 1024 * 0.5)  # Assume 0.5 MB/s minimum
+        timeout_seconds = max(300, int(estimated_upload_time + 300))  # At least 5 minutes
+        
+        print(f"   [DEBUG] Starting POST request (timeout: {timeout_seconds}s)...")
         sys.stdout.flush()
         
         response = session.post(
@@ -205,7 +215,7 @@ def upload_to_lulustream(file_path, code, title, folder_name=None):
                 'Content-Type': monitor.content_type,
                 'Connection': 'keep-alive'
             },
-            timeout=7200  # 2 hours for large files
+            timeout=timeout_seconds
         )
         
         print("   [DEBUG] POST request completed!")
@@ -238,12 +248,16 @@ def upload_to_lulustream(file_path, code, title, folder_name=None):
         if folder_name:
             data['fld_id'] = folder_name
         
+        # Calculate reasonable timeout
+        estimated_upload_time = file_size / (1024 * 1024 * 0.5)  # Assume 0.5 MB/s minimum
+        timeout_seconds = max(300, int(estimated_upload_time + 300))
+        
         with open(file_path, 'rb') as f:
             response = session.post(
                 server,
                 files={'file': (os.path.basename(file_path), f, 'video/mp4')},
                 data=data,
-                timeout=7200  # 2 hours for large files
+                timeout=timeout_seconds
             )
     
     except requests.exceptions.Timeout:
@@ -260,13 +274,23 @@ def upload_to_lulustream(file_path, code, title, folder_name=None):
         return {'service': 'Lulustream', 'success': False, 'error': str(e)}
     
     # Parse response
+    print(f"\n[DEBUG] Response status: {response.status_code}")
+    print(f"[DEBUG] Response length: {len(response.text)} bytes")
+    
     if response.status_code == 200:
         try:
             result = response.json()
+            print(f"[DEBUG] JSON response: {result}")
             
-            # Lulustream response format
-            if result.get('status') == 'success':
-                file_code = result.get('file_code') or result.get('filecode')
+            # Lulustream response format - check multiple status formats
+            status_ok = (
+                result.get('status') == 'success' or 
+                result.get('status') == 200 or
+                result.get('msg') == 'OK'
+            )
+            
+            if status_ok:
+                file_code = result.get('file_code') or result.get('filecode') or result.get('result', {}).get('file_code')
                 if file_code:
                     print(f"\n✅ Upload complete!")
                     print(f"   File code: {file_code}")
@@ -279,14 +303,54 @@ def upload_to_lulustream(file_path, code, title, folder_name=None):
                         'download_url': result.get('download_url', ''),
                         'time': total_time
                     }
+                else:
+                    print(f"\n⚠️ No file code in response, checking result field...")
+                    # Sometimes the response is nested
+                    if 'result' in result and isinstance(result['result'], dict):
+                        file_code = result['result'].get('file_code') or result['result'].get('filecode')
+                        if file_code:
+                            print(f"\n✅ Upload complete!")
+                            print(f"   File code: {file_code}")
+                            return {
+                                'service': 'Lulustream',
+                                'success': True,
+                                'filecode': file_code,
+                                'embed_url': f"https://lulustream.com/e/{file_code}",
+                                'watch_url': f"https://lulustream.com/{file_code}",
+                                'download_url': result.get('download_url', ''),
+                                'time': total_time
+                            }
             else:
-                print(f"\n❌ Upload failed: {result.get('message', 'Unknown error')}")
+                print(f"\n❌ Upload failed: {result.get('message', result.get('msg', 'Unknown error'))}")
+                print(f"   Full response: {result}")
         except Exception as e:
-            print(f"\n❌ Failed to parse response: {e}")
-            print(f"   Response: {response.text[:200]}")
+            print(f"\n⚠️ Response is not JSON, trying HTML parsing...")
+            print(f"   Parse error: {e}")
+            print(f"   Response preview: {response.text[:500]}")
+            
+            # Try HTML parsing as fallback
+            import re
+            file_code = None
+            
+            # Look for file_code in HTML
+            code_match = re.search(r'file_code["\']?\s*[:=]\s*["\']?([a-zA-Z0-9]+)', response.text)
+            if code_match:
+                file_code = code_match.group(1)
+                print(f"\n✅ Upload complete (HTML response)!")
+                print(f"   File code: {file_code}")
+                return {
+                    'service': 'Lulustream',
+                    'success': True,
+                    'filecode': file_code,
+                    'embed_url': f"https://lulustream.com/e/{file_code}",
+                    'watch_url': f"https://lulustream.com/{file_code}",
+                    'time': total_time
+                }
+            else:
+                print(f"\n❌ Could not extract file code from HTML")
     else:
         print(f"\n❌ Upload failed with status {response.status_code}")
-        print(f"   Response: {response.text[:200]}")
+        print(f"   Response: {response.text[:500]}")
     
     return {'service': 'Lulustream', 'success': False}
 
