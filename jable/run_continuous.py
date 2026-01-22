@@ -1492,7 +1492,7 @@ def process_one_video(scraper, url, num, total):
                     video_code=code,
                     video_title=video_data.title,
                     upload_function=upload_preview_with_fallback,
-                    folder_name=f"JAV_VIDEOS/{code}",
+                    folder_name=f"JAV_PREVIEWS/{code}",  # Separate folder for previews
                     enable_preview=True,
                     enable_gif=False  # Set to True if you want GIF too
                 )
