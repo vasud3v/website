@@ -595,18 +595,20 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
                         if is_match:
                             filecode = file_info.get('filecode')
                             
-                            # Additional validation: check file size if available
-                            # Skip if file is too small (likely corrupted or incomplete)
-                            if file_size_server > 0:
-                                file_size_mb = file_size_server / (1024 * 1024)
-                                if not allow_small_files and file_size_mb < 50:
-                                    print(f"[StreamWish] ⚠️ Found existing upload but file too small ({file_size_mb:.1f} MB): {file_title}")
-                                    print(f"[StreamWish] ⚠️ Will re-upload to replace corrupted file")
-                                    continue
+                            # Additional validation: check file size
+                            # Skip if file is 0 bytes, missing filecode, or too small (likely corrupted/incomplete/preview)
+                            file_size_mb = file_size_server / (1024 * 1024) if file_size_server > 0 else 0
+                            
+                            # Skip invalid files: 0 bytes, no filecode, or too small
+                            if file_size_server == 0 or not filecode or (not allow_small_files and file_size_mb < 50):
+                                reason = "0 bytes" if file_size_server == 0 else "no filecode" if not filecode else f"too small ({file_size_mb:.1f} MB)"
+                                print(f"[StreamWish] ⚠️ Found existing upload but {reason}: {file_title}")
+                                print(f"[StreamWish] ⚠️ Will re-upload to replace corrupted/incomplete file")
+                                continue
                             
                             print(f"[StreamWish] ⚠️ Found existing upload: {file_title}")
                             print(f"[StreamWish] ⚠️ Filecode: {filecode}")
-                            print(f"[StreamWish] ⚠️ File size: {file_size_server / (1024**2):.1f} MB")
+                            print(f"[StreamWish] ⚠️ File size: {file_size_mb:.1f} MB")
                             print(f"[StreamWish] ⚠️ Skipping upload to prevent duplicate")
                             return {
                                 'service': 'StreamWish',

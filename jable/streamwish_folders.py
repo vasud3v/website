@@ -374,15 +374,18 @@ def _get_or_create_single_folder(folder_name, api_key, parent_id=None):
                             save_folder_cache(cache)
                             print(f"   [Folder] ✅ Created folder '{folder_name}' with ID: {folder_id}")
                             
-                            # Verify folder was actually created
-                            time.sleep(1)  # Give server time to process
+                            # Verify folder was actually created (non-blocking)
+                            time.sleep(2)  # Give server more time to process
                             try:
                                 verify_folders = list_folders(api_key)
                                 folder_exists = any(str(f.get('fld_id')) == str(folder_id) for f in verify_folders)
                                 if not folder_exists:
-                                    print(f"   [Folder] ⚠️ WARNING: Created folder {folder_id} not found in list")
-                            except:
-                                pass
+                                    print(f"   [Folder] ⚠️ Note: Created folder {folder_id} not immediately visible in list")
+                                    print(f"   [Folder] This is normal - StreamWish API may have delay in listing")
+                                else:
+                                    print(f"   [Folder] ✅ Verified folder exists in list")
+                            except Exception as e:
+                                print(f"   [Folder] ⚠️ Could not verify folder (non-critical): {e}")
                             
                             return folder_id
                     else:
@@ -456,32 +459,56 @@ def _get_or_create_single_folder(folder_name, api_key, parent_id=None):
         print(f"   [Folder] ❌ Failed to create folder after {max_retries} attempts")
         return None
 
-def list_folders(api_key):
-    """List all folders with retry logic and error handling"""
+def list_folders(api_key, max_pages=10):
+    """List all folders with pagination support, retry logic and error handling"""
     max_retries = 3
+    all_folders = []
+    
     for attempt in range(max_retries):
         try:
-            r = requests.get("https://api.streamwish.com/api/folder/list",
-                            params={'key': api_key}, timeout=30)
-            
-            if r.status_code == 200:
-                result = r.json()
-                if result.get('status') == 200:
-                    folders = result.get('result', {}).get('folders', [])
-                    return folders
+            # Fetch all pages
+            page = 1
+            while page <= max_pages:
+                r = requests.get("https://api.streamwish.com/api/folder/list",
+                                params={'key': api_key, 'page': page, 'per_page': 100}, 
+                                timeout=30)
+                
+                if r.status_code == 200:
+                    result = r.json()
+                    if result.get('status') == 200:
+                        folders = result.get('result', {}).get('folders', [])
+                        if not folders:
+                            # No more folders, we've reached the end
+                            break
+                        all_folders.extend(folders)
+                        
+                        # Check if there are more pages
+                        total = result.get('result', {}).get('total', 0)
+                        if len(all_folders) >= total:
+                            break
+                        
+                        page += 1
+                    else:
+                        error_msg = result.get('msg', 'Unknown error')
+                        print(f"   [Folder] API error listing folders: {error_msg}")
+                        if attempt < max_retries - 1:
+                            time.sleep(2 * (attempt + 1))
+                        break
+                elif r.status_code == 429:
+                    print(f"   [Folder] Rate limited (429)")
+                    if attempt < max_retries - 1:
+                        time.sleep(10 * (attempt + 1))
+                    break
                 else:
-                    error_msg = result.get('msg', 'Unknown error')
-                    print(f"   [Folder] API error listing folders: {error_msg}")
+                    print(f"   [Folder] HTTP {r.status_code} listing folders")
                     if attempt < max_retries - 1:
                         time.sleep(2 * (attempt + 1))
-            elif r.status_code == 429:
-                print(f"   [Folder] Rate limited (429)")
-                if attempt < max_retries - 1:
-                    time.sleep(10 * (attempt + 1))
-            else:
-                print(f"   [Folder] HTTP {r.status_code} listing folders")
-                if attempt < max_retries - 1:
-                    time.sleep(2 * (attempt + 1))
+                    break
+            
+            # If we got folders, return them
+            if all_folders:
+                return all_folders
+                
         except requests.exceptions.Timeout:
             print(f"   [Folder] Timeout listing folders (attempt {attempt + 1}/{max_retries})")
             if attempt < max_retries - 1:
@@ -491,8 +518,9 @@ def list_folders(api_key):
             if attempt < max_retries - 1:
                 time.sleep(2 * (attempt + 1))
     
-    print(f"   [Folder] ❌ Failed to list folders after {max_retries} attempts")
-    return []
+    if not all_folders:
+        print(f"   [Folder] ❌ Failed to list folders after {max_retries} attempts")
+    return all_folders
 
 if __name__ == "__main__":
     # Test
