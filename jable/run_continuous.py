@@ -600,7 +600,9 @@ def _commit_database_attempt():
             os.path.join(PROJECT_ROOT, 'database', 'progress_tracking.json'),
             os.path.join(PROJECT_ROOT, 'database', 'failed_videos.json'),
             os.path.join(PROJECT_ROOT, 'database', 'hosting_status.json'),
-            os.path.join(PROJECT_ROOT, 'database', 'stats.json')
+            os.path.join(PROJECT_ROOT, 'database', 'stats.json'),
+            os.path.join(PROJECT_ROOT, 'database', 'disk_reservations.json'),
+            os.path.join(PROJECT_ROOT, 'database', 'streamwish_folders.json')
         ]
         added_files = []
         
