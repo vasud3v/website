@@ -1,0 +1,8 @@
+{
+  "wait_until": 1769289684.1903567,
+  "wait_seconds": 86400,
+  "detected_at": 1769203452.6098964,
+  "error_msg": "Upload quota exceeded",
+  "video_code": "MUKC-112",
+  "fallback_used": "Streamtape"
+}
