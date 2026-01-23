@@ -5,8 +5,8 @@ permissions:
   actions: write
 
 concurrency:
-  group: scraper-24-7
-  cancel-in-progress: false  # Don't cancel running workflows
+  group: scraper-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'scheduled' }}
+  cancel-in-progress: ${{ github.event_name == 'workflow_dispatch' }}
 
 on:
   schedule:
