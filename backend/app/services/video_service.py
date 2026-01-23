@@ -187,27 +187,57 @@ class VideoService:
         )
     
     def get_categories(self) -> List[Category]:
-        """Get all categories with counts and thumbnail from first video"""
+        """Get all categories with counts and static images from Jable"""
         videos = self._load_videos()
+        
+        # Map English category names to Jable image paths
+        category_image_map = {
+            "Roleplay": "/categories/角色劇情.jpg",
+            "Chinese Subtitle": "/categories/中文字幕.jpg",
+            "Uniform": "/categories/制服誘惑.jpg",
+            "Pantyhose": "/categories/絲襪美腿.jpg",
+            "Sex Only": "/categories/直接開啪.jpg",
+            "Group Sex": "/categories/多p群交.jpg",
+            "BDSM": "/categories/主奴調教.jpg",
+            "POV": "/categories/男友視角.jpg",
+            "Insult": "/categories/凌辱快感.jpg",
+            "Private Cam": "/categories/盜攝偷拍.jpg",
+        }
+        
+        # Standard Jable categories with their order
+        standard_categories = [
+            "Roleplay", "Chinese Subtitle", "Uniform", "Pantyhose",
+            "Sex Only", "Group Sex", "BDSM", "POV", "Insult", "Private Cam"
+        ]
+        
         categories = {}
-        category_thumbnails = {}
         
         for video in videos:
-            normalized = self._normalize_video(video)
             for cat in video.get('categories', []):
                 categories[cat] = categories.get(cat, 0) + 1
-                # Store thumbnail from first video in category
-                if cat not in category_thumbnails:
-                    category_thumbnails[cat] = normalized.get('thumbnail_url', '/placeholder.jpg')
         
-        return [
-            Category(
-                name=name, 
+        # Build result with standard categories first, then others
+        result = []
+        
+        # Add standard categories in order if they exist
+        for cat_name in standard_categories:
+            if cat_name in categories:
+                result.append(Category(
+                    name=cat_name,
+                    video_count=categories[cat_name],
+                    thumbnail_url=category_image_map.get(cat_name, '/placeholder.jpg')
+                ))
+        
+        # Add remaining categories sorted by count (use placeholder for unknown categories)
+        remaining = [(name, count) for name, count in categories.items() if name not in standard_categories]
+        for name, count in sorted(remaining, key=lambda x: x[1], reverse=True):
+            result.append(Category(
+                name=name,
                 video_count=count,
-                thumbnail_url=category_thumbnails.get(name, '/placeholder.jpg')
-            )
-            for name, count in sorted(categories.items(), key=lambda x: x[1], reverse=True)
-        ]
+                thumbnail_url=category_image_map.get(name, '/placeholder.jpg')
+            ))
+        
+        return result
     
     def get_studios(self) -> List[Studio]:
         """Get all studios with counts"""

@@ -262,16 +262,13 @@ export default function HomePage() {
                             {categories.slice(0, 10).map((category: any) => (
                                 <div key={category.name} className="col-6">
                                     <div className="horizontal-img-box mb-3">
-                                        <a href={`/categories/${encodeURIComponent(category.name)}`}>
+                                        <a href={`/category/${encodeURIComponent(category.name)}`}>
                                             <div className="media">
                                                 <img 
                                                     className="rounded" 
                                                     src={category.thumbnail_url || '/placeholder.jpg'} 
                                                     width="50"
                                                     alt={category.name}
-                                                    onError={(e) => {
-                                                        (e.target as HTMLImageElement).src = '/placeholder.jpg';
-                                                    }}
                                                 />
                                                 <div className="detail">
                                                     <h6 className="title">{category.name}</h6>
