@@ -1,5 +1,8 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
+import Footer from './components/Footer';
+import SvgSprite from './components/SvgSprite';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import HomePage from './pages/HomePage';
 import CategoriesPage from './pages/CategoriesPage';
 import StudiosPage from './pages/StudiosPage';
@@ -8,20 +11,24 @@ import VideoDetailPage from './pages/VideoDetailPage';
 
 function App() {
     return (
-        <Router>
-            <div className="min-h-screen bg-zinc-50 dark:bg-[#09090b] text-zinc-900 dark:text-white transition-colors duration-300">
-                <Navbar />
-                <main className="pt-14 px-4">
-                    <Routes>
-                        <Route path="/" element={<HomePage />} />
-                        <Route path="/categories" element={<CategoriesPage />} />
-                        <Route path="/studios" element={<StudiosPage />} />
-                        <Route path="/actresses" element={<ActressesPage />} />
-                        <Route path="/video/:code" element={<VideoDetailPage />} />
-                    </Routes>
-                </main>
-            </div>
-        </Router>
+        <ErrorBoundary>
+            <Router>
+                <SvgSprite />
+                <div className="min-h-screen bg-background text-foreground transition-colors duration-300 flex flex-col">
+                    <Navbar />
+                    <main className="pt-20 pb-8 flex-1">
+                        <Routes>
+                            <Route path="/" element={<HomePage />} />
+                            <Route path="/categories" element={<CategoriesPage />} />
+                            <Route path="/studios" element={<StudiosPage />} />
+                            <Route path="/actresses" element={<ActressesPage />} />
+                            <Route path="/video/:code" element={<VideoDetailPage />} />
+                        </Routes>
+                    </main>
+                    <Footer />
+                </div>
+            </Router>
+        </ErrorBoundary>
     );
 }
 

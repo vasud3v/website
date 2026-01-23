@@ -218,7 +218,8 @@ export function useCache<T>({
     } else {
       refetch();
     }
-  }, [key, ...deps]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, refetch, ...deps]);
 
   return { data, loading, error, isStale, refetch };
 }

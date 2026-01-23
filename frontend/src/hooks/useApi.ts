@@ -29,6 +29,7 @@ export function useApi<T>(fetcher: () => Promise<T>, deps: unknown[] = []) {
 
   useEffect(() => {
     refetch();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
   return { ...state, refetch };
@@ -132,7 +133,8 @@ export function useCachedApi<T>(
     return () => {
       isMountedRef.current = false;
     };
-  }, [cacheKey, ...deps]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cacheKey, refetch, ...deps]);
 
   return { data, loading, error, isStale, refetch };
 }

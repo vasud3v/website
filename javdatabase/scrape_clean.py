@@ -93,9 +93,26 @@ class CleanJAVDBScraper:
         """Initialize browser"""
         if self.driver is None:
             print("Initializing browser...")
-            self.driver = Driver(uc=True, headless=self.headless)
-            time.sleep(2)
-            print("Browser ready\n")
+            try:
+                # Try with headless2 mode for better compatibility on Windows
+                self.driver = Driver(
+                    uc=True, 
+                    headless=self.headless,
+                    headless2=self.headless,  # Use new headless mode
+                    incognito=True
+                )
+                time.sleep(2)
+                print("Browser ready\n")
+            except Exception as e:
+                print(f"Headless mode failed: {e}")
+                print("Trying non-headless mode...")
+                try:
+                    self.driver = Driver(uc=True, headless=False)
+                    time.sleep(2)
+                    print("Browser ready (non-headless)\n")
+                except Exception as e2:
+                    print(f"Browser initialization failed: {e2}")
+                    raise
     
     def close(self):
         """Close browser"""
@@ -257,6 +274,10 @@ class CleanJAVDBScraper:
             VideoMetadata object or None
         """
         try:
+            # Ensure driver is initialized
+            if self.driver is None:
+                self._init_driver()
+            
             # Build direct URL
             code_lower = video_code.lower()
             url = f"https://www.javdatabase.com/movies/{code_lower}/"

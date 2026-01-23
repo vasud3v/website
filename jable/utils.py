@@ -104,57 +104,79 @@ def validate_url(url, max_length=2000):
 
 class FileLock:
     """
-    Simple file locking for safe concurrent access
-    Works on Unix-like systems (Linux, macOS)
-    On Windows, uses a simpler approach
+    Improved file locking for safe concurrent access
+    Works on Unix-like systems (Linux, macOS) and Windows
+    Fixes race condition in Windows implementation
     """
-    def __init__(self, filepath, timeout=120):  # Increased from 30s to 120s
+    def __init__(self, filepath, timeout=300):  # Increased from 120s to 300s (5 minutes)
         self.filepath = filepath
         self.lockfile = filepath + '.lock'
         self.timeout = timeout
         self.lock_fd = None
         self.is_windows = sys.platform == 'win32'
+        self.pid = os.getpid()
     
     def acquire(self):
-        """Acquire lock with timeout"""
+        """Acquire lock with timeout and proper atomic operations"""
         if self.is_windows:
-            # Windows: Simple file-based locking
+            # Windows: Use atomic file creation with exclusive access
             start_time = time.time()
             while True:
                 try:
-                    # Try to create lock file exclusively
-                    if not os.path.exists(self.lockfile):
-                        with open(self.lockfile, 'w') as f:
-                            f.write(str(os.getpid()))
+                    # Try to create lock file with exclusive access (atomic operation)
+                    # This prevents race condition where two processes both see file doesn't exist
+                    try:
+                        # Open with exclusive creation flag
+                        fd = os.open(self.lockfile, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                        os.write(fd, f"{self.pid}:{time.time()}".encode())
+                        os.close(fd)
                         return True
-                    
-                    # Check if lock is stale (older than timeout)
-                    if os.path.exists(self.lockfile):
-                        age = time.time() - os.path.getmtime(self.lockfile)
-                        if age > self.timeout:
-                            # Remove stale lock
+                    except FileExistsError:
+                        # Lock file exists, check if it's stale
+                        if os.path.exists(self.lockfile):
                             try:
-                                os.remove(self.lockfile)
+                                # Read lock file to get PID and timestamp
+                                with open(self.lockfile, 'r') as f:
+                                    lock_data = f.read().strip()
+                                    if ':' in lock_data:
+                                        lock_pid, lock_time = lock_data.split(':', 1)
+                                        lock_age = time.time() - float(lock_time)
+                                    else:
+                                        # Old format, use file modification time
+                                        lock_age = time.time() - os.path.getmtime(self.lockfile)
+                                
+                                # Check if lock is stale (older than timeout)
+                                if lock_age > self.timeout:
+                                    print(f"⚠️ Removing stale lock (age: {lock_age:.1f}s)")
+                                    try:
+                                        os.remove(self.lockfile)
+                                        continue  # Try again
+                                    except Exception as e:
+                                        print(f"⚠️ Could not remove stale lock: {e}")
                             except Exception as e:
-                                print(f"⚠️ Could not remove stale lock: {e}")
-                                pass
+                                print(f"⚠️ Error checking lock file: {e}")
                     
                     if time.time() - start_time > self.timeout:
                         raise TimeoutError(f"Could not acquire lock on {self.filepath} after {self.timeout}s")
                     
                     time.sleep(0.1)
+                except TimeoutError:
+                    raise
                 except Exception as e:
                     if time.time() - start_time > self.timeout:
-                        raise
+                        raise TimeoutError(f"Could not acquire lock on {self.filepath} after {self.timeout}s")
                     time.sleep(0.1)
         else:
-            # Unix: Use fcntl
+            # Unix: Use fcntl (already atomic)
             start_time = time.time()
             
             while True:
                 try:
                     # Open lock file
                     self.lock_fd = open(self.lockfile, 'w')
+                    # Write PID and timestamp
+                    self.lock_fd.write(f"{self.pid}:{time.time()}")
+                    self.lock_fd.flush()
                     # Try to acquire exclusive lock (non-blocking)
                     fcntl.flock(self.lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                     return True
@@ -171,15 +193,29 @@ class FileLock:
                     time.sleep(0.1)
     
     def release(self):
-        """Release lock"""
+        """Release lock with proper cleanup"""
         if self.is_windows:
             # Windows: Remove lock file
             try:
                 if os.path.exists(self.lockfile):
-                    os.remove(self.lockfile)
+                    # Verify it's our lock before removing
+                    try:
+                        with open(self.lockfile, 'r') as f:
+                            lock_data = f.read().strip()
+                            if ':' in lock_data:
+                                lock_pid = int(lock_data.split(':', 1)[0])
+                                if lock_pid == self.pid:
+                                    os.remove(self.lockfile)
+                                else:
+                                    print(f"⚠️ Lock file owned by different process (PID {lock_pid})")
+                            else:
+                                # Old format, remove anyway
+                                os.remove(self.lockfile)
+                    except:
+                        # If we can't read it, try to remove anyway
+                        os.remove(self.lockfile)
             except Exception as e:
                 print(f"⚠️ Could not release lock: {e}")
-                pass
         else:
             # Unix: Release fcntl lock
             if self.lock_fd:
@@ -188,16 +224,25 @@ class FileLock:
                     self.lock_fd.close()
                 except Exception as e:
                     print(f"⚠️ Could not release fcntl lock: {e}")
-                    pass
                 finally:
                     self.lock_fd = None
                 
                 # Remove lock file
                 try:
-                    os.remove(self.lockfile)
+                    if os.path.exists(self.lockfile):
+                        os.remove(self.lockfile)
                 except Exception as e:
                     print(f"⚠️ Could not remove lock file: {e}")
-                    pass
+    
+    def __enter__(self):
+        """Context manager entry"""
+        self.acquire()
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - always release lock"""
+        self.release()
+        return False
     
     def __enter__(self):
         self.acquire()

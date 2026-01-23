@@ -193,6 +193,19 @@ class IntegratedPipeline:
             merged_data = merge_and_validate(jable_data, javdb_data)
             print(f"  ✅ Data merged successfully")
             
+            # Show what was merged
+            if javdb_data:
+                print(f"     - JAVDatabase: ✅ Available")
+                print(f"     - Cast: {len(merged_data.get('cast', []))} actresses")
+                print(f"     - Screenshots: {len(merged_data.get('screenshots', []))}")
+            else:
+                print(f"     - JAVDatabase: ⚠️  Not available (Jable data only)")
+            
+            if merged_data.get('hosting'):
+                print(f"     - Hosting: {', '.join(merged_data['hosting'].keys())}")
+            else:
+                print(f"     - Hosting: ⚠️  Not available yet")
+            
         except Exception as e:
             print(f"  ❌ Merge failed: {e}")
             self.log_error(video_code, str(e), "merge_error")

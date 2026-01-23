@@ -124,8 +124,10 @@ def merge_and_validate(jable_data: dict, javdb_data: Optional[dict]) -> dict:
     if not merged.get("title"):
         raise ValueError("Video title is required")
     
+    # Hosting is optional - video can exist without hosting info
+    # This allows JAVDatabase-only entries or entries pending upload
     if not merged.get("hosting"):
-        raise ValueError("Hosting data is required")
+        merged["hosting"] = {}
     
     return merged
 

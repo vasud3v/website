@@ -1512,6 +1512,11 @@ def process_one_video(scraper, url, num, total):
                         return result['failed'][-1]  # Return last failed attempt
                     return {'success': False, 'error': 'Upload failed'}
                 
+                # IMPORTANT: Use the SAME folder as the main video to avoid duplicates
+                # Main video goes to: JAV_VIDEOS/{code}
+                # Preview should go to: JAV_VIDEOS/{code} (same folder)
+                video_folder = f"JAV_VIDEOS/{code}"
+                
                 # Use advanced preview generation with comprehensive sex scene detection
                 # Skips first 5 minutes, captures ALL sex scenes, 30 clips × 2s / 1.3x = ~46s
                 preview_result = integrate_with_workflow(
@@ -1519,7 +1524,7 @@ def process_one_video(scraper, url, num, total):
                     video_code=code,
                     video_title=video_data.title,
                     upload_function=upload_preview_with_fallback,
-                    folder_name=f"JAV_PREVIEWS/{code}",  # Separate folder for previews
+                    folder_name=video_folder,  # SAME folder as main video
                     enable_preview=True,
                     enable_gif=False  # Set to True if you want GIF too
                 )

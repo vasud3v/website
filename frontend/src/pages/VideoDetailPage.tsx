@@ -8,12 +8,23 @@ export default function VideoDetailPage() {
     const { code } = useParams<{ code: string }>();
     const { data, loading, error } = useCachedApi(
         () => api.getVideo(code!),
-        { cacheKey: `video:${code}`, ttl: 300000 },
+        { cacheKey: `video:${code}`, ttl: 300000, skip: !code },
         [code]
     );
 
+    if (!code) return (
+        <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+            <img src="/logo-icon.svg" alt="Javcore" className="w-12 h-16 opacity-50" />
+            <p className="text-center text-destructive">Invalid video code</p>
+        </div>
+    );
     if (loading) return <LoadingSpinner />;
-    if (error) return <div className="text-center text-red-500 mt-20">Error: {error}</div>;
+    if (error) return (
+        <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+            <img src="/logo-icon.svg" alt="Javcore" className="w-12 h-16 opacity-50" />
+            <p className="text-center text-destructive">Error: {error}</p>
+        </div>
+    );
     if (!data) return null;
 
     return (
@@ -24,6 +35,10 @@ export default function VideoDetailPage() {
                         src={proxyImageUrl(data.cover_url || data.thumbnail_url)}
                         alt={data.title}
                         className="w-full rounded-lg shadow-lg"
+                        onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = '/placeholder.jpg';
+                        }}
                     />
                 </div>
                 
@@ -117,6 +132,8 @@ export default function VideoDetailPage() {
                             src={data.embed_urls[0]}
                             className="w-full h-full rounded-lg"
                             allowFullScreen
+                            title={`Watch ${data.title}`}
+                            sandbox="allow-scripts allow-same-origin allow-presentation"
                         />
                     </div>
                 </div>
@@ -133,6 +150,10 @@ export default function VideoDetailPage() {
                                 alt={`Gallery ${idx + 1}`}
                                 className="w-full rounded-lg"
                                 loading="lazy"
+                                onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.src = '/placeholder.jpg';
+                                }}
                             />
                         ))}
                     </div>

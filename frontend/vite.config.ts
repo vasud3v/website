@@ -59,7 +59,7 @@ export default defineConfig({
     extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json']
   },
   server: {
-    port: 3000,
+    port: 5174,
     proxy: {
       '/api': {
         target: 'http://localhost:8000',

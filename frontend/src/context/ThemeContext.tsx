@@ -11,13 +11,21 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
-    // Check localStorage first
-    const savedTheme = localStorage.getItem('theme') as Theme | null;
-    if (savedTheme) return savedTheme;
+    try {
+      // Check localStorage first
+      const savedTheme = localStorage.getItem('theme') as Theme | null;
+      if (savedTheme === 'dark' || savedTheme === 'light') return savedTheme;
+    } catch {
+      // localStorage not available (private browsing)
+    }
     
     // Check system preference
-    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      return 'dark';
+    try {
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        return 'dark';
+      }
+    } catch {
+      // matchMedia not supported
     }
     return 'light';
   });
@@ -32,7 +40,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.classList.add(theme);
     
     // Save to localStorage
-    localStorage.setItem('theme', theme);
+    try {
+      localStorage.setItem('theme', theme);
+    } catch {
+      // localStorage not available (private browsing) - ignore
+    }
   }, [theme]);
 
   const toggleTheme = () => {

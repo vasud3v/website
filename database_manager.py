@@ -412,12 +412,23 @@ class DatabaseManager:
         try:
             videos = self.get_all_videos()
             
+            # Calculate total size safely (handle None values)
+            total_size = 0
+            for v in videos:
+                size = v.get('file_size', 0)
+                if size is not None:
+                    total_size += size
+            
             stats = {
                 "total_videos": len(videos),
-                "total_size_bytes": sum(v.get('file_size', 0) for v in videos),
+                "total_size_bytes": total_size,
                 "by_hosting": {},
                 "by_category": {},
                 "by_model": {},
+                "by_studio": {},
+                "with_javdb": 0,
+                "with_cast": 0,
+                "with_screenshots": 0,
                 "last_updated": datetime.now().isoformat()
             }
             
@@ -430,17 +441,32 @@ class DatabaseManager:
             # Count by category
             for video in videos:
                 for category in video.get('categories', []):
-                    stats['by_category'][category] = stats['by_category'].get(category, 0) + 1
+                    if category:  # Skip empty categories
+                        stats['by_category'][category] = stats['by_category'].get(category, 0) + 1
             
-            # Count by model
+            # Count by model (from Jable data)
             for video in videos:
                 for model in video.get('models', []):
-                    stats['by_model'][model] = stats['by_model'].get(model, 0) + 1
+                    if model:  # Skip empty models
+                        stats['by_model'][model] = stats['by_model'].get(model, 0) + 1
+            
+            # Count by studio (from JAVDatabase)
+            for video in videos:
+                studio = video.get('studio')
+                if studio:
+                    stats['by_studio'][studio] = stats['by_studio'].get(studio, 0) + 1
+            
+            # Count JAVDatabase enrichment
+            stats['with_javdb'] = sum(1 for v in videos if v.get('javdb_available'))
+            stats['with_cast'] = sum(1 for v in videos if len(v.get('cast', [])) > 0)
+            stats['with_screenshots'] = sum(1 for v in videos if len(v.get('screenshots', [])) > 0)
             
             self._write_json(STATS_DB, stats, backup=False)
             
         except Exception as e:
             print(f"⚠️ Could not update stats: {e}")
+            import traceback
+            traceback.print_exc()
     
     def update_hosting_status(self, service: str, available: bool = True, rate_limited_until: int = None):
         """Update hosting service status"""

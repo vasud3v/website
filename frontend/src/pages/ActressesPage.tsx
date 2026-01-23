@@ -10,12 +10,22 @@ export default function ActressesPage() {
     );
 
     if (loading) return <LoadingSpinner />;
-    if (error) return <div className="text-center text-red-500 mt-20">Error: {error}</div>;
-    if (!data) return null;
+    if (error) return (
+        <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+            <img src="/logo-icon.svg" alt="Javcore" className="w-12 h-16 opacity-50" />
+            <p className="text-center text-destructive">Error: {error}</p>
+        </div>
+    );
+    if (!data || data.length === 0) return (
+        <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+            <img src="/logo-icon.svg" alt="Javcore" className="w-12 h-16 opacity-50" />
+            <p className="text-center text-muted-foreground">No actresses found</p>
+        </div>
+    );
 
     return (
-        <div>
-            <h1 className="text-3xl font-bold mb-8 text-zinc-900 dark:text-white">Actresses</h1>
+        <div className="w-full max-w-[1280px] mx-auto px-4 py-6">
+            <h1 className="text-2xl font-bold mb-6 text-foreground dark:text-white">Actresses</h1>
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                 {data.map((actress) => (
                     <Link
@@ -23,22 +33,27 @@ export default function ActressesPage() {
                         to={`/actress/${encodeURIComponent(actress.name)}`}
                         className="group"
                     >
-                        <div className="aspect-square rounded-lg overflow-hidden bg-zinc-200 dark:bg-gray-800 mb-2">
+                        <div className="aspect-square rounded-lg overflow-hidden bg-card mb-2 border border-border/50">
                             {actress.image_url ? (
                                 <img
                                     src={proxyImageUrl(actress.image_url)}
                                     alt={actress.name}
                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                                     loading="lazy"
+                                    onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.style.display = 'none';
+                                        target.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center text-muted-foreground dark:text-white/60">No Image</div>';
+                                    }}
                                 />
                             ) : (
-                                <div className="w-full h-full flex items-center justify-center text-zinc-500 dark:text-gray-500">
+                                <div className="w-full h-full flex items-center justify-center text-muted-foreground dark:text-white/60">
                                     No Image
                                 </div>
                             )}
                         </div>
-                        <h3 className="font-semibold text-sm line-clamp-2 text-zinc-900 dark:text-white">{actress.name}</h3>
-                        <p className="text-xs text-zinc-600 dark:text-gray-400">{actress.video_count} videos</p>
+                        <h3 className="font-semibold text-sm line-clamp-2 text-foreground dark:text-white">{actress.name}</h3>
+                        <p className="text-xs text-muted-foreground dark:text-white/60">{actress.video_count} videos</p>
                     </Link>
                 ))}
             </div>

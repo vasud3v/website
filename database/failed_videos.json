@@ -1,1 +1,9 @@
-[]
+[
+  {
+    "code": "MIDA-486",
+    "source_url": null,
+    "retry_count": 1,
+    "last_error": "Hosting data is required",
+    "last_attempt": "2026-01-23T19:27:23.992691"
+  }
+]

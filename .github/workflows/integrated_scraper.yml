@@ -10,7 +10,7 @@ concurrency:
 
 on:
   schedule:
-    - cron: '0 */6 * * *'
+    - cron: '*/30 * * * *'  # Every 30 minutes - check if restart needed
   
   workflow_dispatch:
     inputs:
@@ -23,6 +23,8 @@ on:
           - scrape
           - check-status
           - force-restart
+          - update-databases
+          - retry-javdb
       max_videos:
         description: 'Max videos to process (for scrape action)'
         required: false
@@ -31,9 +33,11 @@ on:
 jobs:
   determine-action:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     outputs:
       should_scrape: ${{ steps.decide.outputs.should_scrape }}
+      should_update_db: ${{ steps.decide.outputs.should_update_db }}
+      should_retry_javdb: ${{ steps.decide.outputs.should_retry_javdb }}
       reason: ${{ steps.decide.outputs.reason }}
     
     steps:
@@ -43,83 +47,162 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
         run: |
-          echo "Determining action..."
+          set -e
+          echo "=========================================="
+          echo "DETERMINING ACTION"
+          echo "=========================================="
+          echo "Event: ${{ github.event_name }}"
+          echo "Time: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           
-          if [ "${{ github.event.inputs.action }}" = "scrape" ]; then
-            echo "should_scrape=true" >> $GITHUB_OUTPUT
-            echo "reason=Manual scrape requested" >> $GITHUB_OUTPUT
+          # Default values
+          SHOULD_SCRAPE="false"
+          SHOULD_UPDATE_DB="false"
+          SHOULD_RETRY_JAVDB="false"
+          REASON="Unknown"
+          
+          # Manual actions (workflow_dispatch)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual trigger detected"
+            
+            case "${{ github.event.inputs.action }}" in
+              "scrape")
+                SHOULD_SCRAPE="true"
+                REASON="Manual scrape requested"
+                ;;
+              "force-restart")
+                SHOULD_SCRAPE="true"
+                REASON="Force restart requested"
+                ;;
+              "update-databases")
+                SHOULD_UPDATE_DB="true"
+                REASON="Database update requested"
+                ;;
+              "retry-javdb")
+                SHOULD_RETRY_JAVDB="true"
+                REASON="JAVDatabase retry requested"
+                ;;
+              "check-status")
+                REASON="Status check only"
+                ;;
+              *)
+                SHOULD_SCRAPE="true"
+                REASON="Manual trigger (default action)"
+                ;;
+            esac
+            
+            echo "Manual action: ${{ github.event.inputs.action }}"
+            echo "Decision: scrape=$SHOULD_SCRAPE, update_db=$SHOULD_UPDATE_DB, retry_javdb=$SHOULD_RETRY_JAVDB"
+            
+            echo "should_scrape=$SHOULD_SCRAPE" >> $GITHUB_OUTPUT
+            echo "should_update_db=$SHOULD_UPDATE_DB" >> $GITHUB_OUTPUT
+            echo "should_retry_javdb=$SHOULD_RETRY_JAVDB" >> $GITHUB_OUTPUT
+            echo "reason=$REASON" >> $GITHUB_OUTPUT
             exit 0
           fi
           
-          if [ "${{ github.event.inputs.action }}" = "force-restart" ]; then
-            echo "should_scrape=true" >> $GITHUB_OUTPUT
-            echo "reason=Force restart requested" >> $GITHUB_OUTPUT
-            exit 0
-          fi
+          # Scheduled run (cron)
+          echo "Scheduled run - checking if scraper needs restart..."
           
-          if [ "${{ github.event.inputs.action }}" = "check-status" ]; then
-            echo "should_scrape=false" >> $GITHUB_OUTPUT
-            echo "reason=Status check only" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          
-          CURRENT_MINUTE=$((10#$(date +%M)))
-          CURRENT_HOUR=$((10#$(date +%H)))
-          
-          if [ "$CURRENT_MINUTE" -lt 5 ]; then
-            if [ "$CURRENT_HOUR" -eq 0 ] || [ "$CURRENT_HOUR" -eq 6 ] || [ "$CURRENT_HOUR" -eq 12 ] || [ "$CURRENT_HOUR" -eq 18 ]; then
-              echo "should_scrape=true" >> $GITHUB_OUTPUT
-              echo "reason=Scheduled 6-hour run (${CURRENT_HOUR}:00)" >> $GITHUB_OUTPUT
-              exit 0
-            fi
-          fi
-          
-          echo "Checking if scraper needs restart..."
-          
+          # Fetch recent workflow runs
+          echo "Fetching workflow runs..."
           RUNS_JSON=$(curl -s -H "Authorization: token $GH_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/$REPO/actions/runs?per_page=15")
+            "https://api.github.com/repos/$REPO/actions/runs?per_page=20&status=completed,in_progress,queued" || echo "")
           
-          if [ -z "$RUNS_JSON" ] || [ "$RUNS_JSON" = "null" ]; then
-            echo "should_scrape=true" >> $GITHUB_OUTPUT
-            echo "reason=Could not fetch runs" >> $GITHUB_OUTPUT
+          if [ -z "$RUNS_JSON" ] || [ "$RUNS_JSON" = "null" ] || [ "$RUNS_JSON" = "" ]; then
+            echo "⚠️ Could not fetch workflow runs - starting scraper"
+            SHOULD_SCRAPE="true"
+            REASON="Could not fetch runs (API error)"
+            
+            echo "should_scrape=$SHOULD_SCRAPE" >> $GITHUB_OUTPUT
+            echo "should_update_db=$SHOULD_UPDATE_DB" >> $GITHUB_OUTPUT
+            echo "should_retry_javdb=$SHOULD_RETRY_JAVDB" >> $GITHUB_OUTPUT
+            echo "reason=$REASON" >> $GITHUB_OUTPUT
             exit 0
           fi
           
-          RUNNING_COUNT=$(echo "$RUNS_JSON" | jq -r '[.workflow_runs[] | select(.name == "Integrated Jable + JAVDatabase Scraper 24/7") | select(.status == "in_progress" or .status == "queued" or .status == "waiting")] | length')
+          # Check for currently running scraper jobs
+          echo "Checking for running jobs..."
+          RUNNING_COUNT=$(echo "$RUNS_JSON" | jq -r '[.workflow_runs[] | select(.name == "Integrated Jable + JAVDatabase Scraper 24/7" and .id != ${{ github.run_id }}) | select(.status == "in_progress" or .status == "queued" or .status == "waiting")] | length' 2>/dev/null || echo "0")
+          
+          echo "Running jobs (excluding this one): $RUNNING_COUNT"
           
           if [ "$RUNNING_COUNT" -gt "0" ]; then
-            echo "should_scrape=false" >> $GITHUB_OUTPUT
-            echo "reason=Scraper already running ($RUNNING_COUNT jobs)" >> $GITHUB_OUTPUT
+            echo "✓ Scraper is already running"
+            REASON="Scraper already running ($RUNNING_COUNT jobs)"
+            
+            echo "should_scrape=$SHOULD_SCRAPE" >> $GITHUB_OUTPUT
+            echo "should_update_db=$SHOULD_UPDATE_DB" >> $GITHUB_OUTPUT
+            echo "should_retry_javdb=$SHOULD_RETRY_JAVDB" >> $GITHUB_OUTPUT
+            echo "reason=$REASON" >> $GITHUB_OUTPUT
             exit 0
           fi
           
-          LATEST_COMPLETED=$(echo "$RUNS_JSON" | jq -r '[.workflow_runs[] | select(.name == "Integrated Jable + JAVDatabase Scraper 24/7") | select(.status == "completed")] | .[0] | .updated_at' 2>/dev/null || echo "")
+          # No running jobs - check when last job completed
+          echo "No running jobs found - checking last completion time..."
           
-          if [ -z "$LATEST_COMPLETED" ] || [ "$LATEST_COMPLETED" = "null" ]; then
-            echo "should_scrape=true" >> $GITHUB_OUTPUT
-            echo "reason=No completed runs found" >> $GITHUB_OUTPUT
+          LATEST_COMPLETED=$(echo "$RUNS_JSON" | jq -r '[.workflow_runs[] | select(.name == "Integrated Jable + JAVDatabase Scraper 24/7" and .id != ${{ github.run_id }}) | select(.status == "completed")] | sort_by(.updated_at) | reverse | .[0] | .updated_at' 2>/dev/null || echo "")
+          
+          if [ -z "$LATEST_COMPLETED" ] || [ "$LATEST_COMPLETED" = "null" ] || [ "$LATEST_COMPLETED" = "" ]; then
+            echo "⚠️ No completed runs found - starting scraper"
+            SHOULD_SCRAPE="true"
+            REASON="No completed runs found (first run or all failed)"
+            
+            echo "should_scrape=$SHOULD_SCRAPE" >> $GITHUB_OUTPUT
+            echo "should_update_db=$SHOULD_UPDATE_DB" >> $GITHUB_OUTPUT
+            echo "should_retry_javdb=$SHOULD_RETRY_JAVDB" >> $GITHUB_OUTPUT
+            echo "reason=$REASON" >> $GITHUB_OUTPUT
             exit 0
           fi
           
+          echo "Last completed: $LATEST_COMPLETED"
+          
+          # Calculate time since last completion
           LAST_TIMESTAMP=$(date -d "$LATEST_COMPLETED" +%s 2>/dev/null || echo "0")
+          CURRENT_TIMESTAMP=$(date +%s)
+          
           if [ "$LAST_TIMESTAMP" = "0" ]; then
-            echo "should_scrape=true" >> $GITHUB_OUTPUT
-            echo "reason=Could not parse timestamp" >> $GITHUB_OUTPUT
+            echo "⚠️ Could not parse timestamp - starting scraper"
+            SHOULD_SCRAPE="true"
+            REASON="Could not parse timestamp"
+            
+            echo "should_scrape=$SHOULD_SCRAPE" >> $GITHUB_OUTPUT
+            echo "should_update_db=$SHOULD_UPDATE_DB" >> $GITHUB_OUTPUT
+            echo "should_retry_javdb=$SHOULD_RETRY_JAVDB" >> $GITHUB_OUTPUT
+            echo "reason=$REASON" >> $GITHUB_OUTPUT
             exit 0
           fi
           
-          CURRENT_TIMESTAMP=$(date +%s)
           TIME_DIFF=$((CURRENT_TIMESTAMP - LAST_TIMESTAMP))
           MINUTES_SINCE=$((TIME_DIFF / 60))
+          HOURS_SINCE=$((TIME_DIFF / 3600))
           
-          if [ $TIME_DIFF -gt 300 ]; then
-            echo "should_scrape=true" >> $GITHUB_OUTPUT
-            echo "reason=Last completed ${MINUTES_SINCE} minutes ago" >> $GITHUB_OUTPUT
+          echo "Time since last completion: ${MINUTES_SINCE} minutes (${HOURS_SINCE} hours)"
+          
+          # Auto-restart logic:
+          # - If last run completed more than 10 minutes ago, restart
+          # - This ensures continuous operation
+          if [ $TIME_DIFF -gt 600 ]; then
+            echo "✓ Last run completed ${MINUTES_SINCE} minutes ago - restarting"
+            SHOULD_SCRAPE="true"
+            REASON="Auto-restart: ${MINUTES_SINCE} minutes since last completion"
           else
-            echo "should_scrape=false" >> $GITHUB_OUTPUT
-            echo "reason=Recently completed (${MINUTES_SINCE} minutes ago)" >> $GITHUB_OUTPUT
+            echo "✓ Recently completed (${MINUTES_SINCE} minutes ago) - no restart needed"
+            REASON="Recently completed (${MINUTES_SINCE} minutes ago)"
           fi
+          
+          echo ""
+          echo "=========================================="
+          echo "DECISION"
+          echo "=========================================="
+          echo "Should scrape: $SHOULD_SCRAPE"
+          echo "Reason: $REASON"
+          echo "=========================================="
+          
+          echo "should_scrape=$SHOULD_SCRAPE" >> $GITHUB_OUTPUT
+          echo "should_update_db=$SHOULD_UPDATE_DB" >> $GITHUB_OUTPUT
+          echo "should_retry_javdb=$SHOULD_RETRY_JAVDB" >> $GITHUB_OUTPUT
+          echo "reason=$REASON" >> $GITHUB_OUTPUT
   
   scrape-and-upload:
     needs: determine-action
@@ -130,9 +213,14 @@ jobs:
     steps:
       - name: Log start reason
         run: |
+          echo "=========================================="
           echo "STARTING INTEGRATED SCRAPER"
+          echo "=========================================="
           echo "Reason: ${{ needs.determine-action.outputs.reason }}"
           echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "Run ID: ${{ github.run_id }}"
+          echo "Run Number: ${{ github.run_number }}"
+          echo "=========================================="
       
       - name: Checkout code
         uses: actions/checkout@v4
@@ -149,7 +237,7 @@ jobs:
       
       - name: Install system dependencies
         run: |
-          sudo apt-get update
+          sudo apt-get update -qq
           sudo apt-get install -y ffmpeg
           ffmpeg -version
       
@@ -157,17 +245,35 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r jable/requirements.txt
-          pip install -r javdatabase/requirements.txt || echo "No separate requirements"
+          if [ -f javdatabase/requirements.txt ]; then
+            pip install -r javdatabase/requirements.txt
+          fi
+          pip install filelock  # For database locking
       
       - name: Check disk space
         run: df -h
       
-      - name: Create directories
+      - name: Create directories and initialize databases
         run: |
           mkdir -p jable/temp_downloads
           mkdir -p javdatabase/database
           mkdir -p database
-          [ ! -f database/combined_videos.json ] && echo "[]" > database/combined_videos.json || true
+          mkdir -p database/backups
+          
+          # Initialize combined_videos.json if it doesn't exist
+          if [ ! -f database/combined_videos.json ]; then
+            echo "[]" > database/combined_videos.json
+          fi
+          
+          # Initialize other database files
+          python -c "from database_manager import db_manager; db_manager.ensure_structure()" || echo "Database structure already exists"
+      
+      - name: Show current database status
+        run: |
+          echo "=========================================="
+          echo "CURRENT DATABASE STATUS"
+          echo "=========================================="
+          python show_database_summary.py 2>/dev/null || python -c "from database_manager import db_manager; db_manager.print_status()"
       
       - name: Validate API keys
         continue-on-error: true
@@ -181,7 +287,6 @@ jobs:
           [ -z "$STREAMWISH_API_KEY" ] && echo "⚠️ STREAMWISH_API_KEY not set" || echo "✓ StreamWish API key is set"
           [ -z "$LULUSTREAM_API_KEY" ] && echo "⚠️ LULUSTREAM_API_KEY not set" || echo "✓ LuluStream API key is set"
           [ -z "$STREAMTAPE_LOGIN" ] && echo "⚠️ STREAMTAPE_LOGIN not set" || echo "✓ StreamTape login is set"
-          echo "Note: API validation timeouts are non-critical and will be retried during upload"
       
       - name: Run integrated scraper
         env:
@@ -195,20 +300,42 @@ jobs:
           GITHUB_ACTIONS: 'true'
         run: |
           cd jable
-          python run_continuous.py 2>&1 | tee pipeline.log
+          timeout 5h 15m python run_continuous.py 2>&1 | tee pipeline.log || {
+            EXIT_CODE=$?
+            echo "Scraper exited with code: $EXIT_CODE"
+            if [ $EXIT_CODE -eq 124 ]; then
+              echo "⏱️ Timeout reached (5h 15m) - this is expected"
+            else
+              echo "⚠️ Scraper exited unexpectedly"
+            fi
+          }
         continue-on-error: true
       
-      - name: Check statistics
+      - name: Update all database tracking files
         if: always()
         run: |
-          echo "Integration Statistics"
-          [ -f javdatabase/database/stats.json ] && cat javdatabase/database/stats.json | jq '.'
+          echo "=========================================="
+          echo "UPDATING DATABASE TRACKING FILES"
+          echo "=========================================="
+          python update_all_databases.py 2>/dev/null || python -c "from database_manager import db_manager; db_manager.update_progress(); db_manager.update_stats()"
+      
+      - name: Show final statistics
+        if: always()
+        run: |
+          echo "=========================================="
+          echo "FINAL STATISTICS"
+          echo "=========================================="
+          python show_database_summary.py 2>/dev/null || python -c "from database_manager import db_manager; db_manager.print_status()"
+          
+          echo ""
+          echo "Database files:"
           ls -lh database/*.json 2>/dev/null || true
       
       - name: Emergency cleanup
         if: always()
         run: |
-          rm -rf jable/temp_downloads/*
+          echo "Cleaning up temporary files..."
+          rm -rf jable/temp_downloads/* 2>/dev/null || true
           df -h
       
       - name: Commit and push results
@@ -217,11 +344,31 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          git add javdatabase/database/ database/ *.log jable/*.log 2>/dev/null || true
+          # Pull latest changes first to avoid conflicts
+          git pull --rebase origin main 2>/dev/null || git pull --rebase origin master 2>/dev/null || true
+          
+          # Add all database files
+          git add database/*.json 2>/dev/null || true
+          git add javdatabase/database/*.json 2>/dev/null || true
+          git add *.log jable/*.log 2>/dev/null || true
           
           if ! git diff --staged --quiet; then
-            git commit -m "Auto-update: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-            git push || echo "Push failed"
+            VIDEOS_COUNT=$(python -c "import json; print(len(json.load(open('database/combined_videos.json'))))" 2>/dev/null || echo "?")
+            git commit -m "🤖 Auto-update: $(date -u '+%Y-%m-%d %H:%M:%S UTC') - ${VIDEOS_COUNT} videos"
+            
+            # Retry push up to 5 times with exponential backoff
+            for i in {1..5}; do
+              if git push; then
+                echo "✅ Push successful"
+                break
+              else
+                echo "⚠️ Push failed, retrying ($i/5)..."
+                sleep $((i * 2))
+                git pull --rebase origin main 2>/dev/null || git pull --rebase origin master 2>/dev/null || true
+              fi
+            done
+          else
+            echo "No changes to commit"
           fi
       
       - name: Upload artifacts
@@ -232,19 +379,104 @@ jobs:
           path: |
             *.log
             jable/*.log
-            javdatabase/database/
-            database/
+            database/*.json
+            database/backups/
           retention-days: 7
+  
+  update-databases:
+    needs: determine-action
+    if: needs.determine-action.outputs.should_update_db == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Update all databases
+        run: |
+          echo "=========================================="
+          echo "UPDATING ALL DATABASE FILES"
+          echo "=========================================="
+          python update_all_databases.py
+      
+      - name: Commit and push
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git pull --rebase origin main 2>/dev/null || git pull --rebase origin master 2>/dev/null || true
+          git add database/*.json
+          if ! git diff --staged --quiet; then
+            git commit -m "📊 Database update: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            git push
+          fi
+  
+  retry-javdb:
+    needs: determine-action
+    if: needs.determine-action.outputs.should_retry_javdb == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r javdatabase/requirements.txt
+      
+      - name: Process JAVDatabase retry queue
+        run: |
+          echo "=========================================="
+          echo "PROCESSING JAVDATABASE RETRY QUEUE"
+          echo "=========================================="
+          cd javdatabase
+          python -c "from integrated_pipeline import process_javdb_retry_queue; process_javdb_retry_queue(max_videos=10, headless=True)"
+      
+      - name: Update databases
+        run: python update_all_databases.py
+      
+      - name: Commit and push
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git pull --rebase origin main 2>/dev/null || git pull --rebase origin master 2>/dev/null || true
+          git add database/*.json
+          if ! git diff --staged --quiet; then
+            git commit -m "🎭 JAVDatabase retry: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            git push
+          fi
   
   status-report:
     needs: determine-action
-    if: needs.determine-action.outputs.should_scrape == 'false'
+    if: |
+      needs.determine-action.outputs.should_scrape == 'false' &&
+      needs.determine-action.outputs.should_update_db == 'false' &&
+      needs.determine-action.outputs.should_retry_javdb == 'false'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     
     steps:
       - name: Report status
         run: |
+          echo "=========================================="
           echo "NO ACTION NEEDED"
+          echo "=========================================="
           echo "Reason: ${{ needs.determine-action.outputs.reason }}"
           echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "=========================================="
