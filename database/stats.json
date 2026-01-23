@@ -1,12 +1,18 @@
 {
-  "total_videos": 0,
+  "total_videos": 1,
   "total_size_bytes": 0,
-  "by_hosting": {},
-  "by_category": {},
+  "by_hosting": {
+    "streamwish": 1
+  },
+  "by_category": {
+    "Roleplay": 1
+  },
   "by_model": {},
-  "by_studio": {},
-  "with_javdb": 0,
-  "with_cast": 0,
-  "with_screenshots": 0,
-  "last_updated": "2026-01-23T15:16:10.496424"
+  "by_studio": {
+    "M's Video Group": 1
+  },
+  "with_javdb": 1,
+  "with_cast": 1,
+  "with_screenshots": 1,
+  "last_updated": "2026-01-23T15:24:23.828828"
 }
