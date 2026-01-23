@@ -15,6 +15,8 @@
     "Pantyhose": 1
   },
   "by_model": {
+    "広瀬このみ": 1,
+    "有馬美玖": 1,
     "花守夏歩": 1,
     "由衣陽菜": 1,
     "流川莉央": 1,
@@ -24,11 +26,10 @@
     "水原わこ": 1
   },
   "by_studio": {
-    "Real Works": 1,
-    "Muku": 1
+    "Real Works": 1
   },
-  "with_javdb": 2,
+  "with_javdb": 1,
   "with_cast": 1,
-  "with_screenshots": 2,
-  "last_updated": "2026-01-23T19:15:36.267457"
+  "with_screenshots": 1,
+  "last_updated": "2026-01-23T19:24:21.997154"
 }
