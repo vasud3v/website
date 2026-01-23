@@ -597,13 +597,15 @@
   background-position: right 9% top;
 }
 
-/* Jable.tv utility classes */
+/* Jable.tv utility classes - Bootstrap 4 exact match */
 .d-none {
   display: none !important;
 }
 
-.d-lg-block {
-  display: block !important;
+@media (min-width: 992px) {
+  .d-lg-block {
+    display: block !important;
+  }
 }
 
 .d-flex {
@@ -616,12 +618,6 @@
 
 .text-center {
   text-align: center !important;
-}
-
-@media (max-width: 991.98px) {
-  .d-lg-block {
-    display: none !important;
-  }
 }
 
 .pb-3 {

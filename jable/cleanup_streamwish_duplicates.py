@@ -118,21 +118,31 @@ def find_duplicates(files):
     """Find duplicate uploads by video code"""
     print("\n🔍 Analyzing for duplicates...")
     
-    # Group files by video code
-    by_code = defaultdict(list)
+    # Group files by video code AND type (preview vs full)
+    by_code = defaultdict(lambda: {'preview': [], 'full': []})
     
     for file_info in files:
         title = file_info.get('title', '')
         code = extract_video_code(title)
         
         if code:
-            by_code[code].append(file_info)
+            # Determine if this is a preview or full video
+            is_preview = 'PREVIEW' in title.upper()
+            file_type = 'preview' if is_preview else 'full'
+            by_code[code][file_type].append(file_info)
     
-    # Find codes with duplicates
+    # Find codes with duplicates (multiple previews OR multiple full videos)
     duplicates = {}
-    for code, file_list in by_code.items():
-        if len(file_list) > 1:
-            duplicates[code] = file_list
+    for code, file_dict in by_code.items():
+        previews = file_dict['preview']
+        fulls = file_dict['full']
+        
+        # Only flag as duplicate if we have multiple of the SAME type
+        if len(previews) > 1 or len(fulls) > 1:
+            duplicates[code] = {
+                'preview': previews,
+                'full': fulls
+            }
     
     print(f"\n📊 Analysis Results:")
     print(f"   Unique video codes: {len(by_code)}")
@@ -140,14 +150,28 @@ def find_duplicates(files):
     
     if duplicates:
         print(f"\n⚠️ Found duplicates:")
-        for code, file_list in sorted(duplicates.items()):
-            print(f"\n   {code}: {len(file_list)} copies")
-            for f in file_list:
-                # StreamWish API uses 'file_code' not 'filecode'
-                filecode = f.get('file_code') or f.get('filecode', 'N/A')
-                title = f.get('title', 'N/A')
-                uploaded = f.get('uploaded', 'N/A')
-                print(f"      - {filecode}: {title[:50]}... (uploaded: {uploaded})")
+        for code, file_dict in sorted(duplicates.items()):
+            previews = file_dict['preview']
+            fulls = file_dict['full']
+            total = len(previews) + len(fulls)
+            
+            print(f"\n   {code}: {total} copies ({len(previews)} preview, {len(fulls)} full)")
+            
+            if previews:
+                print(f"      PREVIEWS:")
+                for f in previews:
+                    filecode = f.get('file_code') or f.get('filecode', 'N/A')
+                    title = f.get('title', 'N/A')
+                    uploaded = f.get('uploaded', 'N/A')
+                    print(f"      - {filecode}: {title[:50]}... (uploaded: {uploaded})")
+            
+            if fulls:
+                print(f"      FULL VIDEOS:")
+                for f in fulls:
+                    filecode = f.get('file_code') or f.get('filecode', 'N/A')
+                    title = f.get('title', 'N/A')
+                    uploaded = f.get('uploaded', 'N/A')
+                    print(f"      - {filecode}: {title[:50]}... (uploaded: {uploaded})")
     
     return duplicates
 
@@ -178,48 +202,87 @@ def delete_file(filecode):
 
 
 def cleanup_duplicates(duplicates, dry_run=True):
-    """Clean up duplicate uploads, keeping only the most recent"""
+    """Clean up duplicate uploads, keeping only the most recent of each type"""
     print(f"\n🧹 Cleaning up duplicates (dry_run={dry_run})...")
     
     total_to_delete = 0
     total_to_keep = 0
     
-    for code, file_list in sorted(duplicates.items()):
-        # Sort by upload date (newest first)
-        # StreamWish returns uploaded as timestamp string
-        sorted_files = sorted(file_list, key=lambda x: x.get('uploaded', ''), reverse=True)
-        
-        # Keep the first (newest), delete the rest
-        keep = sorted_files[0]
-        delete = sorted_files[1:]
-        
-        total_to_keep += 1
-        total_to_delete += len(delete)
+    for code, file_dict in sorted(duplicates.items()):
+        previews = file_dict['preview']
+        fulls = file_dict['full']
         
         print(f"\n   {code}:")
-        # StreamWish API uses 'file_code' not 'filecode'
-        keep_code = keep.get('file_code') or keep.get('filecode', 'N/A')
-        print(f"      ✓ KEEP: {keep_code} (uploaded: {keep.get('uploaded')})")
         
-        for f in delete:
-            # StreamWish API uses 'file_code' not 'filecode'
-            filecode = f.get('file_code') or f.get('filecode')
-            uploaded = f.get('uploaded')
+        # Handle preview duplicates
+        if len(previews) > 1:
+            sorted_previews = sorted(previews, key=lambda x: x.get('uploaded', ''), reverse=True)
+            keep_preview = sorted_previews[0]
+            delete_previews = sorted_previews[1:]
             
-            if not filecode:
-                print(f"      ⚠️ SKIP: No filecode found for {f.get('title', 'Unknown')}")
-                continue
+            total_to_keep += 1
+            total_to_delete += len(delete_previews)
             
-            if dry_run:
-                print(f"      ❌ WOULD DELETE: {filecode} (uploaded: {uploaded})")
-            else:
-                print(f"      ❌ DELETING: {filecode} (uploaded: {uploaded})...", end=' ')
-                success, msg = delete_file(filecode)
-                if success:
-                    print("✓")
+            keep_code = keep_preview.get('file_code') or keep_preview.get('filecode', 'N/A')
+            print(f"      ✓ KEEP PREVIEW: {keep_code} (uploaded: {keep_preview.get('uploaded')})")
+            
+            for f in delete_previews:
+                filecode = f.get('file_code') or f.get('filecode')
+                uploaded = f.get('uploaded')
+                
+                if not filecode:
+                    print(f"      ⚠️ SKIP: No filecode found for {f.get('title', 'Unknown')}")
+                    continue
+                
+                if dry_run:
+                    print(f"      ❌ WOULD DELETE PREVIEW: {filecode} (uploaded: {uploaded})")
                 else:
-                    print(f"FAILED: {msg}")
-                time.sleep(1)  # Rate limiting
+                    print(f"      ❌ DELETING PREVIEW: {filecode} (uploaded: {uploaded})...", end=' ')
+                    success, msg = delete_file(filecode)
+                    if success:
+                        print("✓")
+                    else:
+                        print(f"FAILED: {msg}")
+                    time.sleep(1)
+        elif len(previews) == 1:
+            total_to_keep += 1
+            keep_code = previews[0].get('file_code') or previews[0].get('filecode', 'N/A')
+            print(f"      ✓ KEEP PREVIEW: {keep_code} (uploaded: {previews[0].get('uploaded')})")
+        
+        # Handle full video duplicates
+        if len(fulls) > 1:
+            sorted_fulls = sorted(fulls, key=lambda x: x.get('uploaded', ''), reverse=True)
+            keep_full = sorted_fulls[0]
+            delete_fulls = sorted_fulls[1:]
+            
+            total_to_keep += 1
+            total_to_delete += len(delete_fulls)
+            
+            keep_code = keep_full.get('file_code') or keep_full.get('filecode', 'N/A')
+            print(f"      ✓ KEEP FULL: {keep_code} (uploaded: {keep_full.get('uploaded')})")
+            
+            for f in delete_fulls:
+                filecode = f.get('file_code') or f.get('filecode')
+                uploaded = f.get('uploaded')
+                
+                if not filecode:
+                    print(f"      ⚠️ SKIP: No filecode found for {f.get('title', 'Unknown')}")
+                    continue
+                
+                if dry_run:
+                    print(f"      ❌ WOULD DELETE FULL: {filecode} (uploaded: {uploaded})")
+                else:
+                    print(f"      ❌ DELETING FULL: {filecode} (uploaded: {uploaded})...", end=' ')
+                    success, msg = delete_file(filecode)
+                    if success:
+                        print("✓")
+                    else:
+                        print(f"FAILED: {msg}")
+                    time.sleep(1)
+        elif len(fulls) == 1:
+            total_to_keep += 1
+            keep_code = fulls[0].get('file_code') or fulls[0].get('filecode', 'N/A')
+            print(f"      ✓ KEEP FULL: {keep_code} (uploaded: {fulls[0].get('uploaded')})")
     
     print(f"\n📊 Summary:")
     print(f"   Files to keep: {total_to_keep}")

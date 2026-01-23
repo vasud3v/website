@@ -561,9 +561,14 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
     print(f"[StreamWish] Starting upload process")
     print(f"[StreamWish] ═══════════════════════════════════════")
     
+    # Determine if this is a preview upload based on title or allow_small_files flag
+    is_preview_upload = allow_small_files or 'PREVIEW' in title.upper()
+    upload_type = "PREVIEW" if is_preview_upload else "FULL VIDEO"
+    print(f"[StreamWish] Upload type: {upload_type}")
+    
     # Check if this video code already exists on StreamWish to prevent duplicates
     if STREAMWISH_API_KEY:
-        print(f"[StreamWish] Checking for existing uploads of {code}...")
+        print(f"[StreamWish] Checking for existing uploads of {code} ({upload_type})...")
         try:
             # Search for files with this code in the title
             search_response = requests.get(
@@ -595,10 +600,20 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
                         )
                         
                         if is_match:
+                            # Check if existing file is a preview or full video
+                            is_existing_preview = 'PREVIEW' in title_upper
+                            existing_type = "PREVIEW" if is_existing_preview else "FULL VIDEO"
+                            
+                            # Only consider it a duplicate if it's the SAME type
+                            if is_existing_preview != is_preview_upload:
+                                # Different types (one is preview, one is full) - not a duplicate
+                                print(f"[StreamWish] ℹ️ Found {existing_type}: {file_title[:50]}... (different type, not a duplicate)")
+                                continue
+                            
                             filecode = file_info.get('filecode')
                             
                             # Additional validation: check file size
-                            # Skip if file is 0 bytes, missing filecode, or too small (likely corrupted/incomplete/preview)
+                            # Skip if file is 0 bytes, missing filecode, or too small (likely corrupted/incomplete)
                             file_size_mb = file_size_server / (1024 * 1024) if file_size_server > 0 else 0
                             
                             # Skip invalid files: 0 bytes, no filecode, or too small
@@ -607,12 +622,33 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
                                 
                                 # Only show warning once per reason to avoid spam
                                 if reason not in invalid_files_found:
-                                    print(f"[StreamWish] ⚠️ Found existing upload but {reason}: {file_title}")
+                                    print(f"[StreamWish] ⚠️ Found existing {existing_type} but {reason}: {file_title}")
+                                    
+                                    # Delete the corrupted file if we have a filecode
+                                    if filecode:
+                                        print(f"[StreamWish] 🗑️ Deleting corrupted file (filecode: {filecode})...")
+                                        try:
+                                            delete_response = requests.get(
+                                                "https://api.streamwish.com/api/file/delete",
+                                                params={'key': STREAMWISH_API_KEY, 'file_code': filecode},
+                                                timeout=30
+                                            )
+                                            if delete_response.status_code == 200:
+                                                delete_data = delete_response.json()
+                                                if delete_data.get('status') == 200:
+                                                    print(f"[StreamWish] ✅ Deleted corrupted file successfully")
+                                                else:
+                                                    print(f"[StreamWish] ⚠️ Delete failed: {delete_data.get('msg', 'Unknown error')}")
+                                            else:
+                                                print(f"[StreamWish] ⚠️ Delete failed: HTTP {delete_response.status_code}")
+                                        except Exception as e:
+                                            print(f"[StreamWish] ⚠️ Delete error: {str(e)}")
+                                    
                                     print(f"[StreamWish] ⚠️ Will re-upload to replace corrupted/incomplete file")
                                     invalid_files_found.append(reason)
                                 continue
                             
-                            print(f"[StreamWish] ⚠️ Found existing upload: {file_title}")
+                            print(f"[StreamWish] ⚠️ Found existing {existing_type}: {file_title}")
                             print(f"[StreamWish] ⚠️ Filecode: {filecode}")
                             print(f"[StreamWish] ⚠️ File size: {file_size_mb:.1f} MB")
                             print(f"[StreamWish] ⚠️ Skipping upload to prevent duplicate")
