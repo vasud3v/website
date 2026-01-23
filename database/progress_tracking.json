@@ -1,8 +1,8 @@
 {
-  "last_updated": "2026-01-23T13:29:38.043043",
-  "total_videos": 30,
-  "total_processed": 30,
-  "total_failed": 0,
+  "last_updated": "2026-01-23T13:48:41.169738",
+  "total_videos": 31,
+  "total_processed": 31,
+  "total_failed": 1,
   "success_rate": 100.0,
   "last_video_code": "MIDA-479",
   "last_video_url": "https://jable.tv/videos/mida-479/"
