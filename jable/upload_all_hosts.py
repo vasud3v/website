@@ -575,6 +575,8 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
                 search_data = search_response.json()
                 if search_data.get('status') == 200 and 'result' in search_data:
                     files = search_data['result'].get('files', [])
+                    invalid_files_found = []  # Track invalid files to avoid duplicate warnings
+                    
                     for file_info in files:
                         file_title = file_info.get('title', '')
                         file_size_server = file_info.get('size', 0)
@@ -602,8 +604,12 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
                             # Skip invalid files: 0 bytes, no filecode, or too small
                             if file_size_server == 0 or not filecode or (not allow_small_files and file_size_mb < 50):
                                 reason = "0 bytes" if file_size_server == 0 else "no filecode" if not filecode else f"too small ({file_size_mb:.1f} MB)"
-                                print(f"[StreamWish] ⚠️ Found existing upload but {reason}: {file_title}")
-                                print(f"[StreamWish] ⚠️ Will re-upload to replace corrupted/incomplete file")
+                                
+                                # Only show warning once per reason to avoid spam
+                                if reason not in invalid_files_found:
+                                    print(f"[StreamWish] ⚠️ Found existing upload but {reason}: {file_title}")
+                                    print(f"[StreamWish] ⚠️ Will re-upload to replace corrupted/incomplete file")
+                                    invalid_files_found.append(reason)
                                 continue
                             
                             print(f"[StreamWish] ⚠️ Found existing upload: {file_title}")
