@@ -5,5 +5,12 @@
     "retry_count": 2,
     "last_error": "Unexpected error: 'JableScraper' object has no attribute 'init_driver'",
     "last_attempt": "2026-01-23T17:33:06.233747"
+  },
+  {
+    "code": null,
+    "source_url": "https://jable.tv/videos/real-960/",
+    "retry_count": 1,
+    "last_error": "Unexpected error: 'JableScraper' object has no attribute 'init_driver'",
+    "last_attempt": "2026-01-23T18:03:37.930597"
   }
 ]
