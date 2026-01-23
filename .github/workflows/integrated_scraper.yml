@@ -6,7 +6,7 @@ permissions:
 
 concurrency:
   group: scraper-24-7
-  cancel-in-progress: true
+  cancel-in-progress: false  # Don't cancel running workflows
 
 on:
   schedule:

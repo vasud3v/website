@@ -70,7 +70,14 @@ def get_or_create_parent_folder(api_key):
     cache_key = f"_parent_{PARENT_FOLDER_NAME}"
     
     if cache_key in cache:
-        folder_id = cache[cache_key]
+        cached_data = cache[cache_key]
+        
+        # Support both old format (string) and new format (dict with timestamp)
+        if isinstance(cached_data, str):
+            folder_id = cached_data
+        else:
+            folder_id = cached_data.get('id')
+        
         # Verify it still exists
         try:
             folders = list_folders(api_key)
@@ -93,7 +100,8 @@ def get_or_create_parent_folder(api_key):
             if server_name.lower() == PARENT_FOLDER_NAME.lower():
                 folder_id = str(folder.get('fld_id'))
                 print(f"   [Folder] ✅ Found existing parent folder: {folder_id} (name: '{server_name}')")
-                cache[cache_key] = folder_id
+                import time
+                cache[cache_key] = {'id': folder_id, 'timestamp': time.time()}
                 save_folder_cache(cache)
                 return folder_id
     except Exception as e:
@@ -117,7 +125,8 @@ def get_or_create_parent_folder(api_key):
                     folder_id = result.get('result', {}).get('fld_id')
                     if folder_id:
                         folder_id = str(folder_id)
-                        cache[cache_key] = folder_id
+                        import time
+                        cache[cache_key] = {'id': folder_id, 'timestamp': time.time()}
                         save_folder_cache(cache)
                         print(f"   [Folder] ✅ Created parent folder with ID: {folder_id}")
                         return folder_id
@@ -131,7 +140,8 @@ def get_or_create_parent_folder(api_key):
                             # Case-insensitive matching
                             if server_name.lower() == PARENT_FOLDER_NAME.lower():
                                 folder_id = str(folder.get('fld_id'))
-                                cache[cache_key] = folder_id
+                                import time
+                                cache[cache_key] = {'id': folder_id, 'timestamp': time.time()}
                                 save_folder_cache(cache)
                                 print(f"   [Folder] ✅ Found parent folder ID: {folder_id} (name: '{server_name}')")
                                 return folder_id
@@ -279,9 +289,26 @@ def _get_or_create_single_folder(folder_name, api_key, parent_id=None):
         # Check cache first (inside lock)
         cache = load_folder_cache()
         if cache_key in cache:
-            folder_id = cache[cache_key]
+            cached_data = cache[cache_key]
             
-            # Verify cached folder still exists on server
+            # Support both old format (string) and new format (dict with timestamp)
+            if isinstance(cached_data, str):
+                folder_id = cached_data
+                cache_timestamp = 0
+            else:
+                folder_id = cached_data.get('id')
+                cache_timestamp = cached_data.get('timestamp', 0)
+            
+            # Trust cache if folder was created/verified recently (within 1 hour)
+            import time
+            cache_age = time.time() - cache_timestamp
+            trust_cache = cache_age < 3600  # 1 hour
+            
+            if trust_cache:
+                print(f"   [Folder] Using cached ID for '{folder_name}': {folder_id} (cached {int(cache_age/60)}m ago)")
+                return folder_id
+            
+            # Verify cached folder still exists on server (only for old cache entries)
             try:
                 folders = list_folders(api_key)
                 for folder in folders:
@@ -296,6 +323,9 @@ def _get_or_create_single_folder(folder_name, api_key, parent_id=None):
                         
                         if name_match and parent_match:
                             print(f"   [Folder] Using cached ID for '{folder_name}': {folder_id}")
+                            # Update timestamp
+                            cache[cache_key] = {'id': folder_id, 'timestamp': time.time()}
+                            save_folder_cache(cache)
                             return folder_id
                 
                 # Cached folder doesn't exist anymore, remove from cache
@@ -304,7 +334,8 @@ def _get_or_create_single_folder(folder_name, api_key, parent_id=None):
                 save_folder_cache(cache)
             except Exception as e:
                 print(f"   [Folder] ⚠️ Could not verify cached folder: {e}")
-                # Continue to check/create folder
+                print(f"   [Folder] Trusting cache anyway to avoid duplicates")
+                return folder_id
         
         # Not in cache or cache invalid, need to check/create folder
         print(f"   [Folder] Checking if folder '{folder_name}' exists...")
@@ -340,7 +371,8 @@ def _get_or_create_single_folder(folder_name, api_key, parent_id=None):
             if name_match and parent_match:
                 print(f"   [Folder] ✅ Found existing folder: {folder_id} (name: '{server_folder_name}')")
                 # Cache it
-                cache[cache_key] = folder_id
+                import time
+                cache[cache_key] = {'id': folder_id, 'timestamp': time.time()}
                 save_folder_cache(cache)
                 return folder_id
         
@@ -369,8 +401,9 @@ def _get_or_create_single_folder(folder_name, api_key, parent_id=None):
                         folder_id = result.get('result', {}).get('fld_id')
                         if folder_id:
                             folder_id = str(folder_id)
-                            # Cache it immediately
-                            cache[cache_key] = folder_id
+                            # Cache it immediately with timestamp
+                            import time
+                            cache[cache_key] = {'id': folder_id, 'timestamp': time.time()}
                             save_folder_cache(cache)
                             print(f"   [Folder] ✅ Created folder '{folder_name}' with ID: {folder_id}")
                             
@@ -412,7 +445,8 @@ def _get_or_create_single_folder(folder_name, api_key, parent_id=None):
                                     if name_match and parent_match:
                                         folder_id = str(folder.get('fld_id'))
                                         # Cache it
-                                        cache[cache_key] = folder_id
+                                        import time
+                                        cache[cache_key] = {'id': folder_id, 'timestamp': time.time()}
                                         save_folder_cache(cache)
                                         print(f"   [Folder] ✅ Found folder ID: {folder_id} (name: '{server_folder_name}')")
                                         return folder_id
