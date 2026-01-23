@@ -570,14 +570,38 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
     if STREAMWISH_API_KEY:
         print(f"[StreamWish] Checking for existing uploads of {code} ({upload_type})...")
         try:
-            # Search for files with this code in the title
-            search_response = requests.get(
-                "https://api.streamwish.com/api/file/list",
-                params={'key': STREAMWISH_API_KEY, 'per_page': 100},
-                timeout=30
-            )
-            if search_response.status_code == 200:
-                search_data = search_response.json()
+            # Search for files with this code in the title - fetch multiple pages to be thorough
+            all_files = []
+            page = 1
+            max_pages = 3  # Check first 300 files (3 pages × 100)
+            
+            while page <= max_pages:
+                search_response = requests.get(
+                    "https://api.streamwish.com/api/file/list",
+                    params={'key': STREAMWISH_API_KEY, 'per_page': 100, 'page': page},
+                    timeout=30
+                )
+                if search_response.status_code == 200:
+                    search_data = search_response.json()
+                    if search_data.get('status') == 200 and 'result' in search_data:
+                        files = search_data['result'].get('files', [])
+                        if not files:
+                            break  # No more files
+                        all_files.extend(files)
+                        
+                        # Check if we've reached the end
+                        total = search_data['result'].get('total', 0)
+                        if len(all_files) >= total:
+                            break
+                        page += 1
+                    else:
+                        break
+                else:
+                    break
+            
+            if all_files:
+                print(f"[StreamWish] Checking {len(all_files)} files for duplicates...")
+                search_data = {'status': 200, 'result': {'files': all_files}}
                 if search_data.get('status') == 200 and 'result' in search_data:
                     files = search_data['result'].get('files', [])
                     invalid_files_found = []  # Track invalid files to avoid duplicate warnings
@@ -610,7 +634,7 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
                                 print(f"[StreamWish] ℹ️ Found {existing_type}: {file_title[:50]}... (different type, not a duplicate)")
                                 continue
                             
-                            filecode = file_info.get('filecode')
+                            filecode = file_info.get('file_code') or file_info.get('filecode')
                             
                             # Additional validation: check file size
                             # Skip if file is 0 bytes, missing filecode, or too small (likely corrupted/incomplete)
