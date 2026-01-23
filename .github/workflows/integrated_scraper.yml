@@ -260,13 +260,54 @@ jobs:
           mkdir -p database
           mkdir -p database/backups
           
-          # Initialize combined_videos.json if it doesn't exist
+          echo "=========================================="
+          echo "CHECKING DATABASE FILES"
+          echo "=========================================="
+          
+          # Create fresh database files if missing
           if [ ! -f database/combined_videos.json ]; then
+            echo "📝 Creating new combined_videos.json..."
             echo "[]" > database/combined_videos.json
+          else
+            echo "✓ combined_videos.json exists"
           fi
           
-          # Initialize other database files
-          python -c "from database_manager import db_manager; db_manager.ensure_structure()" || echo "Database structure already exists"
+          if [ ! -f database/failed_videos.json ]; then
+            echo "📝 Creating new failed_videos.json..."
+            echo "[]" > database/failed_videos.json
+          else
+            echo "✓ failed_videos.json exists"
+          fi
+          
+          if [ ! -f database/hosting_status.json ]; then
+            echo "📝 Creating new hosting_status.json..."
+            echo "{}" > database/hosting_status.json
+          else
+            echo "✓ hosting_status.json exists"
+          fi
+          
+          if [ ! -f database/progress_tracking.json ]; then
+            echo "📝 Creating new progress_tracking.json..."
+            echo '{"total_videos":0,"processed":0,"failed":0,"last_updated":""}' > database/progress_tracking.json
+          else
+            echo "✓ progress_tracking.json exists"
+          fi
+          
+          if [ ! -f database/stats.json ]; then
+            echo "📝 Creating new stats.json..."
+            echo '{"total_videos":0,"total_size_gb":0,"hosting_providers":{},"last_updated":""}' > database/stats.json
+          else
+            echo "✓ stats.json exists"
+          fi
+          
+          if [ ! -f database/javdb_retry_queue.json ]; then
+            echo "📝 Creating new javdb_retry_queue.json..."
+            echo "[]" > database/javdb_retry_queue.json
+          else
+            echo "✓ javdb_retry_queue.json exists"
+          fi
+          
+          echo "=========================================="
       
       - name: Show current database status
         run: |
