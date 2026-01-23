@@ -341,7 +341,7 @@ jobs:
           GITHUB_ACTIONS: 'true'
         run: |
           cd jable
-          timeout 5h 15m python run_continuous.py 2>&1 | tee pipeline.log || {
+          timeout 19000 python run_continuous.py 2>&1 | tee pipeline.log || {
             EXIT_CODE=$?
             echo "Scraper exited with code: $EXIT_CODE"
             if [ $EXIT_CODE -eq 124 ]; then
