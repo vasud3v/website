@@ -706,28 +706,33 @@ def _commit_database_attempt():
         log(f"   [commit] Local commit hash: {local_commit_before[:7]}")
         
         # Pull with rebase before pushing to handle remote changes
-        log(f"   [commit] Pulling latest changes with rebase...")
-        pull_result = subprocess.run(['git', 'pull', '--rebase', 'origin', current_branch],
-                                     capture_output=True, text=True, timeout=60)
-        
-        if pull_result.returncode == 0:
-            log(f"   [commit] ✓ Pull successful")
-            if "Already up to date" not in pull_result.stdout:
-                log(f"   [commit]   Rebased onto remote changes")
+        # Skip pull in GitHub Actions to avoid conflicts - Actions is source of truth
+        if not is_github_actions:
+            log(f"   [commit] Pulling latest changes with rebase...")
+            pull_result = subprocess.run(['git', 'pull', '--rebase', 'origin', current_branch],
+                                         capture_output=True, text=True, timeout=60)
+            
+            if pull_result.returncode == 0:
+                log(f"   [commit] ✓ Pull successful")
+                if "Already up to date" not in pull_result.stdout:
+                    log(f"   [commit]   Rebased onto remote changes")
+            else:
+                log(f"   [commit] ⚠️ Pull failed, attempting to continue...")
+                if pull_result.stderr:
+                    for line in pull_result.stderr.strip().split('\n')[:3]:  # Show first 3 lines
+                        log(f"   [commit]     {line}")
         else:
-            log(f"   [commit] ⚠️ Pull failed, attempting to continue...")
-            if pull_result.stderr:
-                for line in pull_result.stderr.strip().split('\n')[:3]:  # Show first 3 lines
-                    log(f"   [commit]     {line}")
+            log(f"   [commit] Skipping pull in GitHub Actions (will force push)")
         
         # Push with verbose output and force if needed
         log(f"   [commit] Pushing to origin/{current_branch}...")
         
-        # Try normal push first
-        push_cmd = ['git', 'push', 'origin', current_branch]
+        # In GitHub Actions, use force push to avoid conflicts
+        push_cmd = ['git', 'push']
         if is_github_actions:
-            # In GitHub Actions, be more aggressive
-            push_cmd.extend(['--verbose'])
+            push_cmd.extend(['--force', 'origin', current_branch, '--verbose'])
+        else:
+            push_cmd.extend(['origin', current_branch])
         
         result = subprocess.run(push_cmd, 
                                capture_output=True, text=True, timeout=120)
