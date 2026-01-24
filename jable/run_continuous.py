@@ -1391,7 +1391,7 @@ def process_one_video(scraper, url, num, total):
                         log(f"   ⚠️ Could not remove partial download: {e}")
                         pass
                 
-                downloader = HLSDownloader(8)  # 8 workers for stability
+                downloader = HLSDownloader(32)  # 32 workers for maximum speed
                 download_result = downloader.download(video_data.m3u8_url, ts_file, code)
                 
                 if download_result:
