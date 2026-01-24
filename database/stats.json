@@ -10,11 +10,9 @@
     "Roleplay": 1
   },
   "by_model": {},
-  "by_studio": {
-    "Planet Plus": 1
-  },
-  "with_javdb": 1,
-  "with_cast": 1,
-  "with_screenshots": 1,
-  "last_updated": "2026-01-24T07:04:52.333938"
+  "by_studio": {},
+  "with_javdb": 0,
+  "with_cast": 0,
+  "with_screenshots": 0,
+  "last_updated": "2026-01-24T07:08:07.751933"
 }
