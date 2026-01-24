@@ -116,29 +116,38 @@ class JableScraper:
                     # Try headless mode first if requested
                     if self.headless and attempt < max_retries - 1:
                         try:
-                            print(f"  🔄 Attempt {attempt+1}: Trying headless mode...")
+                            print(f"  🔄 Attempt {attempt+1}: Trying headless mode with anti-detection...")
                             
-                            # Add user agent to avoid detection
-                            from seleniumbase import config
-                            config.headless = True
-                            
+                            # More aggressive anti-detection for CI environments
                             self.driver = Driver(
                                 uc=True, 
                                 headless=True,
                                 incognito=True,
-                                page_load_strategy='eager',
-                                # Add user agent to look more like real browser
+                                page_load_strategy='none',  # Changed from 'eager' to 'none' for faster loading
+                                # Add realistic user agent
                                 agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                             )
                             time.sleep(3)
+                            
+                            # Add additional anti-detection measures
+                            try:
+                                # Remove webdriver flag
+                                self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+                                # Add plugins
+                                self.driver.execute_script("Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]})")
+                                # Add languages
+                                self.driver.execute_script("Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']})")
+                            except:
+                                pass
+                            
                             # Set reasonable timeouts
-                            self.driver.set_page_load_timeout(30)
-                            self.driver.set_script_timeout(15)
+                            self.driver.set_page_load_timeout(20)  # Reduced from 30 to 20
+                            self.driver.set_script_timeout(10)     # Reduced from 15 to 10
                             
                             # Test if driver works
                             _ = self.driver.current_url
                             
-                            print("  ✅ Browser initialized in headless mode (eager loading)")
+                            print("  ✅ Browser initialized in headless mode with anti-detection")
                             return
                         except Exception as e:
                             print(f"  ⚠️ Headless mode failed: {e}")
@@ -247,35 +256,56 @@ class JableScraper:
         print(f"📄 Loading page: {page_url}")
         
         try:
-            # Use a more aggressive approach: load page and immediately stop it
-            # This prevents hanging on slow-loading resources
+            # Use a more aggressive approach with timeout
             print(f"  ⏳ Starting page load...")
             
-            # Start loading the page in a separate thread-like manner
-            # by using execute_async_script
-            try:
-                # Navigate to page
-                self.driver.get(page_url)
-                print(f"  ✓ Page navigation started")
-            except Exception as e:
-                # If get() times out or fails, that's okay - we'll try to work with what loaded
-                print(f"  ⚠️ Page load interrupted (this is normal): {str(e)[:80]}")
+            # Set a hard timeout for page load (20 seconds max)
+            import signal
             
-            # Give it more time to load content (longer for headless)
-            wait_time = 5 if self.headless else 3
-            time.sleep(wait_time)
+            def timeout_handler(signum, frame):
+                raise TimeoutError("Page load timeout")
             
-            # Force stop any ongoing page loads
+            # For Windows, we can't use signal.alarm, so use threading
+            import threading
+            
+            load_success = False
+            load_error = None
+            
+            def load_page():
+                nonlocal load_success, load_error
+                try:
+                    self.driver.get(page_url)
+                    load_success = True
+                except Exception as e:
+                    load_error = e
+            
+            # Start loading in a thread with timeout
+            load_thread = threading.Thread(target=load_page)
+            load_thread.daemon = True
+            load_thread.start()
+            load_thread.join(timeout=20)  # 20 second timeout
+            
+            if load_thread.is_alive():
+                print(f"  ⚠️ Page load timeout after 20s (this is normal for slow sites)")
+            elif load_error:
+                print(f"  ⚠️ Page load interrupted: {str(load_error)[:80]}")
+            else:
+                print(f"  ✓ Page navigation completed")
+            
+            # Give it minimal time to start loading (2s)
+            time.sleep(2)
+            
+            # Force stop any ongoing page loads immediately
             try:
                 self.driver.execute_script("window.stop();")
                 print(f"  ✓ Stopped page load to prevent hanging")
             except:
                 pass
             
-            # Wait for body to appear
+            # Wait for body to appear (shorter timeout for headless)
             print(f"  ⏳ Waiting for page body...")
             start_time = time.time()
-            timeout = 15 if self.headless else 10  # Longer timeout for headless
+            timeout = 10 if self.headless else 10
             body_found = False
             while time.time() - start_time < timeout:
                 try:
@@ -288,12 +318,12 @@ class JableScraper:
                 time.sleep(0.5)
             
             if not body_found:
-                print(f"  ❌ Page body not found, cannot proceed")
+                print(f"  ❌ Page body not found after {timeout}s, cannot proceed")
                 return []
             
-            # Wait for JavaScript to render content (longer for headless)
+            # Wait for JavaScript to render content (reduced for headless)
             print(f"  ⏳ Waiting for content to render...")
-            render_wait = 12 if self.headless else 8
+            render_wait = 8 if self.headless else 8
             time.sleep(render_wait)
             
             # Check for video links
@@ -350,26 +380,65 @@ class JableScraper:
                 print(f"  ✅ Browser restarted")
                 print(f"  🔄 Retrying page load...")
                 
-                # Retry the page load with even longer waits for headless
-                retry_wait = 12 if self.headless else 8
+                # Retry the page load with threading timeout
+                retry_wait = 8
+                
+                load_success = False
+                load_error = None
+                
+                def retry_load():
+                    nonlocal load_success, load_error
+                    try:
+                        self.driver.get(page_url)
+                        load_success = True
+                    except Exception as e:
+                        load_error = e
+                
+                import threading
+                retry_thread = threading.Thread(target=retry_load)
+                retry_thread.daemon = True
+                retry_thread.start()
+                retry_thread.join(timeout=20)
+                
+                if retry_thread.is_alive():
+                    print(f"  ⚠️ Retry timeout after 20s")
+                
+                time.sleep(retry_wait)
+                
+                # Stop page load
                 try:
-                    self.driver.get(page_url)
-                    time.sleep(retry_wait)
                     self.driver.execute_script("window.stop();")
-                    time.sleep(retry_wait)
-                    
-                    # Scroll again
+                except:
+                    pass
+                
+                time.sleep(retry_wait)
+                
+                # Scroll again
+                try:
                     self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                    time.sleep(6 if self.headless else 5)
-                    
-                    # Re-parse
+                    time.sleep(5)
+                except:
+                    pass
+                
+                # Re-parse
+                try:
                     soup = BeautifulSoup(self.driver.page_source, 'html.parser')
                     video_containers = soup.find_all('div', class_='video-img-box')
                     print(f"  🔍 After restart: Found {len(video_containers)} video containers")
-                except Exception as retry_error:
-                    print(f"  ⚠️ Retry after restart failed: {retry_error}")
+                except Exception as e:
+                    print(f"  ⚠️ Re-parse failed: {e}")
+                    
             except Exception as restart_error:
                 print(f"  ❌ Browser restart failed: {restart_error}")
+        
+        # If still no videos after retry, log detailed error
+        if len(video_containers) == 0:
+            print(f"\n  ❌ DETECTION ISSUE: No videos found after retry")
+            print(f"  This usually means:")
+            print(f"    1. Cloudflare is blocking headless browsers")
+            print(f"    2. Site structure changed")
+            print(f"    3. IP/region blocking")
+            print(f"  Recommendation: Check page source manually or use non-headless mode")
         
         video_links = []
         
