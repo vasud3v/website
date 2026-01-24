@@ -111,30 +111,42 @@ class JableScraper:
                                 uc=True, 
                                 headless=True,
                                 headless2=True,
-                                incognito=True
+                                incognito=True,
+                                page_load_strategy='none'  # Don't wait for full page load
                             )
                             time.sleep(2)
                             # Set page load timeout to prevent hanging
-                            self.driver.set_page_load_timeout(180)  # 3 minutes max
-                            print("  ✅ Browser initialized in headless mode (timeout: 180s)")
+                            self.driver.set_page_load_timeout(60)  # 1 minute max
+                            self.driver.set_script_timeout(30)  # 30 seconds for scripts
+                            print("  ✅ Browser initialized in headless mode (timeout: 60s, strategy: none)")
                             return
                         except Exception as e:
                             print(f"  ⚠️ Headless mode failed: {e}")
                             if attempt == max_retries - 1:
                                 # Last attempt: try non-headless as fallback
                                 print("  🔄 Falling back to non-headless mode...")
-                                self.driver = Driver(uc=True, headless=False)
+                                self.driver = Driver(
+                                    uc=True, 
+                                    headless=False,
+                                    page_load_strategy='none'
+                                )
                                 time.sleep(2)
                                 # Set page load timeout
-                                self.driver.set_page_load_timeout(180)  # 3 minutes max
-                                print("  ✅ Browser initialized in non-headless mode (timeout: 180s)")
+                                self.driver.set_page_load_timeout(60)
+                                self.driver.set_script_timeout(30)
+                                print("  ✅ Browser initialized in non-headless mode (timeout: 60s, strategy: none)")
                                 return
                     else:
-                        self.driver = Driver(uc=True, headless=False)
+                        self.driver = Driver(
+                            uc=True, 
+                            headless=False,
+                            page_load_strategy='none'
+                        )
                         time.sleep(2)
                         # Set page load timeout
-                        self.driver.set_page_load_timeout(180)  # 3 minutes max
-                        print("  ✅ Browser initialized (timeout: 180s)")
+                        self.driver.set_page_load_timeout(60)
+                        self.driver.set_script_timeout(30)
+                        print("  ✅ Browser initialized (timeout: 60s, strategy: none)")
                         return
                 except Exception as e:
                     print(f"  ⚠️ Browser init attempt {attempt+1} failed: {e}")
@@ -198,19 +210,40 @@ class JableScraper:
         max_retries = 2
         for attempt in range(max_retries):
             try:
-                # Set a shorter timeout for this specific page load
-                self.driver.set_page_load_timeout(60)  # 1 minute per attempt
-                
                 print(f"  Attempt {attempt + 1}/{max_retries}...")
-                self.driver.get(page_url)
-                print(f"  ✓ Page loaded, waiting for JavaScript...")
-                time.sleep(8)  # Wait longer for JavaScript to load
                 
-                # Scroll down to load lazy-loaded content
-                self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                # With page_load_strategy='none', driver.get() returns immediately
+                # We need to wait manually for content to load
+                self.driver.get(page_url)
+                
+                # Wait for page to start loading
                 time.sleep(3)
                 
+                # Wait for body element to be present (page has started rendering)
+                start_time = time.time()
+                timeout = 30  # 30 seconds to wait for body
+                while time.time() - start_time < timeout:
+                    try:
+                        if self.driver.find_element("tag name", "body"):
+                            print(f"  ✓ Page body loaded")
+                            break
+                    except:
+                        pass
+                    time.sleep(0.5)
+                
+                # Wait for JavaScript to render content
+                print(f"  ⏳ Waiting for JavaScript to render...")
+                time.sleep(10)  # Give JavaScript time to render
+                
+                # Scroll down to load lazy-loaded content
+                try:
+                    self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                    time.sleep(3)
+                except:
+                    pass
+                
                 # If we got here, page loaded successfully
+                print(f"  ✓ Page ready for parsing")
                 break
                 
             except Exception as e:
@@ -218,22 +251,9 @@ class JableScraper:
                 
                 if attempt < max_retries - 1:
                     print(f"  🔄 Retrying...")
-                    # Try to stop the page load
-                    try:
-                        self.driver.execute_script("window.stop();")
-                    except:
-                        pass
                     time.sleep(2)
                 else:
                     print(f"  ❌ All attempts failed, trying to parse whatever loaded...")
-                    # Try to parse whatever content is available
-                    try:
-                        self.driver.execute_script("window.stop();")
-                    except:
-                        pass
-        
-        # Reset timeout back to normal
-        self.driver.set_page_load_timeout(180)
         
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
         
