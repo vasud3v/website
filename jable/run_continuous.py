@@ -67,6 +67,21 @@ except ImportError as e:
 
 print("All imports successful!")
 
+# Import edge case fixes
+try:
+    from edge_case_fixes import (
+        run_startup_checks,
+        set_current_video,
+        verify_mp4_integrity,
+        save_video_with_retry,
+        check_duplicate_by_url
+    )
+    EDGE_CASE_FIXES_AVAILABLE = True
+    print("✓ Edge case protection available")
+except ImportError as e:
+    EDGE_CASE_FIXES_AVAILABLE = False
+    print(f"⚠️ Edge case fixes not available: {e}")
+
 # Import JAVDatabase integration
 try:
     from javdb_integration import enrich_with_javdb
@@ -1349,6 +1364,10 @@ def process_one_video(scraper, url, num, total):
         code = sanitize_filename(video_data.code)
         thumbnail_url = video_data.thumbnail_url  # Will be set after upload
         
+        # Set current video for cleanup handlers
+        if EDGE_CASE_FIXES_AVAILABLE:
+            set_current_video(code)
+        
         log(f"\n🖼️ Thumbnail will be set after video upload")
         log(f"   Thumbnail URL: {thumbnail_url}")
         
@@ -1493,6 +1512,17 @@ def process_one_video(scraper, url, num, total):
                 mark_as_failed(url, error_msg)
                 return False
             log("✅ Converted")
+            
+            # Verify MP4 integrity
+            if EDGE_CASE_FIXES_AVAILABLE:
+                log("   Verifying MP4 integrity...")
+                if not verify_mp4_integrity(mp4_file, min_duration=10):
+                    error_msg = "MP4 file corrupted or invalid"
+                    log(f"❌ {error_msg}")
+                    cleanup_and_release(code)
+                    mark_as_failed(url, error_msg)
+                    return False
+                log("   ✓ MP4 integrity verified")
         except Exception as e:
             error_msg = f"Conversion exception: {str(e)[:100]}"
             log(f"❌ {error_msg}")
@@ -1876,6 +1906,12 @@ def main():
 ║  CONTINUOUS SCRAPER - COMPLETE WORKFLOW PER VIDEO        ║
 ╚══════════════════════════════════════════════════════════╝
 """)
+    
+    # Run startup checks
+    if EDGE_CASE_FIXES_AVAILABLE:
+        if not run_startup_checks():
+            log("❌ Startup checks failed, exiting")
+            return
     
     # Clean up caches and temporary files at startup
     log("🧹 Cleaning up caches and temporary files...")

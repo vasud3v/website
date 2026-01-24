@@ -46,7 +46,8 @@ def generate_and_upload_preview(video_path, video_code, video_title=None):
     print("-" * 60)
     
     try:
-        from preview_generator.preview_generator import PreviewGenerator
+        # Import directly from preview_generator package
+        from preview_generator import PreviewGenerator
         
         # Output path for preview
         preview_output = f"{video_code}_preview.mp4"
