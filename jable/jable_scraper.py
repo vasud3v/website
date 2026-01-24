@@ -117,11 +117,18 @@ class JableScraper:
                     if self.headless and attempt < max_retries - 1:
                         try:
                             print(f"  🔄 Attempt {attempt+1}: Trying headless mode...")
+                            
+                            # Add user agent to avoid detection
+                            from seleniumbase import config
+                            config.headless = True
+                            
                             self.driver = Driver(
                                 uc=True, 
                                 headless=True,
                                 incognito=True,
-                                page_load_strategy='eager'
+                                page_load_strategy='eager',
+                                # Add user agent to look more like real browser
+                                agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                             )
                             time.sleep(3)
                             # Set reasonable timeouts
@@ -254,8 +261,9 @@ class JableScraper:
                 # If get() times out or fails, that's okay - we'll try to work with what loaded
                 print(f"  ⚠️ Page load interrupted (this is normal): {str(e)[:80]}")
             
-            # Give it more time to load content
-            time.sleep(3)
+            # Give it more time to load content (longer for headless)
+            wait_time = 5 if self.headless else 3
+            time.sleep(wait_time)
             
             # Force stop any ongoing page loads
             try:
@@ -267,7 +275,7 @@ class JableScraper:
             # Wait for body to appear
             print(f"  ⏳ Waiting for page body...")
             start_time = time.time()
-            timeout = 10
+            timeout = 15 if self.headless else 10  # Longer timeout for headless
             body_found = False
             while time.time() - start_time < timeout:
                 try:
@@ -283,9 +291,10 @@ class JableScraper:
                 print(f"  ❌ Page body not found, cannot proceed")
                 return []
             
-            # Wait for JavaScript to render content (increased to 8 seconds)
+            # Wait for JavaScript to render content (longer for headless)
             print(f"  ⏳ Waiting for content to render...")
-            time.sleep(8)
+            render_wait = 12 if self.headless else 8
+            time.sleep(render_wait)
             
             # Check for video links
             try:
@@ -293,8 +302,9 @@ class JableScraper:
                 print(f"  🔍 Found {len(video_elements)} potential video links")
                 
                 if len(video_elements) == 0:
-                    print(f"  ⏳ No links yet, waiting 8 more seconds...")
-                    time.sleep(8)
+                    extra_wait = 12 if self.headless else 8
+                    print(f"  ⏳ No links yet, waiting {extra_wait} more seconds...")
+                    time.sleep(extra_wait)
                     video_elements = self.driver.find_elements("css selector", "a[href*='/videos/']")
                     print(f"  🔍 Now found {len(video_elements)} potential video links")
             except Exception as e:
@@ -303,12 +313,13 @@ class JableScraper:
             # Scroll to trigger lazy loading
             try:
                 print(f"  📜 Scrolling to load lazy content...")
+                scroll_wait = 5 if self.headless else 4
                 self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(4)  # Increased from 3 to 4 seconds
+                time.sleep(scroll_wait)
                 self.driver.execute_script("window.scrollTo(0, 0);")
                 time.sleep(2)
                 self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(4)  # Increased from 3 to 4 seconds
+                time.sleep(scroll_wait)
             except Exception as e:
                 print(f"  ⚠️ Error scrolling: {e}")
             
@@ -339,16 +350,17 @@ class JableScraper:
                 print(f"  ✅ Browser restarted")
                 print(f"  🔄 Retrying page load...")
                 
-                # Retry the page load with longer waits
+                # Retry the page load with even longer waits for headless
+                retry_wait = 12 if self.headless else 8
                 try:
                     self.driver.get(page_url)
-                    time.sleep(8)  # Increased from 5 to 8
+                    time.sleep(retry_wait)
                     self.driver.execute_script("window.stop();")
-                    time.sleep(8)  # Increased from 5 to 8
+                    time.sleep(retry_wait)
                     
                     # Scroll again
                     self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                    time.sleep(5)  # Increased from 3 to 5
+                    time.sleep(6 if self.headless else 5)
                     
                     # Re-parse
                     soup = BeautifulSoup(self.driver.page_source, 'html.parser')
