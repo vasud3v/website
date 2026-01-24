@@ -10,7 +10,7 @@ concurrency:
 
 on:
   schedule:
-    - cron: '*/30 * * * *'  # Every 30 minutes - check if restart needed
+    - cron: '*/15 * * * *'  # Every 15 minutes - more aggressive scheduling
   
   workflow_dispatch:
     inputs:
@@ -189,6 +189,14 @@ jobs:
           else
             echo "✓ Recently completed (${MINUTES_SINCE} minutes ago) - no restart needed"
             REASON="Recently completed (${MINUTES_SINCE} minutes ago)"
+          fi
+          
+          # EMERGENCY RESTART: If workflow has been idle for 2+ hours, force restart
+          # This handles cases where GitHub Actions cron is delayed/skipped
+          if [ $TIME_DIFF -gt 7200 ]; then
+            echo "⚠️ EMERGENCY: Workflow idle for ${HOURS_SINCE} hours - forcing restart"
+            SHOULD_SCRAPE="true"
+            REASON="EMERGENCY: ${HOURS_SINCE} hours idle - forced restart"
           fi
           
           echo ""
