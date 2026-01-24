@@ -72,10 +72,10 @@ class ClipExtractor:
         self,
         timestamps: List[Tuple[float, float]],
         resolution: str = "720",
-        crf: int = 28,
+        crf: int = 23,
         fps: int = 30,
         parallel: bool = True,
-        max_workers: int = None
+        max_workers: int = 32  # Default 32 workers
     ) -> List[str]:
         """
         Extract multiple clips with parallel processing
@@ -86,7 +86,7 @@ class ClipExtractor:
             crf: Compression quality
             fps: Target frame rate
             parallel: Use parallel processing
-            max_workers: Max parallel workers (default: CPU count)
+            max_workers: Max parallel workers (default: 32)
         
         Returns:
             List of output file paths
@@ -94,8 +94,8 @@ class ClipExtractor:
         print(f"[ClipExtractor] Extracting {len(timestamps)} clips...")
         
         if parallel and len(timestamps) > 1:
-            # Use parallel processing
-            workers = max_workers or min(cpu_count(), len(timestamps))
+            # Use parallel processing with specified workers
+            workers = min(max_workers, len(timestamps))
             print(f"[ClipExtractor] Using {workers} parallel workers")
             
             # Prepare extraction tasks

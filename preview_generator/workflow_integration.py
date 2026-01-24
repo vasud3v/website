@@ -25,28 +25,32 @@ class WorkflowIntegration:
         self,
         upload_function,
         folder_name: str = None,
-        num_clips: int = None,  # Auto-calculate based on video duration
-        clip_duration: float = 2.0,  # 2s per clip for quality
+        target_duration: float = 45.0,  # Target 45 seconds
+        clip_duration: float = 2.5,  # 2.5s per clip for quality
         resolution: str = "720",
         create_gif: bool = False,
-        parallel: bool = True
+        parallel: bool = True,
+        max_workers: int = 32  # 32 parallel workers
     ) -> Dict:
         """
         Generate advanced preview using multi-factor scene detection and upload to hosting
+        Captures ALL sex scenes, intro, outro, and GUARANTEES creampie/climax scenes
         Uses AdultSceneDetector for intelligent scene selection based on:
         - Skin tone detection (40% weight)
         - Motion intensity (30% weight)
         - Audio levels (20% weight)
         - Visual complexity (10% weight)
+        - CREAMPIE DETECTION (last 20% - PRIORITY)
         
         Args:
             upload_function: Function to upload preview (e.g., upload_to_streamwish)
             folder_name: Folder name for upload (e.g., "JAV_VIDEOS/CODE-123")
-            num_clips: Number of clips (None = auto-calculate, 1 every 90s)
+            target_duration: Target total duration (default: 45 seconds)
             clip_duration: Duration of each clip (2-3s recommended)
             resolution: Target resolution (720p for quality)
             create_gif: Also create GIF
             parallel: Use parallel processing
+            max_workers: Max parallel workers (default: 32)
         
         Returns:
             Dict with preview URLs and metadata
@@ -55,7 +59,9 @@ class WorkflowIntegration:
         print("ADVANCED PREVIEW GENERATION & UPLOAD")
         print("=" * 60)
         print("Strategy: Multi-factor scene detection (skin + motion + audio + complexity)")
+        print(f"Target: {target_duration}s | Workers: {max_workers} | Full Video Coverage")
         print("Quality: CRF 23 (high quality) + intelligent scene selection")
+        print("PRIORITY: Creampie/climax scenes (last 20%) - GUARANTEED 2-3 clips")
         print("=" * 60)
         
         result = {
@@ -87,7 +93,9 @@ class WorkflowIntegration:
             print(f"   - Motion intensity (30% weight)")
             print(f"   - Audio levels (20% weight)")
             print(f"   - Visual complexity (10% weight)")
-            print(f"   Clips: {num_clips if num_clips else 'Auto-calculated'}")
+            print(f"   - CREAMPIE DETECTION (last 20% - PRIORITY)")
+            print(f"   Target: {target_duration}s with {max_workers} parallel workers")
+            print(f"   Coverage: FULL video (intro + all scenes + outro + CREAMPIE)")
             print(f"   Quality: CRF 23 (high quality)")
             
             preview_output = os.path.join(self.temp_dir, f"{self.video_code}_preview.mp4")
@@ -98,26 +106,17 @@ class WorkflowIntegration:
             
             generator = PreviewGenerator(self.video_path)
             
-            # Calculate number of clips if not specified
-            if num_clips is None:
-                # Get video duration
-                info = generator.detector.get_video_info()
-                if info:
-                    # 1 clip every 90 seconds for good coverage
-                    num_clips = max(10, min(int(info['duration'] / 90), 30))
-                else:
-                    num_clips = 15  # Default
-            
             preview_result = generator.generate_preview(
                 output_path=preview_output,
-                num_clips=num_clips,
+                target_duration=target_duration,
                 clip_duration=clip_duration,
                 resolution=resolution,
                 crf=23,  # Good quality
                 fps=30,
                 create_gif=False,
                 cleanup=True,
-                parallel=True
+                parallel=parallel,
+                max_workers=max_workers
             )
             
             if not preview_result or not preview_result.get('success'):
@@ -219,7 +218,8 @@ class WorkflowIntegration:
             print(f"Size: {result['preview_file_size_mb']:.1f} MB")
             print(f"Duration: {result['preview_duration']:.1f}s")
             print(f"Best Scenes: {result['num_clips']} (multi-factor analysis)")
-            print(f"Detection: Skin + Motion + Audio + Complexity")
+            print(f"Detection: Skin + Motion + Audio + Complexity + CREAMPIE")
+            print(f"Creampie: GUARANTEED (2-3 clips from last 20%)")
             print("=" * 60)
             
             return result
@@ -268,11 +268,14 @@ def integrate_with_workflow(
     upload_function,
     folder_name: str = None,
     enable_preview: bool = True,
-    enable_gif: bool = False
+    enable_gif: bool = False,
+    target_duration: float = 45.0,
+    max_workers: int = 32
 ) -> Optional[Dict]:
     """
     Convenience function for advanced preview workflow integration
     Uses AdultSceneDetector for intelligent multi-factor scene selection
+    Captures ALL sex scenes, intro, outro, and GUARANTEES creampie/climax scenes
     
     Args:
         video_path: Path to video file
@@ -282,6 +285,8 @@ def integrate_with_workflow(
         folder_name: Upload folder name
         enable_preview: Enable preview generation
         enable_gif: Also create GIF
+        target_duration: Target total duration (default: 45 seconds)
+        max_workers: Max parallel workers (default: 32)
     
     Returns:
         Preview result dict or None if disabled
@@ -296,11 +301,12 @@ def integrate_with_workflow(
         result = integration.generate_and_upload_preview(
             upload_function=upload_function,
             folder_name=folder_name,
-            num_clips=None,  # Auto-calculate based on video duration
-            clip_duration=2.0,  # 2s per clip for quality
+            target_duration=target_duration,
+            clip_duration=2.5,  # 2.5s per clip for quality
             resolution="720",
             create_gif=enable_gif,
-            parallel=True
+            parallel=True,
+            max_workers=max_workers
         )
         
         return result

@@ -71,14 +71,16 @@ class AdultSceneDetector:
             print(f"[AdultDetector] Error getting video info: {e}")
             return None
     
-    def find_best_scenes(self, num_clips: int = 10, sample_size: int = 60) -> List[float]:
+    def find_best_scenes(self, num_clips: int = 10, sample_size: int = 60, max_workers: int = 32) -> List[float]:
         """
         Find best scenes using multiple detection methods
-        Ensures coverage across entire video
+        Ensures coverage across entire video including intro/outro
+        PRIORITIZES creampie/climax scenes (typically in last 20% of video)
         
         Args:
             num_clips: Number of clips to return
             sample_size: Number of segments to analyze
+            max_workers: Maximum parallel workers (default: 32)
             
         Returns:
             List of timestamps with best scenes
@@ -86,11 +88,12 @@ class AdultSceneDetector:
         if not self.duration:
             self.get_video_info()
         
-        print(f"[AdultDetector] Analyzing video with advanced detection ({self.duration/60:.1f} minutes)...")
+        print(f"[AdultDetector] Analyzing FULL video with advanced detection ({self.duration/60:.1f} minutes)...")
+        print(f"[AdultDetector] Special focus: Creampie/climax scenes (last 20% of video)")
         
-        # Skip first and last 5%
-        start_offset = self.duration * 0.05
-        end_offset = self.duration * 0.95
+        # Analyze ENTIRE video including intro/outro (0% to 100%)
+        start_offset = 0
+        end_offset = self.duration
         usable_duration = end_offset - start_offset
         
         # Step 1: Detect keyframes (scene changes)
@@ -103,31 +106,40 @@ class AdultSceneDetector:
         sound_peaks = self._detect_sound_peaks()
         print(f"[AdultDetector] Found {len(sound_peaks)} sound peaks")
         
-        # Step 3: Combine keyframes and sound peaks with regular sampling
+        # Step 3: Detect potential creampie/climax scenes (last 20% of video)
+        print(f"[AdultDetector] Step 3: Detecting creampie/climax scenes...")
+        creampie_candidates = self._detect_creampie_scenes()
+        print(f"[AdultDetector] Found {len(creampie_candidates)} potential creampie/climax scenes")
+        
+        # Step 4: Combine all detection methods
         # This ensures we cover the entire video
         candidate_timestamps = set()
         
         # Add keyframes
-        candidate_timestamps.update(keyframes[:sample_size // 2])
+        candidate_timestamps.update(keyframes[:sample_size // 3])
         
         # Add sound peaks
-        candidate_timestamps.update(sound_peaks[:sample_size // 3])
+        candidate_timestamps.update(sound_peaks[:sample_size // 4])
+        
+        # Add creampie candidates (PRIORITY)
+        candidate_timestamps.update(creampie_candidates)
         
         # Add regular intervals to ensure full coverage
-        interval = usable_duration / (sample_size // 3)
-        for i in range(sample_size // 3):
+        interval = usable_duration / (sample_size // 4)
+        for i in range(sample_size // 4):
             candidate_timestamps.add(start_offset + (i * interval))
         
         # Convert to sorted list
         sample_points = sorted(list(candidate_timestamps))[:sample_size]
         
-        print(f"[AdultDetector] Step 3: Analyzing {len(sample_points)} candidate segments...")
+        print(f"[AdultDetector] Step 5: Analyzing {len(sample_points)} candidate segments...")
         
-        # Analyze all segments in parallel
-        max_workers = min(cpu_count(), 32)
+        # Analyze all segments in parallel with specified workers
+        workers = min(max_workers, len(sample_points))
+        print(f"[AdultDetector] Using {workers} parallel workers for analysis...")
         
         results = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
             future_to_timestamp = {
                 executor.submit(self._analyze_segment_advanced, timestamp, 5.0): timestamp
                 for timestamp in sample_points
@@ -152,41 +164,39 @@ class AdultSceneDetector:
         results.sort(key=lambda x: x[1]['total_score'], reverse=True)
         
         # Ensure diversity: pick best from different parts of video
-        timestamps = self._ensure_diversity(results, num_clips)
+        # BUT guarantee creampie/climax scenes are included
+        timestamps = self._ensure_diversity_with_creampie(results, num_clips, creampie_candidates)
         
         print(f"\n[AdultDetector] Selected {len(timestamps)} best scenes (distributed across video)")
+        print(f"[AdultDetector] Includes creampie/climax scenes from last 20%")
         print(f"[AdultDetector] Score breakdown (top 5):")
         top_5 = sorted([(t, next((s for ts, s in results if ts == t), None)) for t in timestamps[:5]], 
                        key=lambda x: x[1]['total_score'] if x[1] else 0, reverse=True)
         
         for i, (t, score_data) in enumerate(top_5):
             if score_data:
+                is_creampie = t >= self.duration * 0.8
+                marker = " [CREAMPIE/CLIMAX]" if is_creampie else ""
                 print(f"  #{i+1} @ {t:.1f}s ({t/60:.1f}min): Total={score_data['total_score']:.1f} "
                       f"(Skin={score_data['skin_score']:.1f}, Motion={score_data['motion_score']:.1f}, "
-                      f"Audio={score_data['audio_score']:.1f}, Complex={score_data['complexity_score']:.1f})")
+                      f"Audio={score_data['audio_score']:.1f}, Complex={score_data['complexity_score']:.1f}){marker}")
         
         return timestamps
     
     def _detect_keyframes(self) -> List[float]:
         """
-        Detect keyframes (I-frames) using fast sampling
+        Detect keyframes (I-frames) using fast sampling across FULL video
         """
         try:
-            # For long videos, sample keyframes instead of analyzing all
-            # Extract keyframes at 10 second intervals
-            sample_interval = 10  # seconds
+            # Sample keyframes across ENTIRE video including intro/outro
+            sample_interval = 8  # seconds - more frequent sampling
             num_samples = int(self.duration / sample_interval)
             
             keyframes = []
             
-            # Quick method: just sample at regular intervals
-            # This is much faster than analyzing all frames
-            start_offset = self.duration * 0.05
-            end_offset = self.duration * 0.95
-            usable_duration = end_offset - start_offset
-            
-            for i in range(min(num_samples, 50)):  # Max 50 keyframes
-                timestamp = start_offset + (i * usable_duration / min(num_samples, 50))
+            # Sample from start to end (0% to 100%)
+            for i in range(min(num_samples, 100)):  # Max 100 keyframes for full coverage
+                timestamp = (i * self.duration / min(num_samples, 100))
                 keyframes.append(timestamp)
             
             return keyframes
@@ -197,25 +207,21 @@ class AdultSceneDetector:
     
     def _detect_sound_peaks(self) -> List[float]:
         """
-        Detect audio peaks using fast sampling
+        Detect audio peaks using fast sampling across FULL video
         """
         if not self.has_audio:
             return []
         
         try:
-            # Fast method: analyze audio in chunks
+            # Fast method: analyze audio in chunks across ENTIRE video
             sound_peaks = []
             
-            # Sample 20 points throughout the video
-            start_offset = self.duration * 0.05
-            end_offset = self.duration * 0.95
-            usable_duration = end_offset - start_offset
-            
-            num_samples = 20
+            # Sample 40 points throughout ENTIRE video
+            num_samples = 40
             chunk_duration = 5  # Analyze 5 seconds per sample
             
             for i in range(num_samples):
-                timestamp = start_offset + (i * usable_duration / num_samples)
+                timestamp = (i * self.duration / num_samples)
                 
                 # Quick audio level check
                 cmd = [
@@ -245,6 +251,58 @@ class AdultSceneDetector:
             
         except Exception as e:
             print(f"[AdultDetector] Sound peak detection failed: {e}")
+            return []
+    
+    def _detect_creampie_scenes(self) -> List[float]:
+        """
+        Detect potential creampie/climax scenes
+        These typically occur in the last 20% of the video
+        Characteristics:
+        - High skin tone presence
+        - Intense motion
+        - Loud audio (moaning/climax sounds)
+        - Often close-up shots (high visual complexity)
+        """
+        try:
+            # Focus on last 20% of video where creampie/climax typically occurs
+            start_time = self.duration * 0.80
+            end_time = self.duration
+            duration_to_analyze = end_time - start_time
+            
+            # Sample every 5 seconds in this region
+            num_samples = max(10, int(duration_to_analyze / 5))
+            
+            creampie_candidates = []
+            
+            for i in range(num_samples):
+                timestamp = start_time + (i * duration_to_analyze / num_samples)
+                
+                # Quick check: high skin + high motion + loud audio = likely climax scene
+                try:
+                    # Quick skin check (2 second sample)
+                    skin_score = self._detect_skin_tone(timestamp, 2.0)
+                    
+                    # Quick motion check
+                    motion_score = self._analyze_motion(timestamp, 2.0)
+                    
+                    # Quick audio check (if available)
+                    audio_score = 0
+                    if self.has_audio:
+                        audio_score = self._analyze_audio(timestamp, 2.0)
+                    
+                    # Creampie/climax scenes typically have:
+                    # - High skin tone (>40)
+                    # - High motion (>30) OR high audio (>40)
+                    if skin_score > 40 and (motion_score > 30 or audio_score > 40):
+                        creampie_candidates.append(timestamp)
+                        
+                except:
+                    pass
+            
+            return creampie_candidates
+            
+        except Exception as e:
+            print(f"[AdultDetector] Creampie detection failed: {e}")
             return []
     
     def _ensure_diversity(self, results: List[Tuple[float, Dict]], num_clips: int) -> List[float]:
@@ -281,6 +339,70 @@ class AdultSceneDetector:
                 selected.append(closest[0])
         
         # If we don't have enough, add more from top results
+        if len(selected) < num_clips:
+            for t, s in results:
+                if t not in selected:
+                    selected.append(t)
+                    if len(selected) >= num_clips:
+                        break
+        
+        return sorted(selected[:num_clips])
+    
+    def _ensure_diversity_with_creampie(self, results: List[Tuple[float, Dict]], num_clips: int, creampie_candidates: List[float]) -> List[float]:
+        """
+        Ensure selected clips are distributed across the entire video
+        BUT guarantee at least 2-3 clips from creampie/climax region (last 20%)
+        """
+        if not results:
+            return []
+        
+        # Calculate how many clips should be from creampie region
+        # At least 2-3 clips, or 20% of total clips (whichever is more)
+        min_creampie_clips = max(2, int(num_clips * 0.20))
+        
+        # Separate results into creampie region and rest
+        creampie_threshold = self.duration * 0.80
+        creampie_results = [(t, s) for t, s in results if t >= creampie_threshold]
+        other_results = [(t, s) for t, s in results if t < creampie_threshold]
+        
+        selected = []
+        
+        # PRIORITY 1: Select best creampie/climax scenes
+        print(f"[AdultDetector] Prioritizing {min_creampie_clips} creampie/climax scenes...")
+        creampie_results.sort(key=lambda x: x[1]['total_score'], reverse=True)
+        for t, s in creampie_results[:min_creampie_clips]:
+            selected.append(t)
+            print(f"  ✓ Creampie scene @ {t:.1f}s (score: {s['total_score']:.1f})")
+        
+        # PRIORITY 2: Distribute remaining clips across rest of video
+        remaining_clips = num_clips - len(selected)
+        
+        if remaining_clips > 0 and other_results:
+            # Divide non-creampie portion into sections
+            num_sections = remaining_clips
+            section_duration = creampie_threshold / num_sections
+            
+            for section in range(num_sections):
+                section_start = section * section_duration
+                section_end = (section + 1) * section_duration
+                
+                # Find best clip in this section
+                section_clips = [
+                    (t, s) for t, s in other_results 
+                    if section_start <= t < section_end
+                ]
+                
+                if section_clips:
+                    # Pick best from this section
+                    best = max(section_clips, key=lambda x: x[1]['total_score'])
+                    selected.append(best[0])
+                elif other_results:
+                    # If no clips in this section, pick closest one
+                    closest = min(other_results, key=lambda x: abs(x[0] - (section_start + section_duration/2)))
+                    if closest[0] not in selected:
+                        selected.append(closest[0])
+        
+        # If we still don't have enough, add more from top results
         if len(selected) < num_clips:
             for t, s in results:
                 if t not in selected:

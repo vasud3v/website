@@ -20,8 +20,8 @@ class PreviewGenerator:
     def generate_preview(
         self,
         output_path: str = None,
-        num_clips: int = 15,  # 15 clips × 3s = 45 seconds
-        clip_duration: float = 3.0,
+        target_duration: float = 45.0,  # Target 45 seconds
+        clip_duration: float = 2.5,  # Duration of each clip in seconds
         resolution: str = "720",
         crf: int = 23,  # Better quality (lower = better, 23 is high quality)
         fps: int = 30,
@@ -29,14 +29,15 @@ class PreviewGenerator:
         gif_width: int = 480,
         cleanup: bool = True,
         parallel: bool = True,
-        max_workers: int = None
+        max_workers: int = 32  # Default 32 workers
     ) -> dict:
         """
         Generate smart preview video with parallel processing
+        Captures ALL sex scenes, intro, and outro under 45 seconds
         
         Args:
             output_path: Output file path (default: video_preview.mp4)
-            num_clips: Number of clips to extract
+            target_duration: Target total duration (default: 45 seconds)
             clip_duration: Duration of each clip in seconds
             resolution: Target height (720, 480, etc.)
             crf: Compression quality (18-28, lower = better)
@@ -45,14 +46,18 @@ class PreviewGenerator:
             gif_width: GIF width in pixels
             cleanup: Remove temporary clip files
             parallel: Use parallel processing (faster)
-            max_workers: Max parallel workers (default: CPU count)
+            max_workers: Max parallel workers (default: 32)
         
         Returns:
             Dict with preview info and paths
         """
         print("=" * 60)
         print("ADVANCED PREVIEW GENERATOR")
+        print(f"Target: {target_duration}s | Workers: {max_workers} | Full Video Coverage")
         print("=" * 60)
+        
+        # Calculate number of clips to fit target duration
+        num_clips = int(target_duration / clip_duration)
         
         # Generate output path
         if not output_path:
@@ -85,9 +90,11 @@ class PreviewGenerator:
             # Step 2: Advanced multi-factor scene detection
             print("\n[2/5] Detecting best scenes (multi-factor analysis)...")
             print("         Analyzing: Motion + Skin Tones + Audio + Brightness")
+            print(f"         Coverage: FULL video (intro + all scenes + outro)")
             timestamps = self.detector.find_best_scenes(
                 num_clips=num_clips,
-                sample_size=min(60, num_clips * 6)  # Analyze 6x more samples than needed
+                sample_size=min(120, num_clips * 8),  # Analyze 8x more samples for better coverage
+                max_workers=max_workers
             )
             
             if not timestamps or len(timestamps) < num_clips:
@@ -200,18 +207,19 @@ def main():
         print("Usage: python preview_generator.py <video_file> [options]")
         print("\nOptions:")
         print("  --output PATH       Output file path")
-        print("  --clips N           Number of clips (default: 10)")
-        print("  --duration N        Clip duration in seconds (default: 3.0)")
+        print("  --clips N           Number of clips (default: auto-calculated for 45s)")
+        print("  --duration N        Clip duration in seconds (default: 2.5)")
+        print("  --target N          Target total duration (default: 45.0)")
         print("  --resolution N      Target height (default: 720)")
-        print("  --crf N             Compression quality 18-28 (default: 28)")
+        print("  --crf N             Compression quality 18-28 (default: 23)")
         print("  --fps N             Frame rate (default: 30)")
         print("  --gif               Also create GIF version")
         print("  --gif-width N       GIF width (default: 480)")
         print("  --no-cleanup        Keep temporary clip files")
         print("  --no-parallel       Disable parallel processing")
-        print("  --workers N         Max parallel workers (default: CPU count)")
+        print("  --workers N         Max parallel workers (default: 32)")
         print("\nExample:")
-        print("  python preview_generator.py video.mp4 --clips 10 --duration 3 --gif")
+        print("  python preview_generator.py video.mp4 --target 45 --workers 32")
         sys.exit(1)
     
     video_file = sys.argv[1]
@@ -224,16 +232,16 @@ def main():
     # Parse arguments
     args = {
         'output_path': None,
-        'num_clips': 10,
-        'clip_duration': 3.0,
+        'target_duration': 45.0,
+        'clip_duration': 2.5,
         'resolution': '720',
-        'crf': 28,
+        'crf': 23,
         'fps': 30,
         'create_gif': False,
         'gif_width': 480,
         'cleanup': True,
         'parallel': True,
-        'max_workers': None
+        'max_workers': 32
     }
     
     i = 2
@@ -243,8 +251,13 @@ def main():
         if arg == '--output' and i + 1 < len(sys.argv):
             args['output_path'] = sys.argv[i + 1]
             i += 2
+        elif arg == '--target' and i + 1 < len(sys.argv):
+            args['target_duration'] = float(sys.argv[i + 1])
+            i += 2
         elif arg == '--clips' and i + 1 < len(sys.argv):
-            args['num_clips'] = int(sys.argv[i + 1])
+            # Override auto-calculation
+            target = float(sys.argv[i + 1]) * args['clip_duration']
+            args['target_duration'] = target
             i += 2
         elif arg == '--duration' and i + 1 < len(sys.argv):
             args['clip_duration'] = float(sys.argv[i + 1])
