@@ -112,13 +112,13 @@ class JableScraper:
                                 headless=True,
                                 headless2=True,
                                 incognito=True,
-                                page_load_strategy='none'  # Don't wait for full page load
+                                page_load_strategy='eager'  # Don't wait for all resources
                             )
                             time.sleep(2)
-                            # Set page load timeout to prevent hanging
-                            self.driver.set_page_load_timeout(60)  # 1 minute max
-                            self.driver.set_script_timeout(30)  # 30 seconds for scripts
-                            print("  ✅ Browser initialized in headless mode (timeout: 60s, strategy: none)")
+                            # Set reasonable timeouts
+                            self.driver.set_page_load_timeout(30)  # Shorter timeout
+                            self.driver.set_script_timeout(15)
+                            print("  ✅ Browser initialized in headless mode (eager loading)")
                             return
                         except Exception as e:
                             print(f"  ⚠️ Headless mode failed: {e}")
@@ -128,25 +128,23 @@ class JableScraper:
                                 self.driver = Driver(
                                     uc=True, 
                                     headless=False,
-                                    page_load_strategy='none'
+                                    page_load_strategy='eager'
                                 )
                                 time.sleep(2)
-                                # Set page load timeout
-                                self.driver.set_page_load_timeout(60)
-                                self.driver.set_script_timeout(30)
-                                print("  ✅ Browser initialized in non-headless mode (timeout: 60s, strategy: none)")
+                                self.driver.set_page_load_timeout(30)
+                                self.driver.set_script_timeout(15)
+                                print("  ✅ Browser initialized in non-headless mode (eager loading)")
                                 return
                     else:
                         self.driver = Driver(
                             uc=True, 
                             headless=False,
-                            page_load_strategy='none'
+                            page_load_strategy='eager'
                         )
                         time.sleep(2)
-                        # Set page load timeout
-                        self.driver.set_page_load_timeout(60)
-                        self.driver.set_script_timeout(30)
-                        print("  ✅ Browser initialized (timeout: 60s, strategy: none)")
+                        self.driver.set_page_load_timeout(30)
+                        self.driver.set_script_timeout(15)
+                        print("  ✅ Browser initialized (eager loading)")
                         return
                 except Exception as e:
                     print(f"  ⚠️ Browser init attempt {attempt+1} failed: {e}")
@@ -207,101 +205,86 @@ class JableScraper:
         
         print(f"📄 Loading page: {page_url}")
         
-        # Set overall timeout for page loading
-        overall_start = time.time()
-        overall_timeout = 45  # Maximum 45 seconds total for page load
-        
-        max_retries = 1  # Reduced to 1 retry to avoid wasting time
-        for attempt in range(max_retries):
-            # Check if we've exceeded overall timeout
-            if time.time() - overall_start > overall_timeout:
-                print(f"  ⚠️ Overall timeout ({overall_timeout}s) exceeded, giving up...")
-                break
-                
+        try:
+            # Use a more aggressive approach: load page and immediately stop it
+            # This prevents hanging on slow-loading resources
+            print(f"  ⏳ Starting page load...")
+            
+            # Start loading the page in a separate thread-like manner
+            # by using execute_async_script
             try:
-                print(f"  Attempt {attempt + 1}/{max_retries}...")
-                
-                # Try to load page with a timeout
-                # Even with page_load_strategy='none', some sites can still block
-                try:
-                    # Set a very short script timeout to prevent hanging
-                    self.driver.set_script_timeout(10)
-                    
-                    print(f"  ⏳ Calling driver.get()...")
-                    self.driver.get(page_url)
-                    print(f"  ✓ driver.get() returned")
-                except Exception as e:
-                    print(f"  ⚠️ driver.get() error: {str(e)[:100]}")
-                    # Try to stop the page load
-                    try:
-                        self.driver.execute_script("window.stop();")
-                        print(f"  ✓ Stopped page load")
-                    except:
-                        pass
-                
-                # Wait for page to start loading
-                time.sleep(2)  # Reduced from 3 to 2
-                
-                # Wait for body element to be present (page has started rendering)
-                start_time = time.time()
-                timeout = 15  # Reduced from 20 to 15 seconds
-                body_found = False
-                while time.time() - start_time < timeout:
-                    try:
-                        if self.driver.find_element("tag name", "body"):
-                            print(f"  ✓ Page body loaded")
-                            body_found = True
-                            break
-                    except:
-                        pass
-                    time.sleep(0.5)
-                
-                if not body_found:
-                    print(f"  ⚠️ Body not found within {timeout}s, skipping...")
-                    continue
-                
-                # Wait for JavaScript to render content
-                print(f"  ⏳ Waiting for JavaScript to render...")
-                time.sleep(8)  # Reduced from 10 to 8 seconds
-                
-                # Check if video links are present, if not wait a bit more
-                try:
-                    video_elements = self.driver.find_elements("css selector", "a[href*='/videos/']")
-                    if len(video_elements) == 0:
-                        print(f"  ⏳ No video links found yet, waiting 3 more seconds...")
-                        time.sleep(3)  # Reduced from 5 to 3 seconds
-                    else:
-                        print(f"  ✓ Found {len(video_elements)} potential video links")
-                except:
-                    pass
-                
-                # Scroll down to load lazy-loaded content
-                try:
-                    self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                    time.sleep(2)  # Reduced from 3 to 2 seconds
-                    
-                    # Scroll back up to trigger any lazy loading
-                    self.driver.execute_script("window.scrollTo(0, 0);")
-                    time.sleep(1)
-                    
-                    # Scroll down again
-                    self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                    time.sleep(1)  # Reduced from 2 to 1 second
-                except:
-                    pass
-                
-                # If we got here, page loaded successfully
-                print(f"  ✓ Page ready for parsing")
-                break
-                
+                # Navigate to page
+                self.driver.get(page_url)
+                print(f"  ✓ Page navigation started")
             except Exception as e:
-                print(f"  ⚠️ Attempt {attempt + 1} failed: {str(e)[:100]}")
+                # If get() times out or fails, that's okay - we'll try to work with what loaded
+                print(f"  ⚠️ Page load interrupted (this is normal): {str(e)[:80]}")
+            
+            # Give it a moment to start loading
+            time.sleep(3)
+            
+            # Force stop any ongoing page loads
+            try:
+                self.driver.execute_script("window.stop();")
+                print(f"  ✓ Stopped page load to prevent hanging")
+            except:
+                pass
+            
+            # Wait for body to appear
+            print(f"  ⏳ Waiting for page body...")
+            start_time = time.time()
+            timeout = 10
+            body_found = False
+            while time.time() - start_time < timeout:
+                try:
+                    if self.driver.find_element("tag name", "body"):
+                        body_found = True
+                        print(f"  ✓ Page body loaded")
+                        break
+                except:
+                    pass
+                time.sleep(0.5)
+            
+            if not body_found:
+                print(f"  ❌ Page body not found, cannot proceed")
+                return []
+            
+            # Wait for JavaScript to render content
+            print(f"  ⏳ Waiting for content to render...")
+            time.sleep(5)
+            
+            # Check for video links
+            try:
+                video_elements = self.driver.find_elements("css selector", "a[href*='/videos/']")
+                print(f"  🔍 Found {len(video_elements)} potential video links")
                 
-                if attempt < max_retries - 1:
-                    print(f"  🔄 Retrying...")
-                    time.sleep(2)
-                else:
-                    print(f"  ❌ All attempts failed, trying to parse whatever loaded...")
+                if len(video_elements) == 0:
+                    print(f"  ⏳ No links yet, waiting 5 more seconds...")
+                    time.sleep(5)
+                    video_elements = self.driver.find_elements("css selector", "a[href*='/videos/']")
+                    print(f"  🔍 Now found {len(video_elements)} potential video links")
+            except Exception as e:
+                print(f"  ⚠️ Error checking for video links: {e}")
+            
+            # Scroll to trigger lazy loading
+            try:
+                print(f"  📜 Scrolling to load lazy content...")
+                self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(2)
+                self.driver.execute_script("window.scrollTo(0, 0);")
+                time.sleep(1)
+                self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(2)
+            except Exception as e:
+                print(f"  ⚠️ Error scrolling: {e}")
+            
+            print(f"  ✓ Page ready for parsing")
+            
+        except Exception as e:
+            print(f"  ❌ Critical error loading page: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
         
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
         
