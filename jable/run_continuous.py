@@ -1500,102 +1500,14 @@ def process_one_video(scraper, url, num, total):
             mark_as_failed(url, error_msg)
             return False
         
-        # STEP 3.5: Create and upload preview video (ADVANCED)
+        # STEP 3.5: Preview generation (handled by GitHub Actions)
         preview_result = None
-        if ADVANCED_PREVIEW_AVAILABLE:
-            log("\n🎬 Step 3.5: Creating and uploading preview video...")
-            try:
-                from upload_all_hosts import upload_all
-                
-                # Create wrapper function for preview upload with multi-host fallback
-                def upload_preview_with_fallback(file_path, code, title, folder_name, allow_small_files=False):
-                    """Wrapper to use upload_all for preview with multi-host fallback"""
-                    # Pass folder_name to upload_all so preview goes to same folder as main video
-                    result = upload_all(file_path, code, title, allow_small_files=allow_small_files, folder_name=folder_name)
-                    # Return first successful upload or last failed attempt
-                    if result.get('successful'):
-                        return result['successful'][0]
-                    elif result.get('failed'):
-                        return result['failed'][-1]  # Return last failed attempt
-                    return {'success': False, 'error': 'Upload failed'}
-                
-                # IMPORTANT: Use the SAME folder as the main video to avoid duplicates
-                # Main video goes to: JAV_VIDEOS/{code}
-                # Preview should go to: JAV_VIDEOS/{code} (same folder)
-                video_folder = f"JAV_VIDEOS/{code}"
-                
-                # Use advanced preview generation with comprehensive sex scene detection
-                # Skips first 5 minutes, captures ALL sex scenes, 30 clips × 2s / 1.3x = ~46s
-                preview_result = integrate_with_workflow(
-                    video_path=mp4_file,
-                    video_code=code,
-                    video_title=video_data.title,
-                    upload_function=upload_preview_with_fallback,
-                    folder_name=video_folder,  # SAME folder as main video
-                    enable_preview=True,
-                    enable_gif=False  # Set to True if you want GIF too
-                )
-                
-                if preview_result and preview_result.get('success'):
-                    log(f"✅ Preview created and uploaded")
-                    log(f"   URL: {preview_result['preview_video_url']}")
-                    log(f"   Size: {preview_result['preview_file_size_mb']:.1f} MB")
-                    log(f"   Duration: {preview_result['preview_duration']:.1f}s")
-                    log(f"   Clips: {preview_result['num_clips']}")
-                else:
-                    log(f"⚠️ Preview generation failed: {preview_result.get('error') if preview_result else 'Unknown error'}")
-                    preview_result = None
-                    
-            except Exception as e:
-                log(f"⚠️ Preview generation error: {str(e)[:100]}")
-                preview_result = None
-        
-        elif PREVIEW_CREATION_AVAILABLE:
-            # Fallback to simple preview (old method)
-            log("\n🎬 Step 3.5: Creating preview video (simple mode)...")
-            preview_file = None
-            try:
-                preview_file = f"{TEMP_DIR}/{code}_preview.mp4"
-                result = create_preview(mp4_file, preview_file, duration=15, num_clips=3)
-                if result and os.path.exists(result):
-                    preview_size_mb = os.path.getsize(result) / (1024 * 1024)
-                    log(f"✅ Preview created: {preview_size_mb:.1f} MB")
-                    
-                    # Upload preview
-                    log(f"📤 Uploading preview...")
-                    try:
-                        from upload_all_hosts import upload_to_streamwish
-                        preview_folder = f"JAV_VIDEOS/{code}"
-                        preview_title = f"{code} - PREVIEW"
-                        
-                        preview_upload = upload_to_streamwish(preview_file, code, preview_title, preview_folder)
-                        
-                        if preview_upload and preview_upload.get('success'):
-                            preview_result = {
-                                'success': True,
-                                'preview_video_url': preview_upload.get('embed_url'),
-                                'preview_file_size_mb': preview_size_mb,
-                                'preview_duration': 45,  # 3 clips x 15s
-                                'num_clips': 3
-                            }
-                            log(f"✅ Preview uploaded: {preview_result['preview_video_url']}")
-                        else:
-                            log(f"⚠️ Preview upload failed")
-                    except Exception as e:
-                        log(f"⚠️ Preview upload error: {str(e)[:100]}")
-                    
-                    # Cleanup
-                    try:
-                        os.remove(preview_file)
-                    except Exception as e:
-                        log(f"   ⚠️ Could not remove preview file: {e}")
-                        pass
-                else:
-                    log(f"⚠️ Preview creation failed")
-            except Exception as e:
-                log(f"⚠️ Preview creation error: {str(e)[:100]}")
-        else:
-            log("\n⚠️ Step 3.5: Preview creation not available (skipping)")
+        # Note: Preview upload to Internet Archive is handled by GitHub Actions
+        # See: .github/workflows/integrated_scraper.yml
+        # The workflow will automatically generate and upload previews after video processing
+        log("\n🎬 Step 3.5: Preview generation (handled by GitHub Actions)")
+        log("ℹ️ Previews will be automatically generated and uploaded to Internet Archive")
+        log("ℹ️ No local preview upload to StreamWish - using Internet Archive instead")
         
         # Check disk space before upload
         has_space, free_gb, _ = check_disk_space(min_free_gb=1)

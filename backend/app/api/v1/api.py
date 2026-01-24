@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import videos, categories, studios, cast, search
+from app.api.v1.endpoints import videos, categories, studios, cast, search, preview
 
 api_router = APIRouter()
 
@@ -8,3 +8,4 @@ api_router.include_router(categories.router, prefix="/categories", tags=["catego
 api_router.include_router(studios.router, prefix="/studios", tags=["studios"])
 api_router.include_router(cast.router, prefix="/cast", tags=["cast"])
 api_router.include_router(search.router, prefix="/search", tags=["search"])
+api_router.include_router(preview.router, prefix="/preview", tags=["preview"])

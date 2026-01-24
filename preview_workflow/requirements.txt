@@ -1,0 +1,10 @@
+# Preview generation
+opencv-python>=4.8.0
+numpy>=1.24.0
+ffmpeg-python>=0.2.0
+
+# Internet Archive upload
+internetarchive>=3.5.0
+
+# Common
+requests>=2.31.0

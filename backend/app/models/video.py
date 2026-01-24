@@ -13,6 +13,7 @@ class VideoListItem(BaseModel):
     rating_avg: float = 0.0
     rating_count: int = 0
     like_count: int = 0
+    preview_video_url: Optional[str] = None
     
     class Config:
         # Allow extra fields from database

@@ -257,6 +257,12 @@ jobs:
             pip install -r javdatabase/requirements.txt
           fi
           pip install filelock  # For database locking
+          
+          # Install preview generation dependencies
+          pip install opencv-python-headless ffmpeg-python numpy pillow
+          
+          # Install Internet Archive uploader
+          pip install internetarchive requests
       
       - name: Check disk space
         run: df -h
@@ -324,6 +330,15 @@ jobs:
           echo "=========================================="
           python show_database_summary.py 2>/dev/null || python -c "from database_manager import db_manager; db_manager.print_status()"
       
+      - name: Configure Internet Archive credentials
+        env:
+          IA_EMAIL: ${{ secrets.IA_EMAIL }}
+          IA_PASSWORD: ${{ secrets.IA_PASSWORD }}
+        run: |
+          echo "Configuring Internet Archive..."
+          ia configure --username "$IA_EMAIL" --password "$IA_PASSWORD"
+          echo "✓ Internet Archive configured"
+      
       - name: Validate API keys
         continue-on-error: true
         env:
@@ -331,11 +346,15 @@ jobs:
           LULUSTREAM_API_KEY: ${{ secrets.LULUSTREAM_API_KEY }}
           STREAMTAPE_LOGIN: ${{ secrets.STREAMTAPE_LOGIN }}
           STREAMTAPE_API_KEY: ${{ secrets.STREAMTAPE_API_KEY }}
+          IA_EMAIL: ${{ secrets.IA_EMAIL }}
+          IA_PASSWORD: ${{ secrets.IA_PASSWORD }}
         run: |
           echo "Validating API keys..."
           [ -z "$STREAMWISH_API_KEY" ] && echo "⚠️ STREAMWISH_API_KEY not set" || echo "✓ StreamWish API key is set"
           [ -z "$LULUSTREAM_API_KEY" ] && echo "⚠️ LULUSTREAM_API_KEY not set" || echo "✓ LuluStream API key is set"
           [ -z "$STREAMTAPE_LOGIN" ] && echo "⚠️ STREAMTAPE_LOGIN not set" || echo "✓ StreamTape login is set"
+          [ -z "$IA_EMAIL" ] && echo "⚠️ IA_EMAIL not set" || echo "✓ Internet Archive email is set"
+          [ -z "$IA_PASSWORD" ] && echo "⚠️ IA_PASSWORD not set" || echo "✓ Internet Archive password is set"
       
       - name: Run integrated scraper
         env:
@@ -359,6 +378,126 @@ jobs:
             fi
           }
         continue-on-error: true
+      
+      - name: Generate and upload video previews
+        if: always()
+        continue-on-error: true
+        env:
+          IA_EMAIL: ${{ secrets.IA_EMAIL }}
+          IA_PASSWORD: ${{ secrets.IA_PASSWORD }}
+        run: |
+          echo "=========================================="
+          echo "GENERATING VIDEO PREVIEWS"
+          echo "=========================================="
+          
+          # Create preview workflow script that processes videos from database
+          cat > process_previews.py << 'EOF'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+          
+          # Configure Internet Archive first
+          try:
+              from internetarchive import configure
+              
+              ia_email = os.environ.get('IA_EMAIL')
+              ia_password = os.environ.get('IA_PASSWORD')
+              
+              if ia_email and ia_password:
+                  configure(username=ia_email, password=ia_password)
+                  print("✓ Internet Archive configured")
+              else:
+                  print("⚠️ Internet Archive credentials not found in environment")
+                  sys.exit(1)
+          except Exception as e:
+              print(f"❌ Failed to configure Internet Archive: {e}")
+              sys.exit(1)
+          
+          # Add paths
+          sys.path.insert(0, str(Path(__file__).parent))
+          sys.path.insert(0, str(Path(__file__).parent / "preview_workflow"))
+          sys.path.insert(0, str(Path(__file__).parent / "preview_generator"))
+          sys.path.insert(0, str(Path(__file__).parent / "internet_archive_upload"))
+          
+          from preview_workflow.generate_and_upload_preview import generate_and_upload_preview
+          
+          # Load database
+          db_path = Path("database/combined_videos.json")
+          if not db_path.exists():
+              print("No database found")
+              sys.exit(0)
+          
+          with open(db_path, 'r', encoding='utf-8') as f:
+              videos = json.load(f)
+          
+          # Find videos that need previews (have local file but no preview_ia)
+          videos_needing_preview = []
+          for video in videos:
+              # Skip if already has preview
+              if video.get('preview_ia'):
+                  continue
+              
+              # Check if video has a local file path or was recently uploaded
+              video_code = video.get('code')
+              if not video_code:
+                  continue
+              
+              # Look for downloaded video in temp_downloads
+              temp_dir = Path("jable/temp_downloads")
+              if temp_dir.exists():
+                  for ext in ['.mp4', '.mkv', '.avi']:
+                      video_file = temp_dir / f"{video_code}{ext}"
+                      if video_file.exists():
+                          videos_needing_preview.append({
+                              'code': video_code,
+                              'title': video.get('title'),
+                              'file': str(video_file)
+                          })
+                          break
+          
+          if not videos_needing_preview:
+              print("No videos need preview generation")
+              sys.exit(0)
+          
+          print(f"Found {len(videos_needing_preview)} videos needing previews")
+          
+          # Process up to 5 videos per run (to avoid timeout)
+          max_previews = 5
+          processed = 0
+          
+          for video_info in videos_needing_preview[:max_previews]:
+              print(f"\n{'='*60}")
+              print(f"Processing: {video_info['code']}")
+              print(f"{'='*60}")
+              
+              try:
+                  result = generate_and_upload_preview(
+                      video_info['file'],
+                      video_info['code'],
+                      video_info.get('title')
+                  )
+                  
+                  if result['success']:
+                      print(f"✓ Preview generated and uploaded: {video_info['code']}")
+                      processed += 1
+                  else:
+                      print(f"❌ Failed: {result.get('error')}")
+              except Exception as e:
+                  print(f"❌ Error processing {video_info['code']}: {e}")
+                  import traceback
+                  traceback.print_exc()
+          
+          print(f"\n{'='*60}")
+          print(f"Processed {processed}/{len(videos_needing_preview[:max_previews])} previews")
+          print(f"{'='*60}")
+          EOF
+          
+          # Run preview generation
+          python process_previews.py || echo "⚠️ Preview generation had errors (continuing)"
+          
+          # Cleanup
+          rm -f process_previews.py
       
       - name: Update all database tracking files
         if: always()

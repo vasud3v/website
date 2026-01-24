@@ -49,6 +49,17 @@
     --ring: 0.6422 0.2062 345.4133;
   }
 
+  @keyframes pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.1);
+      opacity: 0.8;
+    }
+  }
+
   * {
     margin: 0;
     padding: 0;
@@ -474,16 +485,6 @@
   }
   100% {
     background-position: 200% 0;
-  }
-}
-
-/* Spin animation for video preview loading */
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
   }
 }
 

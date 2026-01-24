@@ -61,6 +61,10 @@ class VideoService:
         if 'release_date' not in normalized or not normalized['release_date']:
             normalized['release_date'] = "Unknown"
         
+        # Include preview_video_url if available
+        if 'preview_video_url' in video and video['preview_video_url']:
+            normalized['preview_video_url'] = video['preview_video_url']
+        
         return normalized
     
     def _load_videos(self) -> List[Dict[str, Any]]:
