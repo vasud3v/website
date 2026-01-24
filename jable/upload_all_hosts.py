@@ -1099,12 +1099,46 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
                     }
             
             if not filecode:
-                print(f"[StreamWish] ❌ No filecode in file info")
-                if attempt < max_retries - 1:
-                    print(f"[StreamWish] Retrying in 10s...")
-                    time.sleep(10)
-                    continue
-                return {'service': 'StreamWish', 'success': False, 'error': 'No filecode'}
+                # Check if it's a duplicate
+                if status and 'Duplicate' in status:
+                    print(f"[StreamWish] ℹ️ File detected as duplicate by StreamWish")
+                    print(f"[StreamWish] Searching for existing file...")
+                    
+                    # Try to find the existing file
+                    try:
+                        search_response = requests.get(
+                            "https://api.streamwish.com/api/file/list",
+                            params={'key': STREAMWISH_API_KEY, 'per_page': 100},
+                            timeout=30
+                        )
+                        
+                        if search_response.status_code == 200:
+                            search_data = search_response.json()
+                            if search_data.get('status') == 200 and 'result' in search_data:
+                                files = search_data['result'].get('files', [])
+                                
+                                # Look for file with same name
+                                for existing_file in files:
+                                    existing_name = existing_file.get('title', '')
+                                    existing_code = existing_file.get('file_code', '')
+                                    
+                                    # Check if this is our file
+                                    if code.upper() in existing_name.upper() or filename in existing_name:
+                                        filecode = existing_code
+                                        print(f"[StreamWish] ✓ Found existing file: {existing_name}")
+                                        print(f"[StreamWish] ✓ Using existing filecode: {filecode}")
+                                        break
+                    except Exception as e:
+                        print(f"[StreamWish] ⚠️ Could not search for existing file: {e}")
+                
+                if not filecode:
+                    print(f"[StreamWish] ❌ No filecode in file info and could not find existing")
+                    if attempt < max_retries - 1:
+                        print(f"[StreamWish] Retrying in 10s...")
+                        time.sleep(10)
+                        continue
+                    return {'service': 'StreamWish', 'success': False, 'error': 'No filecode (duplicate)'}
+
             
             # Success!
             print(f"\n[StreamWish] ═══════════════════════════════════════")
