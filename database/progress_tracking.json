@@ -1,9 +1,9 @@
 {
-  "last_updated": "2026-01-24T07:56:03.833472",
-  "total_videos": 0,
-  "total_processed": 0,
+  "last_updated": "2026-01-24T08:01:06.660888",
+  "total_videos": 1,
+  "total_processed": 1,
   "total_failed": 0,
-  "success_rate": 0,
-  "last_video_code": null,
+  "success_rate": 100.0,
+  "last_video_code": "SNOS-052",
   "last_video_url": null
 }

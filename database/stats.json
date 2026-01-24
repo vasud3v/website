@@ -1,12 +1,19 @@
 {
-  "total_videos": 0,
-  "total_size_bytes": 0,
-  "by_hosting": {},
-  "by_category": {},
+  "total_videos": 1,
+  "total_size_bytes": 1855431555,
+  "by_hosting": {
+    "streamwish": 1
+  },
+  "by_category": {
+    "Insult": 1,
+    "Roleplay": 1
+  },
   "by_model": {},
-  "by_studio": {},
-  "with_javdb": 0,
-  "with_cast": 0,
-  "with_screenshots": 0,
-  "last_updated": "2026-01-24T07:56:03.833808"
+  "by_studio": {
+    "S1 NO.1 STYLE": 1
+  },
+  "with_javdb": 1,
+  "with_cast": 1,
+  "with_screenshots": 1,
+  "last_updated": "2026-01-24T08:01:06.660464"
 }
