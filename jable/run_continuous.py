@@ -988,6 +988,14 @@ def save_video(video_data, upload_results, thumbnail_hosted_url=None, preview_re
             'preview_file_size_mb': preview_result.get('preview_file_size_mb', 0) if preview_result and preview_result.get('success') else 0,
             'preview_generated': preview_result.get('success', False) if preview_result else False,
             
+            # Internet Archive metadata (if preview uploaded to IA)
+            'preview_ia': {
+                'identifier': preview_result.get('identifier'),
+                'direct_url': preview_result.get('preview_url'),
+                'details_url': preview_result.get('details_url'),
+                'file_size_mb': preview_result.get('file_size_mb')
+            } if preview_result and preview_result.get('success') and preview_result.get('identifier') else None,
+            
             # Hosting info
             'hosting': {},
             
@@ -1149,6 +1157,15 @@ def save_video(video_data, upload_results, thumbnail_hosted_url=None, preview_re
             'preview_clips': preview_result.get('num_clips', 0) if preview_result and preview_result.get('success') else 0,
             'preview_file_size_mb': preview_result.get('preview_file_size_mb', 0) if preview_result and preview_result.get('success') else 0,
             'preview_generated': preview_result.get('success', False) if preview_result else False,
+            
+            # Internet Archive metadata (if preview uploaded to IA)
+            'preview_ia': {
+                'identifier': preview_result.get('identifier'),
+                'direct_url': preview_result.get('preview_url'),
+                'details_url': preview_result.get('details_url'),
+                'file_size_mb': preview_result.get('file_size_mb')
+            } if preview_result and preview_result.get('success') and preview_result.get('identifier') else None,
+            
             # Hosting info
             'hosting': {},
             

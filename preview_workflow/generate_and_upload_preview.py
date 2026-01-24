@@ -181,10 +181,15 @@ def generate_and_upload_preview(video_path, video_code, video_title=None):
     return {
         'success': True,
         'video_code': video_code,
-        'preview_url': ia_result['direct_url'],
+        'preview_url': ia_result['direct_url'],  # Keep for backward compatibility
+        'preview_video_url': ia_result['direct_url'],  # For save_video function
         'details_url': ia_result['details_url'],
         'identifier': ia_result['identifier'],
-        'file_size_mb': ia_result['file_size_mb']
+        'file_size_mb': ia_result['file_size_mb'],
+        'preview_file_size_mb': ia_result['file_size_mb'],  # For save_video function
+        'preview_duration': result.get('total_duration', 30) if result else 30,  # From preview generation
+        'num_clips': result.get('num_clips', 10) if result else 10,  # From preview generation
+        'preview_gif_url': None  # Not generating GIF
     }
 
 
