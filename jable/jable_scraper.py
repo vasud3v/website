@@ -295,6 +295,36 @@ class JableScraper:
         video_containers = soup.find_all('div', class_='video-img-box')
         print(f"  🔍 Found {len(video_containers)} video containers")
         
+        # If no videos found, restart browser and retry once
+        if len(video_containers) == 0:
+            print(f"  ⚠️ No video containers found - restarting browser for fresh session...")
+            try:
+                self.close()
+                time.sleep(5)
+                self._init_driver()
+                print(f"  ✅ Browser restarted")
+                print(f"  🔄 Retrying page load...")
+                
+                # Retry the page load
+                try:
+                    self.driver.get(page_url)
+                    time.sleep(5)
+                    self.driver.execute_script("window.stop();")
+                    time.sleep(5)
+                    
+                    # Scroll again
+                    self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                    time.sleep(3)
+                    
+                    # Re-parse
+                    soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+                    video_containers = soup.find_all('div', class_='video-img-box')
+                    print(f"  🔍 After restart: Found {len(video_containers)} video containers")
+                except Exception as retry_error:
+                    print(f"  ⚠️ Retry after restart failed: {retry_error}")
+            except Exception as restart_error:
+                print(f"  ❌ Browser restart failed: {restart_error}")
+        
         video_links = []
         
         # Find all video links
