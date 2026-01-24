@@ -207,55 +207,86 @@ class JableScraper:
         
         print(f"📄 Loading page: {page_url}")
         
-        max_retries = 2
+        # Set overall timeout for page loading
+        overall_start = time.time()
+        overall_timeout = 45  # Maximum 45 seconds total for page load
+        
+        max_retries = 1  # Reduced to 1 retry to avoid wasting time
         for attempt in range(max_retries):
+            # Check if we've exceeded overall timeout
+            if time.time() - overall_start > overall_timeout:
+                print(f"  ⚠️ Overall timeout ({overall_timeout}s) exceeded, giving up...")
+                break
+                
             try:
                 print(f"  Attempt {attempt + 1}/{max_retries}...")
                 
-                # With page_load_strategy='none', driver.get() returns immediately
-                # We need to wait manually for content to load
-                self.driver.get(page_url)
+                # Try to load page with a timeout
+                # Even with page_load_strategy='none', some sites can still block
+                try:
+                    # Set a very short script timeout to prevent hanging
+                    self.driver.set_script_timeout(10)
+                    
+                    print(f"  ⏳ Calling driver.get()...")
+                    self.driver.get(page_url)
+                    print(f"  ✓ driver.get() returned")
+                except Exception as e:
+                    print(f"  ⚠️ driver.get() error: {str(e)[:100]}")
+                    # Try to stop the page load
+                    try:
+                        self.driver.execute_script("window.stop();")
+                        print(f"  ✓ Stopped page load")
+                    except:
+                        pass
                 
                 # Wait for page to start loading
-                time.sleep(3)
+                time.sleep(2)  # Reduced from 3 to 2
                 
                 # Wait for body element to be present (page has started rendering)
                 start_time = time.time()
-                timeout = 30  # 30 seconds to wait for body
+                timeout = 15  # Reduced from 20 to 15 seconds
+                body_found = False
                 while time.time() - start_time < timeout:
                     try:
                         if self.driver.find_element("tag name", "body"):
                             print(f"  ✓ Page body loaded")
+                            body_found = True
                             break
                     except:
                         pass
                     time.sleep(0.5)
                 
+                if not body_found:
+                    print(f"  ⚠️ Body not found within {timeout}s, skipping...")
+                    continue
+                
                 # Wait for JavaScript to render content
                 print(f"  ⏳ Waiting for JavaScript to render...")
-                time.sleep(15)  # Increased from 10 to 15 seconds
+                time.sleep(8)  # Reduced from 10 to 8 seconds
                 
                 # Check if video links are present, if not wait a bit more
                 try:
                     video_elements = self.driver.find_elements("css selector", "a[href*='/videos/']")
                     if len(video_elements) == 0:
-                        print(f"  ⏳ No video links found yet, waiting longer...")
-                        time.sleep(10)  # Wait another 10 seconds
+                        print(f"  ⏳ No video links found yet, waiting 3 more seconds...")
+                        time.sleep(3)  # Reduced from 5 to 3 seconds
+                    else:
+                        print(f"  ✓ Found {len(video_elements)} potential video links")
                 except:
                     pass
                 
                 # Scroll down to load lazy-loaded content
                 try:
                     self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                    time.sleep(5)  # Increased from 3 to 5 seconds
+                    time.sleep(2)  # Reduced from 3 to 2 seconds
                     
                     # Scroll back up to trigger any lazy loading
                     self.driver.execute_script("window.scrollTo(0, 0);")
-                    time.sleep(2)
+                    time.sleep(1)
                     
                     # Scroll down again
                     self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                    time.sleep(3)
+                    time.sleep(1)  # Reduced from 2 to 1 second
                 except:
                     pass
                 
