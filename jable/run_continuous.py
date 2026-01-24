@@ -1410,7 +1410,8 @@ def process_one_video(scraper, url, num, total):
         mp4_file = f"{TEMP_DIR}/{code}.mp4"
         os.makedirs(TEMP_DIR, exist_ok=True)
         
-        # Try download with up to 2 retries (3 total attempts), restarting browser each time
+        # Try download with up to 2 retries (3 total attempts)
+        # On failure (especially 403 errors), restart browser for fresh session
         max_download_attempts = 3  # 1 initial + 2 retries
         download_success = False
         
@@ -1436,40 +1437,50 @@ def process_one_video(scraper, url, num, total):
                     download_success = True
                     break
                 else:
-                    # Download failed
+                    # Download failed (likely due to 403 errors or high failure rate)
                     log(f"❌ Download attempt {download_attempt} failed")
                     
                     if download_attempt < max_download_attempts:
-                        log(f"🔄 Restarting browser for fresh retry...")
+                        log(f"🔄 Restarting browser to get fresh session and cookies...")
                         
-                        # Close current browser
+                        # Close current browser to clear session
                         try:
                             if hasattr(scraper, 'driver') and scraper.driver:
                                 scraper.driver.quit()
+                                scraper.driver = None
                                 log(f"   ✓ Browser closed")
                         except Exception as e:
                             log(f"   ⚠️ Browser close warning: {e}")
                         
-                        # Wait before restart
+                        # Wait before restart to avoid rate limiting
                         wait_time = 10
                         log(f"   Waiting {wait_time}s before restart...")
                         time.sleep(wait_time)
                         
-                        # Reinitialize browser
+                        # Reinitialize browser with fresh session
                         try:
                             scraper._init_driver()
-                            log(f"   ✅ Browser restarted - starting fresh download")
+                            log(f"   ✅ Browser restarted with fresh session")
+                            log(f"   🔄 Re-scraping video page to get fresh M3U8 URL...")
+                            
+                            # Re-scrape the video to get fresh M3U8 URL
+                            video_data = scraper.scrape_video(url)
+                            if not video_data or not video_data.m3u8_url:
+                                log(f"   ❌ Failed to get fresh M3U8 URL")
+                                raise Exception("Failed to re-scrape video after browser restart")
+                            
+                            log(f"   ✓ Got fresh M3U8 URL")
                         except Exception as e:
                             log(f"   ⚠️ Browser restart warning: {e}")
-                            # Don't pass here - we need to know if browser restart failed
                             raise
                         
                         # Wait a bit more before retry
                         time.sleep(5)
                     else:
-                        error_msg = f"Download failed after {max_download_attempts} attempts (1 initial + 2 retries)"
+                        error_msg = f"Download failed after {max_download_attempts} attempts with browser restarts"
                         log(f"❌ {error_msg}")
                         log(f"⏭️ Moving on to next video...")
+                        cleanup_and_release(code)
                         mark_as_failed(url, error_msg)
                         return False
                         

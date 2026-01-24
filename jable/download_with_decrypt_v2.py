@@ -129,7 +129,7 @@ class HLSDownloaderV2:
                                 fresh_seg = fresh_playlist.segments[index]
                                 url = base_url + fresh_seg.uri if not fresh_seg.uri.startswith('http') else fresh_seg.uri
                         except Exception as e:
-                            print(f"   ⚠️ URL refresh failed: {e}")
+                            # Silently fail - URL refresh is optional and 403 is expected
                             pass
                 
                 response = self.session.get(url, timeout=30)
