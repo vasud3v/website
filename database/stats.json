@@ -1,26 +1,24 @@
 {
   "total_videos": 4,
-  "total_size_bytes": 1589375278,
+  "total_size_bytes": 0,
   "by_hosting": {
     "streamwish": 4
   },
   "by_category": {
-    "Insult": 1,
-    "Roleplay": 3,
+    "Uniform": 1,
     "Pantyhose": 2,
-    "Sex Only": 1,
-    "Uniform": 1
+    "Roleplay": 3,
+    "Insult": 1,
+    "Sex Only": 1
   },
   "by_model": {
     "東実果": 1,
     "Soa": 1,
     "河北彩伽": 1
   },
-  "by_studio": {
-    "Planet Plus": 1
-  },
-  "with_javdb": 1,
-  "with_cast": 1,
-  "with_screenshots": 1,
-  "last_updated": "2026-01-24T11:36:42.898725"
+  "by_studio": {},
+  "with_javdb": 0,
+  "with_cast": 0,
+  "with_screenshots": 0,
+  "last_updated": "2026-01-24T11:51:29.133683"
 }
