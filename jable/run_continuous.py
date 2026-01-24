@@ -1421,7 +1421,7 @@ def process_one_video(scraper, url, num, total):
                         
                         # Reinitialize browser
                         try:
-                            scraper.init_driver()
+                            scraper._init_driver()
                             log(f"   ✅ Browser restarted - starting fresh download")
                         except Exception as e:
                             log(f"   ⚠️ Browser restart warning: {e}")
@@ -1456,7 +1456,7 @@ def process_one_video(scraper, url, num, total):
                     # Wait and restart
                     time.sleep(10)
                     try:
-                        scraper.init_driver()
+                        scraper._init_driver()
                         log(f"   ✅ Browser restarted")
                     except Exception as e:
                         log(f"   ❌ Browser restart failed: {e}")
