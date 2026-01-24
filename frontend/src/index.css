@@ -477,6 +477,16 @@
   }
 }
 
+/* Spin animation for video preview loading */
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
 /* Carousel gradient animation - J logo colors (toned down) */
 @keyframes carouselGradient {
   0% {

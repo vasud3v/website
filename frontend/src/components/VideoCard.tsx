@@ -2,7 +2,7 @@
  * Video Card matching jable.tv exact structure
  */
 
-import { useState, memo, useCallback, useMemo } from 'react';
+import { useState, memo, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, Heart } from 'lucide-react';
 import type { VideoListItem } from '../lib/api';
@@ -32,6 +32,10 @@ const VideoCard = memo(function VideoCard({
 }: VideoCardProps) {
   const navigate = useNavigate();
   const [imageError, setImageError] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewLoaded, setPreviewLoaded] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const hasValidThumbnail = useMemo(
     () => {
@@ -71,10 +75,51 @@ const VideoCard = memo(function VideoCard({
     setImageError(true);
   }, []);
 
+  const handleMouseEnter = useCallback(() => {
+    if (video.preview_video_url) {
+      hoverTimeoutRef.current = setTimeout(() => {
+        setShowPreview(true);
+      }, 500); // 500ms delay before showing preview
+    }
+  }, [video.preview_video_url]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setShowPreview(false);
+    setPreviewLoaded(false);
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showPreview && videoRef.current && !previewLoaded) {
+      videoRef.current.play().catch(() => {
+        // Autoplay failed, ignore
+      });
+    }
+  }, [showPreview, previewLoaded]);
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return (
     <div className="video-img-box mb-e-20">
       {/* img-box */}
-      <div className="img-box">
+      <div 
+        className="img-box"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
         <a 
           onClick={(e) => { e.preventDefault(); handleClick(); }}
           className="cursor-pointer"
@@ -85,6 +130,10 @@ const VideoCard = memo(function VideoCard({
               alt={video.title}
               onError={handleImageError}
               loading="lazy"
+              style={{
+                opacity: showPreview ? 0 : 1,
+                transition: 'opacity 0.3s ease'
+              }}
             />
           ) : (
             <div style={{ 
@@ -95,7 +144,9 @@ const VideoCard = memo(function VideoCard({
               alignItems: 'center', 
               justifyContent: 'center', 
               background: 'linear-gradient(135deg, #27272a 0%, #18181b 100%)',
-              gap: '0.5rem'
+              gap: '0.5rem',
+              opacity: showPreview ? 0 : 1,
+              transition: 'opacity 0.3s ease'
             }}>
               <svg 
                 width="48" 
@@ -114,6 +165,49 @@ const VideoCard = memo(function VideoCard({
                 {video.code}
               </span>
             </div>
+          )}
+
+          {/* Video Preview */}
+          {video.preview_video_url && showPreview && (
+            <>
+              {!previewLoaded && (
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  zIndex: 2
+                }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    border: '3px solid rgba(255, 255, 255, 0.3)',
+                    borderTop: '3px solid white',
+                    borderRadius: '50%',
+                    animation: 'spin 0.8s linear infinite'
+                  }} />
+                </div>
+              )}
+              <video
+                ref={videoRef}
+                src={video.preview_video_url}
+                loop
+                muted
+                playsInline
+                onLoadedData={() => setPreviewLoaded(true)}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  opacity: previewLoaded ? 1 : 0,
+                  transition: 'opacity 0.3s ease',
+                  zIndex: 1
+                }}
+              />
+            </>
           )}
 
           {/* absolute-bottom-right - Duration */}
