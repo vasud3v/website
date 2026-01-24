@@ -114,7 +114,9 @@ class JableScraper:
                                 incognito=True
                             )
                             time.sleep(2)
-                            print("  ✅ Browser initialized in headless mode")
+                            # Set page load timeout to prevent hanging
+                            self.driver.set_page_load_timeout(180)  # 3 minutes max
+                            print("  ✅ Browser initialized in headless mode (timeout: 180s)")
                             return
                         except Exception as e:
                             print(f"  ⚠️ Headless mode failed: {e}")
@@ -123,12 +125,16 @@ class JableScraper:
                                 print("  🔄 Falling back to non-headless mode...")
                                 self.driver = Driver(uc=True, headless=False)
                                 time.sleep(2)
-                                print("  ✅ Browser initialized in non-headless mode")
+                                # Set page load timeout
+                                self.driver.set_page_load_timeout(180)  # 3 minutes max
+                                print("  ✅ Browser initialized in non-headless mode (timeout: 180s)")
                                 return
                     else:
                         self.driver = Driver(uc=True, headless=False)
                         time.sleep(2)
-                        print("  ✅ Browser initialized")
+                        # Set page load timeout
+                        self.driver.set_page_load_timeout(180)  # 3 minutes max
+                        print("  ✅ Browser initialized (timeout: 180s)")
                         return
                 except Exception as e:
                     print(f"  ⚠️ Browser init attempt {attempt+1} failed: {e}")
@@ -188,12 +194,23 @@ class JableScraper:
             page_url += '?lang=en'
         
         print(f"📄 Loading page: {page_url}")
-        self.driver.get(page_url)
-        time.sleep(8)  # Wait longer for JavaScript to load
         
-        # Scroll down to load lazy-loaded content
-        self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        time.sleep(3)
+        try:
+            self.driver.get(page_url)
+            time.sleep(8)  # Wait longer for JavaScript to load
+            
+            # Scroll down to load lazy-loaded content
+            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(3)
+        except Exception as e:
+            print(f"❌ Page load timeout or error: {e}")
+            # Try to get whatever content is available
+            try:
+                # If page partially loaded, try to parse it anyway
+                pass
+            except:
+                # If completely failed, return empty list
+                return []
         
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
         
