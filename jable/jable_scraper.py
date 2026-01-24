@@ -195,22 +195,45 @@ class JableScraper:
         
         print(f"📄 Loading page: {page_url}")
         
-        try:
-            self.driver.get(page_url)
-            time.sleep(8)  # Wait longer for JavaScript to load
-            
-            # Scroll down to load lazy-loaded content
-            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(3)
-        except Exception as e:
-            print(f"❌ Page load timeout or error: {e}")
-            # Try to get whatever content is available
+        max_retries = 2
+        for attempt in range(max_retries):
             try:
-                # If page partially loaded, try to parse it anyway
-                pass
-            except:
-                # If completely failed, return empty list
-                return []
+                # Set a shorter timeout for this specific page load
+                self.driver.set_page_load_timeout(60)  # 1 minute per attempt
+                
+                print(f"  Attempt {attempt + 1}/{max_retries}...")
+                self.driver.get(page_url)
+                print(f"  ✓ Page loaded, waiting for JavaScript...")
+                time.sleep(8)  # Wait longer for JavaScript to load
+                
+                # Scroll down to load lazy-loaded content
+                self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(3)
+                
+                # If we got here, page loaded successfully
+                break
+                
+            except Exception as e:
+                print(f"  ⚠️ Attempt {attempt + 1} failed: {str(e)[:100]}")
+                
+                if attempt < max_retries - 1:
+                    print(f"  🔄 Retrying...")
+                    # Try to stop the page load
+                    try:
+                        self.driver.execute_script("window.stop();")
+                    except:
+                        pass
+                    time.sleep(2)
+                else:
+                    print(f"  ❌ All attempts failed, trying to parse whatever loaded...")
+                    # Try to parse whatever content is available
+                    try:
+                        self.driver.execute_script("window.stop();")
+                    except:
+                        pass
+        
+        # Reset timeout back to normal
+        self.driver.set_page_load_timeout(180)
         
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
         
