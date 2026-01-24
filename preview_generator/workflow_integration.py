@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Workflow Integration for GitHub Actions
-Integrates comprehensive preview generation with video processing pipeline
-Uses comprehensive detector for full sex scene coverage
+Integrates advanced preview generation with video processing pipeline
+Uses AdultSceneDetector for intelligent multi-factor scene selection
 """
 import os
 import sys
@@ -11,8 +11,8 @@ from typing import Dict, Optional
 
 class WorkflowIntegration:
     """
-    Integrates comprehensive preview generation into video processing workflow
-    Skips first 5 minutes, captures ALL sex scenes in high quality
+    Integrates advanced preview generation into video processing workflow
+    Uses AdultSceneDetector with multi-factor analysis (skin + motion + audio + complexity)
     """
     
     def __init__(self, video_path: str, video_code: str, video_title: str):
@@ -32,15 +32,18 @@ class WorkflowIntegration:
         parallel: bool = True
     ) -> Dict:
         """
-        Generate comprehensive preview and upload to hosting
-        Skips first 5 minutes, captures EVERY sex scene at 1.5x speed
-        Dynamically adjusts clip count: 1 clip every 90 seconds
+        Generate advanced preview using multi-factor scene detection and upload to hosting
+        Uses AdultSceneDetector for intelligent scene selection based on:
+        - Skin tone detection (40% weight)
+        - Motion intensity (30% weight)
+        - Audio levels (20% weight)
+        - Visual complexity (10% weight)
         
         Args:
             upload_function: Function to upload preview (e.g., upload_to_streamwish)
             folder_name: Folder name for upload (e.g., "JAV_VIDEOS/CODE-123")
             num_clips: Number of clips (None = auto-calculate, 1 every 90s)
-            clip_duration: Duration of each clip (2s for quality)
+            clip_duration: Duration of each clip (2-3s recommended)
             resolution: Target resolution (720p for quality)
             create_gif: Also create GIF
             parallel: Use parallel processing
@@ -49,11 +52,10 @@ class WorkflowIntegration:
             Dict with preview URLs and metadata
         """
         print("\n" + "=" * 60)
-        print("COMPREHENSIVE PREVIEW GENERATION & UPLOAD")
+        print("ADVANCED PREVIEW GENERATION & UPLOAD")
         print("=" * 60)
-        print("Strategy: Skip 3min intro → Capture EVERY scene → 1.5x speed")
-        print("Dynamic: 1 clip every 80s = MAXIMUM COVERAGE")
-        print("Quality: CRF 20 (excellent) + 256k audio")
+        print("Strategy: Multi-factor scene detection (skin + motion + audio + complexity)")
+        print("Quality: CRF 23 (high quality) + intelligent scene selection")
         print("=" * 60)
         
         result = {
@@ -78,28 +80,44 @@ class WorkflowIntegration:
             return result
         
         try:
-            # Step 1: Generate comprehensive preview with sex scene detection
-            print(f"\n[1/3] Generating comprehensive preview for {self.video_code}...")
-            print(f"   Skipping first 3 minutes (minimal intro skip)")
-            print(f"   Analyzing remaining content for EVERY sex scene")
-            print(f"   Dynamic clips: Auto-calculated (1 every 80s)")
-            print(f"   Speed: 1.5x for optimal preview length")
-            print(f"   Quality: CRF 20 (excellent) + 256k audio")
+            # Step 1: Generate advanced preview with multi-factor scene detection
+            print(f"\n[1/3] Generating advanced preview for {self.video_code}...")
+            print(f"   Using AdultSceneDetector with multi-factor analysis:")
+            print(f"   - Skin tone detection (40% weight)")
+            print(f"   - Motion intensity (30% weight)")
+            print(f"   - Audio levels (20% weight)")
+            print(f"   - Visual complexity (10% weight)")
+            print(f"   Clips: {num_clips if num_clips else 'Auto-calculated'}")
+            print(f"   Quality: CRF 23 (high quality)")
             
             preview_output = os.path.join(self.temp_dir, f"{self.video_code}_preview.mp4")
             gif_output = os.path.join(self.temp_dir, f"{self.video_code}_preview.gif") if create_gif else None
             
-            # Use comprehensive detector for sex scene detection
-            from comprehensive_detector import ComprehensiveDetector
+            # Use adult scene detector for advanced multi-factor analysis
+            from preview_generator import PreviewGenerator
             
-            detector = ComprehensiveDetector(self.video_path)
+            generator = PreviewGenerator(self.video_path)
             
-            preview_result = detector.create_comprehensive_preview(
+            # Calculate number of clips if not specified
+            if num_clips is None:
+                # Get video duration
+                info = generator.detector.get_video_info()
+                if info:
+                    # 1 clip every 90 seconds for good coverage
+                    num_clips = max(10, min(int(info['duration'] / 90), 30))
+                else:
+                    num_clips = 15  # Default
+            
+            preview_result = generator.generate_preview(
                 output_path=preview_output,
+                num_clips=num_clips,
                 clip_duration=clip_duration,
                 resolution=resolution,
-                speed=1.5,  # 1.5x speed
-                skip_intro=180.0  # Skip first 3 minutes (reduced from 5)
+                crf=23,  # Good quality
+                fps=30,
+                create_gif=False,
+                cleanup=True,
+                parallel=True
             )
             
             if not preview_result or not preview_result.get('success'):
@@ -114,8 +132,8 @@ class WorkflowIntegration:
             
             print(f"✓ Preview generated: {preview_result['file_size_mb']:.1f} MB")
             print(f"   Duration: {preview_result['total_duration']:.1f}s")
-            print(f"   Clips: {preview_result['num_clips']} sex scenes")
-            print(f"   Speed: {preview_result['speed']}x")
+            print(f"   Clips: {preview_result['num_clips']} best scenes")
+            print(f"   Resolution: {preview_result['resolution']}p")
             
             # Step 2: Upload preview video
             print(f"\n[2/3] Uploading preview video...")
@@ -189,20 +207,19 @@ class WorkflowIntegration:
                 'preview_duration': preview_result.get('total_duration', 0),
                 'num_clips': preview_result.get('num_clips', 0),
                 'resolution': preview_result.get('resolution', resolution),
-                'speed': preview_result.get('speed', 1.5),
                 'error': None
             })
             
             print("\n" + "=" * 60)
-            print("COMPREHENSIVE PREVIEW UPLOAD COMPLETE")
+            print("ADVANCED PREVIEW UPLOAD COMPLETE")
             print("=" * 60)
             print(f"Video URL: {result['preview_video_url']}")
             if result['preview_gif_url']:
                 print(f"GIF URL: {result['preview_gif_url']}")
             print(f"Size: {result['preview_file_size_mb']:.1f} MB")
-            print(f"Duration: {result['preview_duration']:.1f}s at {result.get('speed', 1.3)}x speed")
-            print(f"Sex Scenes: {result['num_clips']}")
-            print(f"Coverage: Full video (skipped 5min intro)")
+            print(f"Duration: {result['preview_duration']:.1f}s")
+            print(f"Best Scenes: {result['num_clips']} (multi-factor analysis)")
+            print(f"Detection: Skin + Motion + Audio + Complexity")
             print("=" * 60)
             
             return result
@@ -254,8 +271,8 @@ def integrate_with_workflow(
     enable_gif: bool = False
 ) -> Optional[Dict]:
     """
-    Convenience function for comprehensive preview workflow integration
-    Skips first 5 minutes, captures ALL sex scenes in high quality
+    Convenience function for advanced preview workflow integration
+    Uses AdultSceneDetector for intelligent multi-factor scene selection
     
     Args:
         video_path: Path to video file
@@ -270,7 +287,7 @@ def integrate_with_workflow(
         Preview result dict or None if disabled
     """
     if not enable_preview:
-        print("[Preview] Comprehensive preview generation disabled")
+        print("[Preview] Advanced preview generation disabled")
         return None
     
     try:
@@ -289,7 +306,7 @@ def integrate_with_workflow(
         return result
         
     except Exception as e:
-        print(f"[Preview] Error in comprehensive workflow integration: {e}")
+        print(f"[Preview] Error in advanced workflow integration: {e}")
         return {
             'success': False,
             'error': str(e)

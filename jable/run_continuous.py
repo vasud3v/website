@@ -1530,41 +1530,9 @@ def process_one_video(scraper, url, num, total):
             mark_as_failed(url, error_msg)
             return False
         
-        # STEP 3.5: Generate and upload preview to Internet Archive
-        log("\n🎬 Step 3.5: Generating preview for Internet Archive...")
+        # STEP 3.5: Preview will be generated after full video upload
+        log("\n📝 Step 3.5: Preview will be generated and uploaded to Internet Archive after full video upload...")
         preview_result = None
-        try:
-            # Check if preview generation is available
-            if ADVANCED_PREVIEW_AVAILABLE:
-                log("   Using advanced preview generator...")
-                
-                # Import preview workflow
-                sys.path.insert(0, os.path.join(PROJECT_ROOT, 'preview_workflow'))
-                from generate_and_upload_preview import generate_and_upload_preview
-                
-                # Generate and upload preview to Internet Archive
-                preview_result = generate_and_upload_preview(
-                    mp4_file,
-                    code,
-                    video_data.title
-                )
-                
-                if preview_result and preview_result.get('success'):
-                    log(f"✅ Preview uploaded to Internet Archive")
-                    log(f"   Preview URL: {preview_result['preview_url']}")
-                    log(f"   Size: {preview_result['file_size_mb']:.1f} MB")
-                else:
-                    log(f"⚠️ Preview generation failed: {preview_result.get('error') if preview_result else 'Unknown error'}")
-                    log(f"   Continuing with full video upload...")
-            else:
-                log("⚠️ Advanced preview generator not available")
-                log("   Skipping preview generation...")
-                
-        except Exception as e:
-            log(f"⚠️ Preview generation error: {e}")
-            log(f"   Continuing with full video upload...")
-            import traceback
-            traceback.print_exc()
         
         # Check disk space before upload
         has_space, free_gb, _ = check_disk_space(min_free_gb=1)
@@ -1714,6 +1682,40 @@ def process_one_video(scraper, url, num, total):
             cleanup_and_release(code)
             mark_as_failed(url, error_msg)
             return False
+        
+        # STEP 4.5: Generate and upload preview to Internet Archive
+        log("\n🎬 Step 4.5: Generating and uploading preview to Internet Archive...")
+        preview_result = None
+        try:
+            if ADVANCED_PREVIEW_AVAILABLE:
+                log("   Using advanced preview generator...")
+                
+                # Import preview workflow
+                sys.path.insert(0, os.path.join(PROJECT_ROOT, 'preview_workflow'))
+                from generate_and_upload_preview import generate_and_upload_preview
+                
+                # Generate and upload preview to Internet Archive
+                preview_result = generate_and_upload_preview(
+                    mp4_file,
+                    code,
+                    video_data.title
+                )
+                
+                if preview_result and preview_result.get('success'):
+                    log(f"✅ Preview uploaded to Internet Archive")
+                    log(f"   Preview URL: {preview_result['preview_url']}")
+                    log(f"   Details URL: {preview_result.get('details_url', 'N/A')}")
+                    log(f"   Size: {preview_result['file_size_mb']:.1f} MB")
+                else:
+                    log(f"⚠️ Preview generation failed: {preview_result.get('error') if preview_result else 'Unknown error'}")
+            else:
+                log("⚠️ Advanced preview generator not available")
+                log("   Skipping preview generation...")
+                
+        except Exception as e:
+            log(f"⚠️ Preview generation error: {e}")
+            import traceback
+            traceback.print_exc()
         
         # STEP 5: Save metadata with embed URLs
         log("\n💾 Step 5: Saving to database...")
