@@ -136,7 +136,7 @@ class ComprehensiveDetector:
         
         print(f"\n[Step 2/2] Scoring {len(samples)} samples...")
         
-        max_workers = min(cpu_count(), 8)
+        max_workers = min(cpu_count(), 32)
         scored_samples = []
         
         try:

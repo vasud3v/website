@@ -124,7 +124,7 @@ class AdultSceneDetector:
         print(f"[AdultDetector] Step 3: Analyzing {len(sample_points)} candidate segments...")
         
         # Analyze all segments in parallel
-        max_workers = min(cpu_count(), 8)
+        max_workers = min(cpu_count(), 32)
         
         results = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:

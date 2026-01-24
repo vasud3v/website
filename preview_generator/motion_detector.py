@@ -85,7 +85,7 @@ class MotionDetector:
         print(f"[MotionDetector] Analyzing {sample_size} segments in parallel...")
         
         # Analyze all segments in parallel
-        max_workers = min(cpu_count(), 8)
+        max_workers = min(cpu_count(), 32)
         
         results = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -217,7 +217,7 @@ class MotionDetector:
         timestamps = []
         
         # Analyze 3 samples per section and pick the best
-        max_workers = min(cpu_count(), 8)
+        max_workers = min(cpu_count(), 32)
         
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             for i in range(num_sections):

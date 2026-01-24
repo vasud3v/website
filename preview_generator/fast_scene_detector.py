@@ -90,7 +90,7 @@ class FastSceneDetector:
         print(f"[FastSceneDetector] Analyzing {num_samples} segments in parallel...")
         
         # Analyze all segments in parallel
-        max_workers = min(cpu_count(), 8)  # Use up to 8 threads
+        max_workers = min(cpu_count(), 32)  # Use up to 32 threads
         
         results = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
