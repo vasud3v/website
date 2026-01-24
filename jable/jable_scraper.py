@@ -233,10 +233,27 @@ class JableScraper:
                 
                 # Wait for JavaScript to render content
                 print(f"  ⏳ Waiting for JavaScript to render...")
-                time.sleep(10)  # Give JavaScript time to render
+                time.sleep(15)  # Increased from 10 to 15 seconds
+                
+                # Check if video links are present, if not wait a bit more
+                try:
+                    video_elements = self.driver.find_elements("css selector", "a[href*='/videos/']")
+                    if len(video_elements) == 0:
+                        print(f"  ⏳ No video links found yet, waiting longer...")
+                        time.sleep(10)  # Wait another 10 seconds
+                except:
+                    pass
                 
                 # Scroll down to load lazy-loaded content
                 try:
+                    self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                    time.sleep(5)  # Increased from 3 to 5 seconds
+                    
+                    # Scroll back up to trigger any lazy loading
+                    self.driver.execute_script("window.scrollTo(0, 0);")
+                    time.sleep(2)
+                    
+                    # Scroll down again
                     self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                     time.sleep(3)
                 except:
@@ -256,6 +273,13 @@ class JableScraper:
                     print(f"  ❌ All attempts failed, trying to parse whatever loaded...")
         
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+        
+        # Debug: Check if page has content
+        print(f"  🔍 Page source length: {len(self.driver.page_source)} characters")
+        
+        # Debug: Check for common Jable elements
+        video_containers = soup.find_all('div', class_='video-img-box')
+        print(f"  🔍 Found {len(video_containers)} video containers")
         
         video_links = []
         
