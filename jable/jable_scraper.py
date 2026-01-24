@@ -220,8 +220,8 @@ class JableScraper:
                 # If get() times out or fails, that's okay - we'll try to work with what loaded
                 print(f"  ⚠️ Page load interrupted (this is normal): {str(e)[:80]}")
             
-            # Give it a moment to start loading
-            time.sleep(3)
+            # Give it more time to load content (increased from 3 to 5 seconds)
+            time.sleep(5)
             
             # Force stop any ongoing page loads
             try:
@@ -266,15 +266,15 @@ class JableScraper:
             except Exception as e:
                 print(f"  ⚠️ Error checking for video links: {e}")
             
-            # Scroll to trigger lazy loading
+            # Scroll to trigger lazy loading (increased wait time)
             try:
                 print(f"  📜 Scrolling to load lazy content...")
                 self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(2)
+                time.sleep(3)  # Increased from 2 to 3 seconds
                 self.driver.execute_script("window.scrollTo(0, 0);")
                 time.sleep(1)
                 self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(2)
+                time.sleep(3)  # Increased from 2 to 3 seconds
             except Exception as e:
                 print(f"  ⚠️ Error scrolling: {e}")
             
