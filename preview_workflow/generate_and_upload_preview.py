@@ -52,14 +52,16 @@ def generate_and_upload_preview(video_path, video_code, video_title=None):
         # Output path for preview
         preview_output = f"{video_code}_preview.mp4"
         
-        # Generate preview (10 clips, 3 seconds each)
+        # Generate preview with new API (target duration instead of num_clips)
         generator = PreviewGenerator(video_path)
         result = generator.generate_preview(
             output_path=preview_output,
-            num_clips=10,
-            clip_duration=3,
-            resolution="480",  # 480p for faster loading (height as string)
-            create_gif=False  # We don't need GIF for hover preview
+            target_duration=45.0,  # 45 seconds total
+            clip_duration=2.5,     # 2.5s per clip
+            resolution="720",      # 720p for quality
+            crf=23,                # High quality
+            max_workers=32,        # 32 parallel workers
+            create_gif=False       # We don't need GIF for hover preview
         )
         
         if not result or not os.path.exists(preview_output):
@@ -71,7 +73,10 @@ def generate_and_upload_preview(video_path, video_code, video_title=None):
         preview_size_mb = os.path.getsize(preview_output) / (1024 * 1024)
         print(f"✓ Preview generated: {preview_output}")
         print(f"  Size: {preview_size_mb:.2f} MB")
-        print(f"  Duration: ~30 seconds")
+        print(f"  Duration: {result.get('total_duration', 45):.1f} seconds")
+        print(f"  Clips: {result.get('num_clips', 18)}")
+        print(f"  Quality: CRF {result.get('crf', 23)}")
+        print(f"  Resolution: {result.get('resolution', 720)}p")
         
     except Exception as e:
         print(f"❌ Preview generation failed: {e}")
@@ -187,8 +192,9 @@ def generate_and_upload_preview(video_path, video_code, video_title=None):
         'identifier': ia_result['identifier'],
         'file_size_mb': ia_result['file_size_mb'],
         'preview_file_size_mb': ia_result['file_size_mb'],  # For save_video function
-        'preview_duration': result.get('total_duration', 30) if result else 30,  # From preview generation
-        'num_clips': result.get('num_clips', 10) if result else 10,  # From preview generation
+        'preview_duration': result.get('total_duration', 45) if result else 45,  # From preview generation
+        'num_clips': result.get('num_clips', 18) if result else 18,  # From preview generation (45s / 2.5s)
+        'preview_clips': result.get('num_clips', 18) if result else 18,  # Alias for compatibility
         'preview_gif_url': None  # Not generating GIF
     }
 
