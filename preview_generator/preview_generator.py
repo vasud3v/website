@@ -93,7 +93,7 @@ class PreviewGenerator:
             print(f"         Coverage: FULL video (intro + all scenes + outro)")
             timestamps = self.detector.find_best_scenes(
                 num_clips=num_clips,
-                sample_size=min(120, num_clips * 8),  # Analyze 8x more samples for better coverage
+                sample_size=min(60, num_clips * 5),  # Analyze 5x samples (balanced speed/quality)
                 max_workers=max_workers
             )
             

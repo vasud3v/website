@@ -352,6 +352,7 @@ class AdultSceneDetector:
         """
         Ensure selected clips are distributed across the entire video
         BUT guarantee at least 2-3 clips from creampie/climax region (last 20%)
+        LESS STRICT: Will fill to num_clips even if sections are empty
         """
         if not results:
             return []
@@ -374,35 +375,21 @@ class AdultSceneDetector:
             selected.append(t)
             print(f"  ✓ Creampie scene @ {t:.1f}s (score: {s['total_score']:.1f})")
         
-        # PRIORITY 2: Distribute remaining clips across rest of video
+        # PRIORITY 2: Fill remaining slots with best scenes from rest of video
         remaining_clips = num_clips - len(selected)
         
-        if remaining_clips > 0 and other_results:
-            # Divide non-creampie portion into sections
-            num_sections = remaining_clips
-            section_duration = creampie_threshold / num_sections
+        if remaining_clips > 0:
+            # Sort other results by score
+            other_results.sort(key=lambda x: x[1]['total_score'], reverse=True)
             
-            for section in range(num_sections):
-                section_start = section * section_duration
-                section_end = (section + 1) * section_duration
-                
-                # Find best clip in this section
-                section_clips = [
-                    (t, s) for t, s in other_results 
-                    if section_start <= t < section_end
-                ]
-                
-                if section_clips:
-                    # Pick best from this section
-                    best = max(section_clips, key=lambda x: x[1]['total_score'])
-                    selected.append(best[0])
-                elif other_results:
-                    # If no clips in this section, pick closest one
-                    closest = min(other_results, key=lambda x: abs(x[0] - (section_start + section_duration/2)))
-                    if closest[0] not in selected:
-                        selected.append(closest[0])
+            # Add best scenes until we reach num_clips
+            for t, s in other_results:
+                if t not in selected:
+                    selected.append(t)
+                    if len(selected) >= num_clips:
+                        break
         
-        # If we still don't have enough, add more from top results
+        # If still not enough, add ANY remaining results
         if len(selected) < num_clips:
             for t, s in results:
                 if t not in selected:
