@@ -97,6 +97,15 @@
     "source_javdb": "https://www.javdatabase.com/movies/snos-054/",
     "source_jable": "https://jable.tv/videos/snos-054/",
     "javdb_available": true,
-    "scraped_at": "2026-01-24T10:26:23.946434"
+    "scraped_at": "2026-01-24T10:26:23.946434",
+    "preview_ia": {
+      "identifier": "javcore-preview-snos-054",
+      "direct_url": "https://archive.org/download/javcore-preview-snos-054/SNOS-054_preview.mp4",
+      "details_url": "https://archive.org/details/javcore-preview-snos-054",
+      "filename": "SNOS-054_preview.mp4",
+      "file_size_mb": 3.774350166320801,
+      "uploaded_at": "2026-01-24T10:32:38.534296",
+      "generated_at": "2026-01-24T10:32:38.534307"
+    }
   }
 ]
