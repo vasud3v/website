@@ -650,7 +650,7 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
                                     
                                     # Delete the corrupted file if we have a filecode
                                     if filecode:
-                                        print(f"[StreamWish] 🗑️ Deleting corrupted file (filecode: {filecode})...")
+                                        print(f"[StreamWish] 🗑️ Attempting to delete corrupted file (filecode: {filecode})...")
                                         try:
                                             delete_response = requests.get(
                                                 "https://api.streamwish.com/api/file/delete",
@@ -661,14 +661,67 @@ def upload_to_streamwish(file_path, code, title, folder_name=None, allow_small_f
                                                 delete_data = delete_response.json()
                                                 if delete_data.get('status') == 200:
                                                     print(f"[StreamWish] ✅ Deleted corrupted file successfully")
+                                                    print(f"[StreamWish] ✓ Will proceed with fresh upload")
                                                 else:
-                                                    print(f"[StreamWish] ⚠️ Delete failed: {delete_data.get('msg', 'Unknown error')}")
+                                                    error_msg = delete_data.get('msg', 'Unknown error')
+                                                    print(f"[StreamWish] ⚠️ Delete failed: {error_msg}")
+                                                    
+                                                    # If delete failed, the file still exists on StreamWish
+                                                    # We should NOT upload again as it will be rejected as duplicate
+                                                    print(f"[StreamWish] ⚠️ Cannot delete existing file, using it instead")
+                                                    print(f"[StreamWish] ℹ️ Returning existing filecode to avoid duplicate upload")
+                                                    return {
+                                                        'service': 'StreamWish',
+                                                        'success': True,
+                                                        'filecode': filecode,
+                                                        'embed_url': f"https://hglink.to/e/{filecode}",
+                                                        'watch_url': f"https://hglink.to/{filecode}",
+                                                        'download_url': f"https://hglink.to/{filecode}",
+                                                        'direct_url': f"https://streamwish.com/{filecode}",
+                                                        'api_url': f"https://api.streamwish.com/api/file/direct_link?key={STREAMWISH_API_KEY}&file_code={filecode}",
+                                                        'time': 0,
+                                                        'folder': folder_name,
+                                                        'file_size': file_size_server,
+                                                        'already_exists': True,
+                                                        'corrupted': True
+                                                    }
                                             else:
                                                 print(f"[StreamWish] ⚠️ Delete failed: HTTP {delete_response.status_code}")
+                                                print(f"[StreamWish] ⚠️ Using existing filecode to avoid duplicate upload")
+                                                return {
+                                                    'service': 'StreamWish',
+                                                    'success': True,
+                                                    'filecode': filecode,
+                                                    'embed_url': f"https://hglink.to/e/{filecode}",
+                                                    'watch_url': f"https://hglink.to/{filecode}",
+                                                    'download_url': f"https://hglink.to/{filecode}",
+                                                    'direct_url': f"https://streamwish.com/{filecode}",
+                                                    'api_url': f"https://api.streamwish.com/api/file/direct_link?key={STREAMWISH_API_KEY}&file_code={filecode}",
+                                                    'time': 0,
+                                                    'folder': folder_name,
+                                                    'file_size': file_size_server,
+                                                    'already_exists': True,
+                                                    'corrupted': True
+                                                }
                                         except Exception as e:
                                             print(f"[StreamWish] ⚠️ Delete error: {str(e)}")
+                                            print(f"[StreamWish] ⚠️ Using existing filecode to avoid duplicate upload")
+                                            return {
+                                                'service': 'StreamWish',
+                                                'success': True,
+                                                'filecode': filecode,
+                                                'embed_url': f"https://hglink.to/e/{filecode}",
+                                                'watch_url': f"https://hglink.to/{filecode}",
+                                                'download_url': f"https://hglink.to/{filecode}",
+                                                'direct_url': f"https://streamwish.com/{filecode}",
+                                                'api_url': f"https://api.streamwish.com/api/file/direct_link?key={STREAMWISH_API_KEY}&file_code={filecode}",
+                                                'time': 0,
+                                                'folder': folder_name,
+                                                'file_size': file_size_server,
+                                                'already_exists': True,
+                                                'corrupted': True
+                                            }
                                     
-                                    print(f"[StreamWish] ⚠️ Will re-upload to replace corrupted/incomplete file")
                                     invalid_files_found.append(reason)
                                 continue
                             
