@@ -104,16 +104,29 @@ class IntegratedPipeline:
         if self.use_db_manager:
             video = db_manager.get_video_by_code(video_code)
             if video:
-                # Check if it has JAVDatabase data
-                return video.get('javdb_available', False) or video.get('javdb_data') is not None
+                # Only skip if it has JAVDatabase data already
+                # This allows enrichment of videos that only have Jable data
+                has_javdb = video.get('javdb_available', False) or video.get('javdb_data') is not None
+                if has_javdb:
+                    print(f"   Video {video_code} already has JAVDatabase data, skipping")
+                    return True
+                else:
+                    print(f"   Video {video_code} exists but missing JAVDatabase data, will enrich")
+                    return False
             return False
         
         # Legacy fallback
         existing = self.load_combined_database()
         for v in existing:
             if v.get("code") == video_code.upper():
-                # Check if it has JAVDatabase data
-                return v.get('javdb_available', False) or v.get('javdb_data') is not None
+                # Only skip if it has JAVDatabase data
+                has_javdb = v.get('javdb_available', False) or v.get('javdb_data') is not None
+                if has_javdb:
+                    print(f"   Video {video_code} already has JAVDatabase data, skipping")
+                    return True
+                else:
+                    print(f"   Video {video_code} exists but missing JAVDatabase data, will enrich")
+                    return False
         return False
     
     def log_error(self, video_code: str, error: str, error_type: str = "unknown"):

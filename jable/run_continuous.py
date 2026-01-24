@@ -1998,19 +1998,27 @@ def main():
                 from datetime import datetime
                 resume_time = datetime.fromtimestamp(wait_until)
                 wait_hours = (wait_until - current_time) / 3600
+                fallback_used = rate_limit_data.get('fallback_used')
                 
-                log(f"\n🚫 ═══════════════════════════════════════════════════")
-                log(f"🚫 STREAMWISH UPLOAD LIMIT STILL ACTIVE")
-                log(f"🚫 ═══════════════════════════════════════════════════")
+                log(f"\n⚠️ ═══════════════════════════════════════════════════")
+                log(f"⚠️ STREAMWISH UPLOAD LIMIT ACTIVE")
+                log(f"⚠️ ═══════════════════════════════════════════════════")
                 log(f"   Wait time remaining: {wait_hours:.1f} hours")
                 log(f"   Resume at: {resume_time.strftime('%Y-%m-%d %H:%M:%S')}")
-                log(f"   Exiting workflow...")
                 
-                remove_process_lock(lock_file)
-                return
+                if fallback_used:
+                    log(f"   Fallback service: {fallback_used}")
+                    log(f"   ✅ Workflow will continue using {fallback_used}")
+                else:
+                    log(f"   Will use fallback services (StreamTape/LuluStream)")
+                
+                log(f"   Continuing workflow with fallback uploads...")
+                
+                # DON'T EXIT - let workflow continue with fallback services
+                # The upload_all() function will handle fallback automatically
             else:
                 # Limit has expired, remove the file
-                log("✅ Rate limit period has expired, resuming workflow")
+                log("✅ Rate limit period has expired, resuming normal workflow")
                 os.remove(rate_limit_file)
         except Exception as e:
             log(f"⚠️ Error checking rate limit: {e}")
