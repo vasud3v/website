@@ -390,6 +390,16 @@ jobs:
           echo "GENERATING VIDEO PREVIEWS"
           echo "=========================================="
           
+          # Check what files exist in temp_downloads
+          echo "Checking temp_downloads directory..."
+          if [ -d "jable/temp_downloads" ]; then
+            echo "Files in temp_downloads:"
+            ls -lh jable/temp_downloads/ || echo "Directory is empty"
+          else
+            echo "temp_downloads directory does not exist"
+          fi
+          echo ""
+          
           # Create preview workflow script that processes videos from database
           cat > process_previews.py << 'EOF'
           import json
@@ -491,13 +501,31 @@ jobs:
           print(f"\n{'='*60}")
           print(f"Processed {processed}/{len(videos_needing_preview[:max_previews])} previews")
           print(f"{'='*60}")
+          
+          # Cleanup video files after preview generation
+          print(f"\nCleaning up video files...")
+          for video_info in videos_needing_preview[:max_previews]:
+              try:
+                  video_file = Path(video_info['file'])
+                  if video_file.exists():
+                      video_file.unlink()
+                      print(f"✓ Deleted: {video_file.name}")
+              except Exception as e:
+                  print(f"⚠️ Could not delete {video_info['file']}: {e}")
+          
+          print(f"✓ Cleanup complete")
           EOF
           
           # Run preview generation
           python process_previews.py || echo "⚠️ Preview generation had errors (continuing)"
           
-          # Cleanup
+          # Cleanup script and any remaining temp files
           rm -f process_previews.py
+          
+          # Final cleanup of temp_downloads directory
+          echo "Final cleanup of temp_downloads..."
+          rm -rf jable/temp_downloads/* 2>/dev/null || true
+          echo "✓ All temporary files cleaned up"
       
       - name: Update all database tracking files
         if: always()

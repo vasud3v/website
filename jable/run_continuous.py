@@ -1804,11 +1804,20 @@ def process_one_video(scraper, url, num, total):
         else:
             log("⚠️ Commit failed or no changes")
         
-        # STEP 6: Delete video file
+        # STEP 6: Delete video file (skip in GitHub Actions for preview generation)
         log("\n🗑️ Step 6: Cleaning up...")
-        cleanup_and_release(code)
         
-        log("✅ Deleted video file")
+        # Check if running in GitHub Actions
+        is_github_actions = os.environ.get('GITHUB_ACTIONS') == 'true'
+        
+        if is_github_actions:
+            log("ℹ️ Running in GitHub Actions - keeping video file for preview generation")
+            log(f"ℹ️ Video file will be cleaned up after preview generation: {mp4_file}")
+            # Don't cleanup yet - let the preview generation step handle it
+        else:
+            # Local run - cleanup immediately
+            cleanup_and_release(code)
+            log("✅ Deleted video file")
         
         log(f"\n✅ VIDEO {num}/{total} COMPLETE!")
         return True
