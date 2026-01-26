@@ -12,6 +12,24 @@ on:
         description: 'Max videos to process (0 = unlimited)'
         required: false
         default: '0'
+        type: string
+      workers:
+        description: 'Number of parallel workers'
+        required: false
+        default: '32'
+        type: string
+  
+  # Trigger on push to main (for initial setup)
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/continuous-scraper.yml'
+    inputs:
+      max_videos:
+        description: 'Max videos to process (0 = unlimited)'
+        required: false
+        default: '0'
       workers:
         description: 'Number of parallel workers'
         required: false
