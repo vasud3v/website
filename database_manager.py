@@ -412,12 +412,24 @@ class DatabaseManager:
         try:
             videos = self.get_all_videos()
             
-            # Calculate total size safely (handle None values)
+            # Calculate total size safely (handle None values and string values)
             total_size = 0
             for v in videos:
                 size = v.get('file_size', 0)
                 if size is not None:
-                    total_size += size
+                    # Handle string sizes like "~600MB"
+                    if isinstance(size, str):
+                        # Try to extract number from string
+                        import re
+                        match = re.search(r'(\d+)', size)
+                        if match:
+                            # Assume MB if no unit specified
+                            size_num = int(match.group(1))
+                            if 'GB' in size.upper() or 'gb' in size:
+                                size_num *= 1024  # Convert GB to MB
+                            total_size += size_num * 1024 * 1024  # Convert MB to bytes
+                    elif isinstance(size, (int, float)):
+                        total_size += int(size)
             
             stats = {
                 "total_videos": len(videos),

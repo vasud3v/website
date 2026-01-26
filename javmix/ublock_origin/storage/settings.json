@@ -1,0 +1,8 @@
+{
+  "advancedUserEnabled": true,
+  "dynamicFilteringEnabled": true,
+  "parseAllABPHideFilters": true,
+  "userFiltersEnabled": true,
+  "contextMenuEnabled": false,
+  "showIconBadge": true
+}

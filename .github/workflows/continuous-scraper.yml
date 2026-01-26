@@ -1,0 +1,179 @@
+name: 24/7 Continuous Video Scraper & Uploader
+
+on:
+  # Run every 5 hours automatically
+  schedule:
+    - cron: '0 */5 * * *'  # Every 5 hours
+  
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      max_videos:
+        description: 'Max videos to process (0 = unlimited)'
+        required: false
+        default: '0'
+      workers:
+        description: 'Number of parallel workers'
+        required: false
+        default: '32'
+
+env:
+  PYTHON_VERSION: '3.10'
+  MAX_RUNTIME_MINUTES: 290  # 4h 50m (leave 10min buffer for cleanup)
+
+jobs:
+  scrape-download-enrich-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300  # 5 hours max
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: 📦 Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            ffmpeg \
+            chromium-browser \
+            chromium-chromedriver \
+            wget \
+            curl
+      
+      - name: 📚 Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r javmix/requirements.txt
+          pip install -r javdatabase/requirements.txt
+          pip install -r upload_pipeline/requirements.txt
+          pip install seleniumbase undetected-chromedriver deep-translator internetarchive
+      
+      - name: 🔧 Configure Environment
+        run: |
+          # Create .env files from secrets
+          echo "SEEKSTREAMING_API_KEY=${{ secrets.SEEKSTREAMING_API_KEY }}" >> upload_pipeline/.env
+          echo "STREAMTAPE_USERNAME=${{ secrets.STREAMTAPE_USERNAME }}" >> upload_pipeline/.env
+          echo "STREAMTAPE_PASSWORD=${{ secrets.STREAMTAPE_PASSWORD }}" >> upload_pipeline/.env
+          echo "TURBOVIPLAY_EMAIL=${{ secrets.TURBOVIPLAY_EMAIL }}" >> upload_pipeline/.env
+          echo "TURBOVIPLAY_USERNAME=${{ secrets.TURBOVIPLAY_USERNAME }}" >> upload_pipeline/.env
+          echo "TURBOVIPLAY_PASSWORD=${{ secrets.TURBOVIPLAY_PASSWORD }}" >> upload_pipeline/.env
+          echo "TURBOVIPLAY_API_KEY=${{ secrets.TURBOVIPLAY_API_KEY }}" >> upload_pipeline/.env
+          echo "VIDOZA_EMAIL=${{ secrets.VIDOZA_EMAIL }}" >> upload_pipeline/.env
+          echo "VIDOZA_PASSWORD=${{ secrets.VIDOZA_PASSWORD }}" >> upload_pipeline/.env
+          echo "VIDOZA_API_KEY=${{ secrets.VIDOZA_API_KEY }}" >> upload_pipeline/.env
+          echo "UPLOADY_EMAIL=${{ secrets.UPLOADY_EMAIL }}" >> upload_pipeline/.env
+          echo "UPLOADY_USERNAME=${{ secrets.UPLOADY_USERNAME }}" >> upload_pipeline/.env
+          echo "UPLOADY_API_KEY=${{ secrets.UPLOADY_API_KEY }}" >> upload_pipeline/.env
+          echo "UPLOAD18_API_KEY=${{ secrets.UPLOAD18_API_KEY }}" >> upload_pipeline/.env
+          
+          # Internet Archive credentials
+          echo "IA_ACCESS_KEY=${{ secrets.IA_ACCESS_KEY }}" >> upload_pipeline/.env
+          echo "IA_SECRET_KEY=${{ secrets.IA_SECRET_KEY }}" >> upload_pipeline/.env
+          
+          # Export for Python scripts
+          export IA_ACCESS_KEY="${{ secrets.IA_ACCESS_KEY }}"
+          export IA_SECRET_KEY="${{ secrets.IA_SECRET_KEY }}"
+          
+          # Create necessary directories
+          mkdir -p database
+          mkdir -p downloaded_files
+          mkdir -p upload_pipeline/upload_results
+          mkdir -p javmix/downloaded_files
+          mkdir -p javdatabase/downloaded_files
+      
+      - name: 📊 Restore Previous State
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            database/
+            sitemap_videos.json
+            javmix/new_videos.json
+          key: scraper-state-${{ github.run_number }}
+          restore-keys: |
+            scraper-state-
+      
+      - name: 🔍 Check for New Videos
+        id: check_new
+        run: |
+          echo "🔍 Checking for new videos..."
+          python javmix/monitor_new_videos.py --rss-only
+          
+          # Check if new videos found
+          if [ -f "javmix/new_videos.json" ]; then
+            NEW_COUNT=$(python -c "import json; data=json.load(open('javmix/new_videos.json')); print(data.get('total_new', 0))")
+            echo "new_videos=$NEW_COUNT" >> $GITHUB_OUTPUT
+            echo "✅ Found $NEW_COUNT new videos"
+          else
+            echo "new_videos=0" >> $GITHUB_OUTPUT
+            echo "ℹ️ No new videos found"
+          fi
+      
+      - name: 🎬 Scrape New Videos
+        if: steps.check_new.outputs.new_videos > 0
+        run: |
+          echo "🎬 Scraping ${{ steps.check_new.outputs.new_videos }} new videos..."
+          python javmix/auto_scrape_new.py --scrape-pending
+      
+      - name: 🤖 Run Continuous Workflow
+        id: workflow
+        run: |
+          echo "🤖 Starting continuous workflow..."
+          python .github/workflows/continuous_workflow.py \
+            --max-runtime ${{ env.MAX_RUNTIME_MINUTES }} \
+            --workers ${{ github.event.inputs.workers || '32' }} \
+            --max-videos ${{ github.event.inputs.max_videos || '0' }}
+      
+      - name: 💾 Save State
+        if: always()
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            database/
+            sitemap_videos.json
+            javmix/new_videos.json
+          key: scraper-state-${{ github.run_number }}
+      
+      - name: 📤 Upload Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-results-${{ github.run_number }}
+          path: |
+            database/
+            upload_pipeline/upload_results/
+            *.log
+          retention-days: 7
+      
+      - name: 📊 Generate Summary
+        if: always()
+        run: |
+          echo "## 📊 Workflow Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f "workflow_stats.json" ]; then
+            python -c "
+import json
+with open('workflow_stats.json') as f:
+    stats = json.load(f)
+    
+print(f\"### Statistics\")
+print(f\"- **Videos Processed**: {stats.get('videos_processed', 0)}\")
+print(f\"- **Videos Downloaded**: {stats.get('videos_downloaded', 0)}\")
+print(f\"- **Videos Enriched**: {stats.get('videos_enriched', 0)}\")
+print(f\"- **Videos Uploaded**: {stats.get('videos_uploaded', 0)}\")
+print(f\"- **Runtime**: {stats.get('runtime_minutes', 0):.1f} minutes\")
+print(f\"- **Success Rate**: {stats.get('success_rate', 0):.1f}%\")
+            " >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Run" >> $GITHUB_STEP_SUMMARY
+          echo "Scheduled in 5 hours" >> $GITHUB_STEP_SUMMARY

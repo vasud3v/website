@@ -71,9 +71,12 @@ def merge_single_video(jable_data: dict, javdb_data: Optional[dict]) -> dict:
     merged["rating"] = javdb_data.get("rating") if javdb_data else None
     merged["rating_count"] = javdb_data.get("rating_count") if javdb_data else None
     
-    # Streaming (always from Jable)
+    # Streaming (always from Jable/Javmix)
     # Handle both old format (single service object) and new format (dict of services)
+    # Also handle Javmix format (embed_urls)
     hosting_data = jable_data.get("hosting", {})
+    embed_urls = jable_data.get("embed_urls", {})
+    
     if hosting_data:
         # Check if it's old format (has 'service' key) or new format (dict of services)
         if isinstance(hosting_data, dict) and 'service' in hosting_data:
@@ -96,6 +99,16 @@ def merge_single_video(jable_data: dict, javdb_data: Optional[dict]) -> dict:
             merged["hosting"] = hosting_data
     else:
         merged["hosting"] = {}
+    
+    # CRITICAL: Preserve embed_urls from Javmix scraper
+    # This contains the actual video URLs (iplayerhls, streamtape, doodstream, etc.)
+    if embed_urls:
+        merged["embed_urls"] = embed_urls
+        # Also preserve quality info if available
+        if jable_data.get("quality_info"):
+            merged["quality_info"] = jable_data.get("quality_info")
+        if jable_data.get("all_available_servers"):
+            merged["all_available_servers"] = jable_data.get("all_available_servers")
     
     # Sources
     merged["source_javdb"] = javdb_data.get("source_url") if javdb_data else None

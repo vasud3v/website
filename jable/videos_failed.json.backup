@@ -1,0 +1,8 @@
+[
+  {
+    "source_url": "https://jable.tv/videos/test-retry/",
+    "retry_count": 1,
+    "last_error": "Test error 1",
+    "last_attempt": "2026-01-20T19:48:26.830516"
+  }
+]

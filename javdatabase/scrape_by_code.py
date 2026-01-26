@@ -10,6 +10,7 @@ from typing import List, Dict, Optional
 from dataclasses import dataclass, asdict
 from bs4 import BeautifulSoup
 from seleniumbase import Driver
+from selenium.common.exceptions import TimeoutException
 
 
 @dataclass
@@ -431,9 +432,9 @@ class JAVDBCodeScraper:
                             # Visit profile directly
                             print(f"       Visiting profile: {profile_href[:60]}...")
                             try:
-                                self.driver.set_page_load_timeout(10)
+                                self.driver.set_page_load_timeout(20)  # Increased timeout
                                 self.driver.get(profile_href)
-                                time.sleep(2)
+                                time.sleep(3)  # Increased wait time
                                 
                                 profile_soup = BeautifulSoup(self.driver.page_source, 'html.parser')
                                 
@@ -463,8 +464,18 @@ class JAVDBCodeScraper:
                                 self.driver.back()
                                 time.sleep(1)
                                 
+                            except TimeoutException:
+                                print(f"       Profile: Timeout (page took too long) - skipping")
+                                # Try to stop page load and go back
+                                try:
+                                    self.driver.execute_script("window.stop();")
+                                    time.sleep(1)
+                                    self.driver.back()
+                                    time.sleep(1)
+                                except:
+                                    pass
                             except Exception as e:
-                                print(f"       Profile: Timeout/Error - {e}")
+                                print(f"       Profile: Error - {str(e)[:50]}")
                                 # Try to go back
                                 try:
                                     self.driver.back()

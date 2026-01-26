@@ -10,6 +10,7 @@ from typing import List, Dict, Optional
 from dataclasses import dataclass, asdict, field
 from bs4 import BeautifulSoup
 from seleniumbase import Driver
+from selenium.common.exceptions import TimeoutException
 from datetime import datetime
 
 
@@ -374,9 +375,9 @@ class CleanJAVDBScraper:
                     try:
                         profile_href = href if href.startswith('http') else 'https://www.javdatabase.com' + href
                         
-                        self.driver.set_page_load_timeout(10)
+                        self.driver.set_page_load_timeout(20)  # Increased timeout
                         self.driver.get(profile_href)
-                        time.sleep(2)
+                        time.sleep(3)  # Increased wait time
                         
                         profile_soup = BeautifulSoup(self.driver.page_source, 'html.parser')
                         profile = self._extract_actress_profile(profile_soup, profile_href, name)
@@ -395,8 +396,17 @@ class CleanJAVDBScraper:
                         
                         self.driver.back()
                         time.sleep(1)
+                    except TimeoutException:
+                        print(f"       Timeout (page took too long) - skipping")
+                        try:
+                            self.driver.execute_script("window.stop();")
+                            time.sleep(1)
+                            self.driver.back()
+                            time.sleep(1)
+                        except:
+                            pass
                     except Exception as e:
-                        print(f"       Error: {e}")
+                        print(f"       Error: {str(e)[:50]}")
                         try:
                             self.driver.back()
                             time.sleep(1)

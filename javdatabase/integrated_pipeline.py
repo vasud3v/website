@@ -143,6 +143,28 @@ class IntegratedPipeline:
             db_manager.update_stats()
             db_manager.update_progress()
     
+    def should_skip_javdb_enrichment(self, video_code: str) -> tuple[bool, str]:
+        """
+        Check if video should skip JAVDatabase enrichment
+        
+        Returns:
+            tuple: (should_skip, reason)
+        """
+        video_code_upper = video_code.upper()
+        
+        # FC2PPV videos are not on JAVDatabase (amateur/independent content)
+        if video_code_upper.startswith('FC2') or 'FC2PPV' in video_code_upper or 'FC2-PPV' in video_code_upper:
+            return (True, "FC2PPV videos are not indexed on JAVDatabase (amateur content)")
+        
+        # Add other patterns that are not on JAVDatabase
+        # Example: Some amateur codes, personal uploads, etc.
+        amateur_patterns = ['AMATEUR', 'PERSONAL', 'PRIVATE']
+        for pattern in amateur_patterns:
+            if pattern in video_code_upper:
+                return (True, f"Amateur/personal content not on JAVDatabase")
+        
+        return (False, "")
+    
     def process_video(self, jable_data: dict, headless: bool = True) -> Optional[dict]:
         """
         Process single video: scrape JAVDatabase + merge + save
@@ -163,6 +185,59 @@ class IntegratedPipeline:
         print(f"\n{'='*70}")
         print(f"🎬 Processing: {video_code}")
         print(f"{'='*70}")
+        
+        # Check if this video type should skip JAVDatabase enrichment
+        should_skip, skip_reason = self.should_skip_javdb_enrichment(video_code)
+        if should_skip:
+            print(f"⏭️  Skipping JAVDatabase enrichment: {skip_reason}")
+            print(f"   Will save Javmix data only...")
+            
+            # Save Javmix data without JAVDatabase enrichment
+            try:
+                # Add metadata to indicate no JAVDatabase data
+                jable_data['javdb_available'] = False
+                jable_data['javdb_skip_reason'] = skip_reason
+                
+                if self.use_db_manager:
+                    if db_manager.add_or_update_video(jable_data):
+                        print(f"  ✅ Saved Javmix data to database")
+                        all_videos = db_manager.get_all_videos()
+                        print(f"     Total videos in database: {len(all_videos)}")
+                        self.update_stats(success=True, javdb_available=False)
+                        
+                        print(f"\n{'='*70}")
+                        print(f"✅ {video_code} processed successfully!")
+                        print(f"   JAVDatabase: ⏭️  Skipped ({skip_reason})")
+                        print(f"{'='*70}\n")
+                        
+                        return jable_data
+                    else:
+                        print(f"  ❌ Failed to save database")
+                        return None
+                else:
+                    # Legacy save
+                    existing = self.load_combined_database()
+                    existing = [v for v in existing if v.get("code") != video_code]
+                    existing.append(jable_data)
+                    
+                    if self.save_combined_database(existing):
+                        print(f"  ✅ Saved to {self.combined_db_path}")
+                        print(f"     Total videos in database: {len(existing)}")
+                        self.update_stats(success=True, javdb_available=False)
+                        
+                        print(f"\n{'='*70}")
+                        print(f"✅ {video_code} processed successfully!")
+                        print(f"   JAVDatabase: ⏭️  Skipped ({skip_reason})")
+                        print(f"{'='*70}\n")
+                        
+                        return jable_data
+                    else:
+                        print(f"  ❌ Failed to save database")
+                        return None
+            except Exception as e:
+                print(f"  ❌ Save failed: {e}")
+                self.log_error(video_code, str(e), "save_error")
+                return None
         
         # Check if already processed
         if self.is_already_processed(video_code):
