@@ -111,25 +111,6 @@ jobs:
           restore-keys: |
             scraper-state-
       
-      - name: Check for New Videos
-        id: check_new
-        run: |
-          echo "Checking for new videos..."
-          python javmix/monitor_new_videos.py --rss-only || true
-          if [ -f "javmix/new_videos.json" ]; then
-            echo "new_videos=1" >> $GITHUB_OUTPUT
-            echo "Found new videos"
-          else
-            echo "new_videos=0" >> $GITHUB_OUTPUT
-            echo "No new videos found"
-          fi
-      
-      - name: Scrape New Videos
-        if: steps.check_new.outputs.new_videos > 0
-        run: |
-          echo "Scraping ${{ steps.check_new.outputs.new_videos }} new videos..."
-          python javmix/auto_scrape_new.py --scrape-pending
-      
       - name: Run Continuous Workflow
         id: workflow
         run: |

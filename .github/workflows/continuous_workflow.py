@@ -80,21 +80,54 @@ class ContinuousWorkflow:
         with open(self.combined_db, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
     
+    def load_sitemap_urls(self):
+        """Load URLs from sitemap"""
+        sitemap_file = Path("sitemap_videos.json")
+        if sitemap_file.exists():
+            with open(sitemap_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return data.get('urls', [])
+        return []
+    
     def get_pending_videos(self):
-        """Get videos that need processing"""
-        db = self.load_combined_database()
+        """Get videos that need processing from sitemap"""
+        # Load sitemap URLs
+        sitemap_urls = self.load_sitemap_urls()
+        safe_print(f"📋 Loaded {len(sitemap_urls)} URLs from sitemap")
         
-        # Find videos without download or upload info
-        pending = []
+        # Load combined database to check what's already processed
+        db = self.load_combined_database()
+        processed_urls = set()
+        
         for video in db.get('videos', []):
-            # Check if video needs processing
-            needs_download = not video.get('downloaded', False)
-            needs_upload = not video.get('uploaded_hosts', {})
-            
-            if needs_download or needs_upload:
-                pending.append(video)
+            url = video.get('url', '')
+            if url:
+                processed_urls.add(url)
+        
+        safe_print(f"✅ Already processed: {len(processed_urls)} videos")
+        
+        # Find unprocessed URLs
+        pending_urls = [url for url in sitemap_urls if url not in processed_urls]
+        safe_print(f"📋 Pending: {len(pending_urls)} videos to process")
+        
+        # Convert URLs to video data format
+        pending = []
+        for url in pending_urls:
+            pending.append({
+                'url': url,
+                'code': self.extract_code_from_url(url),
+                'needs_scraping': True
+            })
         
         return pending
+    
+    def extract_code_from_url(self, url):
+        """Extract video code from URL"""
+        import re
+        match = re.search(r'/(video|fc2ppv|xvideo)/([^/]+)', url)
+        if match:
+            return match.group(2).upper()
+        return 'unknown'
     
     def scrape_video(self, video_url):
         """Scrape a single video"""
@@ -102,21 +135,27 @@ class ContinuousWorkflow:
             safe_print(f"🎬 Scraping: {video_url}")
             
             result = subprocess.run(
-                ['python', 'javmix/javmix_scraper.py', '--url', video_url],
+                ['python', 'javmix/javmix_scraper.py', '--url', video_url, '--output', 'database/scraped_video.json'],
                 capture_output=True,
                 text=True,
                 timeout=300
             )
             
             if result.returncode == 0:
-                safe_print(f"✅ Scraped: {video_url}")
-                return True
-            else:
-                safe_print(f"❌ Failed to scrape: {video_url}")
-                return False
+                # Load scraped data
+                scraped_file = Path('database/scraped_video.json')
+                if scraped_file.exists():
+                    with open(scraped_file, 'r', encoding='utf-8') as f:
+                        video_data = json.load(f)
+                    scraped_file.unlink()  # Clean up
+                    safe_print(f"✅ Scraped: {video_url}")
+                    return video_data
+            
+            safe_print(f"❌ Failed to scrape: {video_url}")
+            return None
         except Exception as e:
             safe_print(f"❌ Error scraping {video_url}: {e}")
-            return False
+            return None
     
     def download_video(self, video_data):
         """Download video with best quality"""
@@ -288,12 +327,20 @@ class ContinuousWorkflow:
     
     def process_single_video(self, video_data):
         """Process a single video through the complete workflow"""
+        url = video_data.get('url', '')
         code = video_data.get('code', 'unknown')
         
         try:
             safe_print(f"\n{'='*70}")
             safe_print(f"🎯 Processing: {code}")
             safe_print(f"{'='*70}")
+            
+            # Step 0: Scrape if needed
+            if video_data.get('needs_scraping', False):
+                video_data = self.scrape_video(url)
+                if not video_data:
+                    self.stats['errors'] += 1
+                    return False
             
             # Step 1: Download
             video_path = self.download_video(video_data)
@@ -325,26 +372,42 @@ class ContinuousWorkflow:
             # Step 5: Update combined database
             db = self.load_combined_database()
             
-            # Find and update video
+            # Add or update video
+            video_entry = {
+                'url': url,
+                'code': code,
+                **video_data,
+                'downloaded': True,
+                'download_path': video_path,
+                'preview_path': preview_path,
+                'enriched': enriched,
+                'uploaded_hosts': uploaded_hosts,
+                'processed_at': datetime.now().isoformat()
+            }
+            
+            # Add Internet Archive preview info
+            if ia_result:
+                video_entry['preview_ia'] = {
+                    'identifier': ia_result.get('identifier'),
+                    'direct_mp4_link': ia_result.get('direct_mp4_link'),
+                    'player_link': ia_result.get('player_link'),
+                    'embed_code': ia_result.get('embed_code'),
+                    'uploaded_at': ia_result.get('uploaded_at')
+                }
+            
+            # Check if video already exists
+            found = False
             for i, v in enumerate(db['videos']):
-                if v.get('code') == code:
-                    db['videos'][i]['downloaded'] = True
-                    db['videos'][i]['download_path'] = video_path
-                    db['videos'][i]['preview_path'] = preview_path
-                    db['videos'][i]['enriched'] = enriched
-                    db['videos'][i]['uploaded_hosts'] = uploaded_hosts
-                    db['videos'][i]['processed_at'] = datetime.now().isoformat()
-                    
-                    # Add Internet Archive preview info
-                    if ia_result:
-                        db['videos'][i]['preview_ia'] = {
-                            'identifier': ia_result.get('identifier'),
-                            'direct_mp4_link': ia_result.get('direct_mp4_link'),
-                            'player_link': ia_result.get('player_link'),
-                            'embed_code': ia_result.get('embed_code'),
-                            'uploaded_at': ia_result.get('uploaded_at')
-                        }
+                if v.get('url') == url or v.get('code') == code:
+                    db['videos'][i] = video_entry
+                    found = True
                     break
+            
+            if not found:
+                db['videos'].append(video_entry)
+            
+            # Update stats
+            db['stats']['total_videos'] = len(db['videos'])
             
             self.save_combined_database(db)
             
