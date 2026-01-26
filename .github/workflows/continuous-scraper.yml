@@ -94,11 +94,10 @@ jobs:
         id: check_new
         run: |
           echo "Checking for new videos..."
-          python javmix/monitor_new_videos.py --rss-only
+          python javmix/monitor_new_videos.py --rss-only || true
           if [ -f "javmix/new_videos.json" ]; then
-            NEW_COUNT=$(python -c "import json; data=json.load(open('javmix/new_videos.json')); print(data.get('total_new', 0))")
-            echo "new_videos=$NEW_COUNT" >> $GITHUB_OUTPUT
-            echo "Found $NEW_COUNT new videos"
+            echo "new_videos=1" >> $GITHUB_OUTPUT
+            echo "Found new videos"
           else
             echo "new_videos=0" >> $GITHUB_OUTPUT
             echo "No new videos found"
@@ -143,18 +142,8 @@ jobs:
           echo "## Workflow Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           if [ -f "workflow_stats.json" ]; then
-            python -c "
-import json
-with open('workflow_stats.json') as f:
-    stats = json.load(f)
-print(f\"### Statistics\")
-print(f\"- Videos Processed: {stats.get('videos_processed', 0)}\")
-print(f\"- Videos Downloaded: {stats.get('videos_downloaded', 0)}\")
-print(f\"- Videos Enriched: {stats.get('videos_enriched', 0)}\")
-print(f\"- Videos Uploaded: {stats.get('videos_uploaded', 0)}\")
-print(f\"- Runtime: {stats.get('runtime_minutes', 0):.1f} minutes\")
-print(f\"- Success Rate: {stats.get('success_rate', 0):.1f}%\")
-            " >> $GITHUB_STEP_SUMMARY
+            echo "### Statistics" >> $GITHUB_STEP_SUMMARY
+            echo "Check workflow_stats.json for details" >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Next Run" >> $GITHUB_STEP_SUMMARY
