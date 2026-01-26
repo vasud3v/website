@@ -2,7 +2,9 @@
 """
 Continuous Workflow for GitHub Actions
 Orchestrates: Scraping → Downloading → Preview → Enrichment → Upload
-Runs for specified duration with 32 parallel workers
+- Processes videos SEQUENTIALLY (one by one)
+- Downloads use PARALLEL CHUNKS (32 connections per video)
+- Runs for specified duration
 """
 
 import os
@@ -158,7 +160,7 @@ class ContinuousWorkflow:
             return None
     
     def download_video(self, video_data):
-        """Download video with best quality"""
+        """Download video with parallel chunks"""
         try:
             code = video_data.get('code', 'unknown')
             safe_print(f"📥 Downloading: {code}")
@@ -182,16 +184,60 @@ class ContinuousWorkflow:
             # Download using appropriate downloader
             output_file = self.download_dir / f"{code}.mp4"
             
-            # Use yt-dlp or custom downloader
+            safe_print(f"  🔗 URL: {download_url}")
+            safe_print(f"  📦 Using {self.max_workers} parallel connections")
+            
+            # Try aria2c first (supports parallel chunk downloading)
+            try:
+                result = subprocess.run(
+                    [
+                        'aria2c',
+                        '--max-connection-per-server=16',
+                        '--split=16',
+                        '--min-split-size=1M',
+                        '--max-concurrent-downloads=1',
+                        '--continue=true',
+                        '--max-tries=5',
+                        '--retry-wait=3',
+                        '--timeout=60',
+                        '--connect-timeout=30',
+                        '--allow-overwrite=true',
+                        '--auto-file-renaming=false',
+                        '--console-log-level=warn',
+                        '-o', str(output_file),
+                        download_url
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=1800  # 30 minutes max
+                )
+                
+                if result.returncode == 0 and output_file.exists():
+                    safe_print(f"✅ Downloaded with aria2c: {code} ({output_file.stat().st_size / 1024 / 1024:.1f} MB)")
+                    return str(output_file)
+            except FileNotFoundError:
+                safe_print(f"  ⚠️ aria2c not found, falling back to yt-dlp")
+            except Exception as e:
+                safe_print(f"  ⚠️ aria2c failed: {e}, falling back to yt-dlp")
+            
+            # Fallback to yt-dlp with concurrent fragments
             result = subprocess.run(
-                ['yt-dlp', '-o', str(output_file), download_url],
+                [
+                    'yt-dlp',
+                    '--concurrent-fragments', str(min(self.max_workers, 16)),
+                    '--retries', '10',
+                    '--fragment-retries', '10',
+                    '--no-part',
+                    '-o', str(output_file),
+                    download_url
+                ],
                 capture_output=True,
                 text=True,
                 timeout=1800  # 30 minutes max
             )
             
             if result.returncode == 0 and output_file.exists():
-                safe_print(f"✅ Downloaded: {code} ({output_file.stat().st_size / 1024 / 1024:.1f} MB)")
+                safe_print(f"✅ Downloaded with yt-dlp: {code} ({output_file.stat().st_size / 1024 / 1024:.1f} MB)")
                 return str(output_file)
             else:
                 safe_print(f"❌ Failed to download: {code}")
@@ -434,9 +480,10 @@ class ContinuousWorkflow:
         safe_print("🚀 CONTINUOUS WORKFLOW STARTED")
         safe_print("="*70)
         safe_print(f"Max Runtime: {self.max_runtime_minutes} minutes")
-        safe_print(f"Max Workers: {self.max_workers}")
+        safe_print(f"Max Workers (for downloads): {self.max_workers}")
         safe_print(f"Max Videos: {self.max_videos or 'Unlimited'}")
         safe_print(f"Start Time: {self.start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        safe_print(f"Processing Mode: Sequential (one video at a time)")
         safe_print("="*70)
         
         try:
@@ -448,31 +495,18 @@ class ContinuousWorkflow:
                 pending = pending[:self.max_videos]
                 safe_print(f"📋 Limited to {len(pending)} videos")
             
-            # Process videos with parallel workers
-            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-                futures = []
+            # Process videos SEQUENTIALLY (one by one)
+            for i, video in enumerate(pending, 1):
+                if not self.check_runtime():
+                    safe_print("\n⏰ Runtime limit reached, stopping...")
+                    break
                 
-                for video in pending:
-                    if not self.check_runtime():
-                        safe_print("\n⏰ Runtime limit reached, stopping...")
-                        break
-                    
-                    future = executor.submit(self.process_single_video, video)
-                    futures.append(future)
-                    
-                    # Limit concurrent tasks
-                    if len(futures) >= self.max_workers:
-                        # Wait for at least one to complete
-                        done, futures = futures[:1], futures[1:]
-                        for f in done:
-                            f.result()
+                safe_print(f"\n{'='*70}")
+                safe_print(f"📹 Video {i}/{len(pending)}")
+                safe_print(f"{'='*70}")
                 
-                # Wait for remaining tasks
-                for future in as_completed(futures):
-                    if not self.check_runtime():
-                        safe_print("\n⏰ Runtime limit reached, cancelling remaining tasks...")
-                        break
-                    future.result()
+                # Process single video (downloads will use parallel chunks internally)
+                self.process_single_video(video)
             
         except KeyboardInterrupt:
             safe_print("\n⚠️ Interrupted by user")

@@ -52,8 +52,9 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg wget curl
+          sudo apt-get install -y ffmpeg wget curl aria2
           echo "✅ System dependencies installed"
+          aria2c --version
       
       - name: Install Python Dependencies
         timeout-minutes: 10
