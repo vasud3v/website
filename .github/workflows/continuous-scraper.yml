@@ -47,17 +47,38 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg chromium-browser chromium-chromedriver wget curl
+          sudo apt-get install -y ffmpeg wget curl
+          
+          # Install Chrome instead of Chromium (more reliable)
+          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+          
+          # Install ChromeDriver
+          CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d '.' -f 1)
+          wget -q "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}" -O /tmp/chromedriver_version
+          CHROMEDRIVER_VERSION=$(cat /tmp/chromedriver_version)
+          wget -q "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip" -O /tmp/chromedriver.zip
+          sudo unzip -q /tmp/chromedriver.zip -d /usr/local/bin/
+          sudo chmod +x /usr/local/bin/chromedriver
+          
+          echo "✅ Chrome and ChromeDriver installed"
+          google-chrome --version
+          chromedriver --version
       
       - name: Install Python Dependencies
+        timeout-minutes: 10
         run: |
           python -m pip install --upgrade pip
           pip install -r javmix/requirements.txt
           pip install -r javdatabase/requirements.txt
           pip install -r upload_pipeline/requirements.txt
           pip install seleniumbase undetected-chromedriver deep-translator internetarchive
+          echo "✅ Python dependencies installed"
       
       - name: Configure Environment
+        timeout-minutes: 5
         run: |
           echo "SEEKSTREAMING_API_KEY=${{ secrets.SEEKSTREAMING_API_KEY }}" >> upload_pipeline/.env
           echo "STREAMTAPE_USERNAME=${{ secrets.STREAMTAPE_USERNAME }}" >> upload_pipeline/.env
