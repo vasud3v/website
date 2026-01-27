@@ -43,7 +43,7 @@ class WorkflowManager:
         self.base_dir = Path(base_dir) if base_dir else Path(__file__).parent.parent
         self.download_dir = self.base_dir / 'downloaded_files'
         self.database_dir = self.base_dir / 'database'
-        self.db_manager = DatabaseManager(str(self.database_dir))
+        self.db_manager = DatabaseManager()  # DatabaseManager doesn't take arguments
         
         # Create directories
         self.download_dir.mkdir(exist_ok=True)
