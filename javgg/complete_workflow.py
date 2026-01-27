@@ -29,7 +29,7 @@ from database_manager import DatabaseManager
 
 # Import preview generator
 sys.path.insert(0, str(Path(__file__).parent.parent / 'tools' / 'preview_generator'))
-from preview_generator import generate_preview
+from preview_generator import PreviewGenerator
 
 # Import upload pipeline
 sys.path.insert(0, str(Path(__file__).parent.parent / 'upload_pipeline'))
@@ -232,15 +232,21 @@ class WorkflowManager:
         try:
             preview_file = self.download_dir / f"{video_code}_preview.mp4"
             
-            # Generate 2-minute preview
-            success = generate_preview(
-                input_video=video_file,
-                output_video=str(preview_file),
-                duration=120,  # 2 minutes
-                num_clips=6
+            # Generate 2-minute preview using PreviewGenerator
+            generator = PreviewGenerator(video_file)
+            result = generator.generate_preview(
+                output_path=str(preview_file),
+                target_duration=120,  # 2 minutes
+                clip_duration=2.5,
+                resolution="720",
+                crf=23,
+                fps=30,
+                cleanup=True,
+                parallel=True,
+                max_workers=32
             )
             
-            if success and preview_file.exists():
+            if result['success'] and preview_file.exists():
                 print(f"  ✅ Preview generated: {preview_file.name}")
                 return str(preview_file)
             else:
