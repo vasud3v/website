@@ -409,23 +409,33 @@ class DatabaseManager:
             videos = self.get_all_videos()
             failed_videos = self._read_json_locked(FAILED_DB, [])
             
+            # Ensure videos is a list
+            if not isinstance(videos, list):
+                videos = []
+            
             # Count processed (has hosting data)
             processed = sum(1 for v in videos if v.get('hosting') and len(v.get('hosting', {})) > 0)
             
+            # Calculate success rate safely
+            total_videos = len(videos)
+            success_rate = (processed / total_videos * 100) if total_videos > 0 else 0
+            
             progress = {
                 "last_updated": datetime.now().isoformat(),
-                "total_videos": len(videos),
+                "total_videos": total_videos,
                 "total_processed": processed,
-                "total_failed": len(failed_videos),
-                "success_rate": (processed / len(videos) * 100) if len(videos) > 0 else 0,
-                "last_video_code": videos[0].get('code') if videos else None,
-                "last_video_url": videos[0].get('source_url') if videos else None
+                "total_failed": len(failed_videos) if isinstance(failed_videos, list) else 0,
+                "success_rate": success_rate,
+                "last_video_code": videos[0].get('code') if videos and len(videos) > 0 else None,
+                "last_video_url": videos[0].get('source_url') if videos and len(videos) > 0 else None
             }
             
             self._write_json(PROGRESS_DB, progress, backup=False)
             
         except Exception as e:
             print(f"⚠️ Could not update progress: {e}")
+            import traceback
+            traceback.print_exc()
     
     def update_stats(self):
         """Update statistics"""
@@ -436,20 +446,41 @@ class DatabaseManager:
             total_size = 0
             for v in videos:
                 size = v.get('file_size', 0)
-                if size is not None:
-                    # Handle string sizes like "~600MB"
+                if size is None:
+                    continue
+                
+                try:
+                    # Handle string sizes like "~600MB", "1.5GB", "600 MB"
                     if isinstance(size, str):
-                        # Try to extract number from string
+                        # Remove common prefixes and clean whitespace
+                        size_str = size.strip().replace('~', '').replace(' ', '').upper()
+                        
+                        # Skip if it's a placeholder
+                        if size_str in ['N/A', 'UNKNOWN', '', 'NONE']:
+                            continue
+                        
+                        # Extract number (including decimals)
                         import re
-                        match = re.search(r'(\d+)', size)
+                        match = re.search(r'(\d+\.?\d*)', size_str)
                         if match:
-                            # Assume MB if no unit specified
-                            size_num = int(match.group(1))
-                            if 'GB' in size.upper() or 'gb' in size:
-                                size_num *= 1024  # Convert GB to MB
-                            total_size += size_num * 1024 * 1024  # Convert MB to bytes
+                            size_num = float(match.group(1))
+                            
+                            # Determine unit and convert to bytes
+                            if 'GB' in size_str:
+                                total_size += int(size_num * 1024 * 1024 * 1024)
+                            elif 'MB' in size_str:
+                                total_size += int(size_num * 1024 * 1024)
+                            elif 'KB' in size_str:
+                                total_size += int(size_num * 1024)
+                            else:
+                                # Assume MB if no unit specified
+                                total_size += int(size_num * 1024 * 1024)
                     elif isinstance(size, (int, float)):
                         total_size += int(size)
+                except Exception as e:
+                    # Skip this video's size if parsing fails
+                    print(f"⚠️ Could not parse file_size '{size}' for video {v.get('code', 'unknown')}: {e}")
+                    continue
             
             stats = {
                 "total_videos": len(videos),

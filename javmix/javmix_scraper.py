@@ -150,15 +150,28 @@ class JavmixScraper:
             self.translator = None
     
     def _translate_text(self, text: str, max_length: int = 5000) -> str:
-        """Translate Japanese text to English with caching"""
+        """Translate Japanese text to English with caching and robust error handling"""
         if not self.translator or not text:
+            return ""
+        
+        # Validate input
+        if not isinstance(text, str):
+            print(f"  ⚠️ Translation skipped: invalid input type {type(text).__name__}")
+            return ""
+        
+        text = text.strip()
+        if not text:
             return ""
         
         # Check cache first
         if self.enable_cache:
-            cache_key = hashlib.md5(text.encode()).hexdigest()
-            if cache_key in self.cache:
-                return self.cache[cache_key]
+            try:
+                cache_key = hashlib.md5(text.encode()).hexdigest()
+                if cache_key in self.cache:
+                    self.stats['cache_hits'] += 1
+                    return self.cache[cache_key]
+            except Exception as e:
+                print(f"  ⚠️ Cache lookup failed: {str(e)[:50]}")
         
         try:
             # Split long text into chunks if needed
@@ -166,34 +179,59 @@ class JavmixScraper:
                 chunks = [text[i:i+max_length] for i in range(0, len(text), max_length)]
                 translated_chunks = []
                 for chunk in chunks:
-                    translated = self.translator.translate(chunk)
-                    translated_chunks.append(translated)
-                    time.sleep(0.5)  # Rate limiting
+                    try:
+                        translated = self.translator.translate(chunk)
+                        if translated:
+                            translated_chunks.append(translated)
+                        time.sleep(0.5)  # Rate limiting
+                    except Exception as chunk_error:
+                        print(f"  ⚠️ Chunk translation failed: {str(chunk_error)[:50]}")
+                        translated_chunks.append(chunk)  # Keep original
                 result = ' '.join(translated_chunks)
             else:
                 result = self.translator.translate(text)
             
+            # Validate result
+            if not result or not isinstance(result, str):
+                print(f"  ⚠️ Translation returned invalid result")
+                return text  # Return original
+            
             # Cache result
             if self.enable_cache:
-                self.cache[cache_key] = result
+                try:
+                    self.cache[cache_key] = result
+                except Exception as cache_error:
+                    print(f"  ⚠️ Cache save failed: {str(cache_error)[:50]}")
             
             return result
         except Exception as e:
             print(f"  ⚠️ Translation failed: {str(e)[:50]}")
-            return ""
+            return text  # Return original text on failure
     
     def _translate_list(self, items: List[str]) -> List[str]:
-        """Translate a list of items"""
+        """Translate a list of items with robust error handling"""
         if not self.translator or not items:
+            return []
+        
+        # Validate input
+        if not isinstance(items, list):
+            print(f"  ⚠️ Translation skipped: invalid input type {type(items).__name__}")
             return []
         
         translated = []
         for item in items:
+            if not item or not isinstance(item, str):
+                continue
+            
             try:
-                trans = self.translator.translate(item)
-                translated.append(trans)
+                trans = self.translator.translate(item.strip())
+                if trans and isinstance(trans, str):
+                    translated.append(trans)
+                else:
+                    translated.append(item)  # Keep original if translation invalid
                 time.sleep(0.3)  # Rate limiting
-            except:
+            except Exception as e:
+                print(f"  ⚠️ Item translation failed for '{item[:30]}': {str(e)[:30]}")
                 translated.append(item)  # Keep original if translation fails
         
         return translated
@@ -1976,9 +2014,9 @@ Examples:
             video_data = scraper.scrape_video(args.url)
             
             if video_data:
-                # Save to file
+                # Save to file (as dict, not list, for single video)
                 with open(args.output, 'w', encoding='utf-8') as f:
-                    json.dump([asdict(video_data)], f, indent=2, ensure_ascii=False)
+                    json.dump(asdict(video_data), f, indent=2, ensure_ascii=False)
                 
                 print(f"\n{'='*60}")
                 print(f"✅ SUCCESS")

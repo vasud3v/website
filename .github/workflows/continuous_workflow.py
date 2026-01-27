@@ -128,20 +128,40 @@ class ContinuousWorkflow:
         return pending
     
     def extract_code_from_url(self, url):
-        """Extract video code from URL"""
+        """Extract video code from URL with validation"""
         import re
         match = re.search(r'/(video|fc2ppv|xvideo)/([^/]+)', url)
         if match:
-            return match.group(2).upper()
+            code = match.group(2).upper()
+            # Validate code format (alphanumeric, hyphens, underscores)
+            if re.match(r'^[A-Z0-9_-]+$', code):
+                return code
+            else:
+                safe_print(f"⚠️ Invalid code format extracted: {code}")
+                return 'unknown'
         return 'unknown'
+    
+    def sanitize_code_for_filesystem(self, code):
+        """Sanitize video code for safe filesystem use"""
+        import re
+        # Remove or replace unsafe characters
+        safe_code = re.sub(r'[<>:"/\\|?*]', '_', code)
+        # Limit length to avoid filesystem issues
+        safe_code = safe_code[:200]
+        # Remove leading/trailing dots and spaces
+        safe_code = safe_code.strip('. ')
+        return safe_code if safe_code else 'unknown'
     
     def scrape_video(self, video_url):
         """Scrape a single video with timeout"""
+        scraped_file = None
         try:
             safe_print(f"🎬 Scraping: {video_url}")
             
+            scraped_file = Path('database/scraped_video.json')
+            
             result = subprocess.run(
-                ['python', 'javmix/javmix_scraper.py', '--url', video_url, '--output', 'database/scraped_video.json'],
+                ['python', 'javmix/javmix_scraper.py', '--url', video_url, '--output', str(scraped_file)],
                 capture_output=True,
                 text=True,
                 timeout=120  # 2 minutes max for scraping
@@ -149,11 +169,15 @@ class ContinuousWorkflow:
             
             if result.returncode == 0:
                 # Load scraped data
-                scraped_file = Path('database/scraped_video.json')
                 if scraped_file.exists():
                     with open(scraped_file, 'r', encoding='utf-8') as f:
                         video_data = json.load(f)
-                    scraped_file.unlink()  # Clean up
+                    
+                    # Validate it's a dict
+                    if not isinstance(video_data, dict):
+                        safe_print(f"⚠️ Scraper returned invalid data type: {type(video_data).__name__}")
+                        return None
+                    
                     safe_print(f"✅ Scraped: {video_url}")
                     return video_data
                 else:
@@ -171,17 +195,31 @@ class ContinuousWorkflow:
         except Exception as e:
             safe_print(f"❌ Error scraping {video_url}: {e}")
             return None
+        finally:
+            # Cleanup temp file
+            if scraped_file and scraped_file.exists():
+                try:
+                    scraped_file.unlink()
+                except Exception as e:
+                    safe_print(f"⚠️ Could not cleanup {scraped_file}: {e}")
     
     def download_video(self, video_data):
         """Download video with parallel chunks"""
         try:
             code = video_data.get('code', 'unknown')
+            # Sanitize code for filesystem
+            safe_code = self.sanitize_code_for_filesystem(code)
             safe_print(f"📥 Downloading: {code}")
             
             # Get best quality URL
             embed_urls = video_data.get('embed_urls', {})
             if not embed_urls:
                 safe_print(f"⚠️ No embed URLs for {code}")
+                return None
+            
+            # Validate embed_urls is a dict
+            if not isinstance(embed_urls, dict):
+                safe_print(f"⚠️ Invalid embed_urls type for {code}: {type(embed_urls).__name__}")
                 return None
             
             # Priority: iplayerhls > streamtape > others
@@ -192,10 +230,15 @@ class ContinuousWorkflow:
                     break
             
             if not download_url:
-                download_url = list(embed_urls.values())[0]
+                # Get first available URL, but check if dict is not empty
+                if len(embed_urls) > 0:
+                    download_url = list(embed_urls.values())[0]
+                else:
+                    safe_print(f"⚠️ Empty embed_urls dict for {code}")
+                    return None
             
             # Download using appropriate downloader
-            output_file = self.download_dir / f"{code}.mp4"
+            output_file = self.download_dir / f"{safe_code}.mp4"
             
             safe_print(f"  🔗 URL: {download_url}")
             safe_print(f"  📦 Using {self.max_workers} parallel connections")
@@ -401,6 +444,13 @@ class ContinuousWorkflow:
                     safe_print(f"⚠️ Skipping {code} - scraping failed")
                     self.stats['errors'] += 1
                     return False
+                
+                # Validate scraped data is a dict
+                if not isinstance(scraped_data, dict):
+                    safe_print(f"⚠️ Skipping {code} - scraped data is not a dict (got {type(scraped_data).__name__})")
+                    self.stats['errors'] += 1
+                    return False
+                
                 video_data = scraped_data
                 code = video_data.get('code', code)  # Update code from scraped data
             
