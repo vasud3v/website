@@ -10,11 +10,6 @@ on:
         description: 'Maximum videos to process (0 = unlimited)'
         required: false
         default: '0'
-  # Trigger on workflow completion to create continuous loop
-  workflow_run:
-    workflows: ["JavaGG Complete Workflow"]
-    types:
-      - completed
 
 jobs:
   process-videos:
