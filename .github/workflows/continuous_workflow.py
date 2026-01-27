@@ -128,17 +128,41 @@ class ContinuousWorkflow:
         return pending
     
     def extract_code_from_url(self, url):
-        """Extract video code from URL with validation"""
+        """Extract video code from URL with validation and URL decoding"""
         import re
+        from urllib.parse import unquote
+        
         match = re.search(r'/(video|fc2ppv|xvideo)/([^/]+)', url)
         if match:
-            code = match.group(2).upper()
-            # Validate code format (alphanumeric, hyphens, underscores)
-            if re.match(r'^[A-Z0-9_-]+$', code):
+            raw_code = match.group(2)
+            
+            # URL decode to handle encoded characters
+            decoded = unquote(raw_code)
+            
+            # For FC2PPV, extract just the code part (FC2PPV-XXXXXX)
+            # Pattern: FC2PPV-digits, optionally followed by title
+            fc2_match = re.match(r'(FC2PPV-\d+)', decoded, re.IGNORECASE)
+            if fc2_match:
+                code = fc2_match.group(1).upper()
+                return code
+            
+            # For regular codes, take the part before any special characters or spaces
+            # Split on common separators and take first part
+            code_part = re.split(r'[%\s【\u3000]', decoded)[0]
+            code = code_part.upper()
+            
+            # Validate code format (alphanumeric, hyphens, underscores only)
+            if re.match(r'^[A-Z0-9_-]+$', code) and len(code) > 0:
                 return code
             else:
-                safe_print(f"⚠️ Invalid code format extracted: {code}")
+                # If validation fails, try to extract any alphanumeric-hyphen sequence
+                clean_match = re.search(r'^([A-Z0-9_-]+)', code, re.IGNORECASE)
+                if clean_match:
+                    return clean_match.group(1).upper()
+                
+                safe_print(f"⚠️ Could not extract valid code from: {raw_code[:50]}")
                 return 'unknown'
+        
         return 'unknown'
     
     def sanitize_code_for_filesystem(self, code):
