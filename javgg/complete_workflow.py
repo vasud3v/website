@@ -91,6 +91,9 @@ class WorkflowManager:
         new_urls = []
         
         try:
+            # Initialize driver
+            scraper._init_driver()
+            
             # Get latest videos from homepage
             page = self.progress['last_scraped_page']
             
