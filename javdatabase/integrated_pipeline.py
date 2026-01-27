@@ -69,6 +69,8 @@ class IntegratedPipeline:
             if os.path.exists(self.combined_db_path):
                 with open(self.combined_db_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
+                    if isinstance(data, dict):
+                        return data.get('videos', [])
                     if isinstance(data, list):
                         return data
             return []
@@ -86,8 +88,18 @@ class IntegratedPipeline:
         # Legacy fallback
         try:
             temp_path = f"{self.combined_db_path}.tmp"
+            
+            # Prepare new data structure
+            new_data = {
+                'videos': data,
+                'stats': {
+                    'total_videos': len(data),
+                    'last_updated': datetime.now().isoformat()
+                }
+            }
+            
             with open(temp_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
+                json.dump(new_data, f, indent=2, ensure_ascii=False)
             
             if os.path.exists(self.combined_db_path):
                 backup_path = f"{self.combined_db_path}.bak"

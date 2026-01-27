@@ -255,7 +255,10 @@ class DatabaseManager:
     
     def get_all_videos(self) -> List[Dict]:
         """Get all videos from combined database"""
-        return self._read_json_locked(COMBINED_DB, [])
+        data = self._read_json_locked(COMBINED_DB, [])
+        if isinstance(data, dict):
+            return data.get('videos', [])
+        return data if isinstance(data, list) else []
     
     def get_video_by_code(self, code: str) -> Optional[Dict]:
         """Get video by code"""
@@ -291,7 +294,15 @@ class DatabaseManager:
     def add_or_update_video(self, video_data: Dict) -> bool:
         """Add new video or update existing one"""
         try:
-            videos = self.get_all_videos()
+            # Get existing structure to preserve stats if possible
+            raw_data = self._read_json_locked(COMBINED_DB, [])
+            if isinstance(raw_data, list):
+                videos = raw_data
+                stats = {}
+            else:
+                videos = raw_data.get('videos', [])
+                stats = raw_data.get('stats', {})
+
             code = video_data.get('code')
             
             if not code:
@@ -325,8 +336,17 @@ class DatabaseManager:
                     seen_codes.add(v_code)
                     unique_videos.append(video)
             
+            # Prepare new data structure
+            new_data = {
+                'videos': unique_videos,
+                'stats': stats
+            }
+            # Update explicit stats
+            new_data['stats']['total_videos'] = len(unique_videos)
+            new_data['stats']['last_updated'] = datetime.now().isoformat()
+            
             # Save
-            if self._write_json_locked(COMBINED_DB, unique_videos):
+            if self._write_json_locked(COMBINED_DB, new_data):
                 self.update_progress()
                 self.update_stats()
                 return True

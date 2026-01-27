@@ -74,7 +74,11 @@ class ContinuousWorkflow:
         """Load combined database"""
         if self.combined_db.exists():
             with open(self.combined_db, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                data = json.load(f)
+                # Handle legacy list format
+                if isinstance(data, list):
+                    return {"videos": data, "stats": {"total_videos": len(data)}}
+                return data
         return {"videos": [], "stats": {"total_videos": 0}}
     
     def save_combined_database(self, data):
