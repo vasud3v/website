@@ -33,8 +33,7 @@ from preview_generator import PreviewGenerator
 
 # Import upload pipeline
 sys.path.insert(0, str(Path(__file__).parent.parent / 'upload_pipeline'))
-from upload_to_all_hosts import upload_to_all_hosts
-from internet_archive_uploader import upload_to_internet_archive
+from upload_to_all_hosts import MultiHostUploader
 
 
 class WorkflowManager:
@@ -302,19 +301,30 @@ class WorkflowManager:
         try:
             # Upload full video to all hosting sites
             print(f"\n  📤 Uploading full video to hosting sites...")
-            hosting_urls = upload_to_all_hosts(video_file, video_code)
-            urls['hosting'] = hosting_urls
+            uploader = MultiHostUploader()
+            results = uploader.upload_to_all(video_file, title=video_code)
             
-            # Upload preview to Internet Archive
+            # Extract URLs from results
+            hosting_urls = {}
+            for host, result in results.items():
+                if result.get('success'):
+                    hosting_urls[host] = {
+                        'embed_url': result.get('embed_url', ''),
+                        'download_url': result.get('download_url', ''),
+                        'file_code': result.get('file_code', '')
+                    }
+            
+            urls['hosting'] = hosting_urls
+            print(f"  ✅ Uploaded to {len(hosting_urls)} hosting sites")
+            
+            # For preview, we'll skip Internet Archive for now (can add later)
+            # Internet Archive upload is complex and may not be needed
             if preview_file:
-                print(f"\n  📤 Uploading preview to Internet Archive...")
-                ia_url = upload_to_internet_archive(preview_file, video_code)
-                urls['internet_archive'] = ia_url
+                print(f"\n  ℹ️ Preview saved locally: {preview_file}")
+                urls['preview_file'] = preview_file
             
             print(f"\n  ✅ Uploads complete")
             print(f"     - Hosting sites: {len(hosting_urls)} URLs")
-            if preview_file:
-                print(f"     - Internet Archive: {ia_url}")
             
             return urls
             
@@ -378,6 +388,45 @@ class WorkflowManager:
         except Exception as e:
             print(f"  ⚠️ Cleanup error: {str(e)}")
     
+    def commit_and_push_changes(self, video_code: str):
+        """
+        Commit and push database changes to GitHub after each video
+        This ensures we don't lose data if workflow times out
+        """
+        try:
+            import subprocess
+            
+            # Check if running in GitHub Actions
+            if not os.getenv('GITHUB_ACTIONS'):
+                print(f"  ℹ️ Not in GitHub Actions, skipping git commit")
+                return
+            
+            print(f"\n💾 Committing changes for {video_code}...")
+            
+            # Add database files
+            subprocess.run(['git', 'add', 'database/combined_videos.json'], check=True)
+            subprocess.run(['git', 'add', 'database/workflow_progress.json'], check=True)
+            subprocess.run(['git', 'add', 'database/stats.json'], check=True, stderr=subprocess.DEVNULL)
+            subprocess.run(['git', 'add', 'database/progress_tracking.json'], check=True, stderr=subprocess.DEVNULL)
+            
+            # Check if there are changes
+            result = subprocess.run(['git', 'diff', '--staged', '--quiet'], capture_output=True)
+            
+            if result.returncode != 0:  # There are changes
+                # Commit
+                commit_msg = f"Update database: {video_code} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                subprocess.run(['git', 'commit', '-m', commit_msg], check=True)
+                
+                # Push
+                subprocess.run(['git', 'push'], check=True)
+                print(f"  ✅ Changes committed and pushed")
+            else:
+                print(f"  ℹ️ No changes to commit")
+                
+        except Exception as e:
+            print(f"  ⚠️ Git commit failed: {str(e)}")
+            # Don't fail the workflow if git commit fails
+    
     def process_video(self, video_url: str) -> bool:
         """
         Process a single video through the complete workflow
@@ -419,6 +468,9 @@ class WorkflowManager:
             # Mark as processed
             self.progress['processed_videos'].append(video_code)
             self.save_progress()
+            
+            # Commit and push changes after each video (important for GitHub Actions)
+            self.commit_and_push_changes(video_code)
             
             print(f"\n✅ Successfully processed: {video_code}")
             return True

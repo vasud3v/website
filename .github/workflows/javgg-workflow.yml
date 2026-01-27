@@ -2,7 +2,7 @@ name: JavaGG Complete Workflow
 
 on:
   schedule:
-    # Run every 6 hours
+    # Run every 6 hours as backup
     - cron: '0 */6 * * *'
   workflow_dispatch:
     inputs:
@@ -10,17 +10,26 @@ on:
         description: 'Maximum videos to process (0 = unlimited)'
         required: false
         default: '0'
+  # Trigger on workflow completion to create continuous loop
+  workflow_run:
+    workflows: ["JavaGG Complete Workflow"]
+    types:
+      - completed
 
 jobs:
   process-videos:
     runs-on: ubuntu-latest
-    timeout-minutes: 360  # 6 hours max
+    timeout-minutes: 330  # 5.5 hours (safe margin before 6h limit)
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Pull latest changes
+        run: |
+          git pull origin main
       
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -75,3 +84,21 @@ jobs:
             javgg/*.log
             database/*.json
           retention-days: 7
+      
+      - name: Trigger next run for 24/7 operation
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // Trigger the workflow again to continue 24/7
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'javgg-workflow.yml',
+              ref: 'main',
+              inputs: {
+                max_videos: '0'
+              }
+            });
+            console.log('✅ Triggered next workflow run for continuous operation');
