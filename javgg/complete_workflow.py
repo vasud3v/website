@@ -163,6 +163,7 @@ class WorkflowManager:
                 '-o', str(video_file),
                 '--no-warnings',
                 '--quiet',
+                '--concurrent-fragments', '32',  # 32 parallel workers for faster downloads
                 download_url
             ]
             
