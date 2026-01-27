@@ -74,13 +74,18 @@ class WorkflowManager:
         with open(self.progress_file, 'w', encoding='utf-8') as f:
             json.dump(self.progress, f, indent=2, ensure_ascii=False)
     
-    def scrape_new_videos(self, max_videos: int = 10) -> List[str]:
+    def scrape_new_videos(self, max_videos: int = 0) -> List[str]:
         """
         Scrape new video URLs from JavaGG
+        max_videos: 0 = unlimited, otherwise limit to N videos
         Returns list of video URLs
         """
         print("\n" + "="*70)
         print("STEP 1: SCRAPING NEW VIDEOS FROM JAVGG")
+        if max_videos == 0:
+            print("MODE: UNLIMITED - Processing all new videos")
+        else:
+            print(f"MODE: LIMITED - Processing up to {max_videos} videos")
         print("="*70)
         
         scraper = JavaGGScraper(headless=True)
@@ -89,42 +94,70 @@ class WorkflowManager:
         try:
             # Get latest videos from homepage
             page = self.progress['last_scraped_page']
-            print(f"\n📄 Scraping page {page}...")
             
-            # Navigate to JavaGG homepage or specific page
-            base_url = "https://javgg.net"
-            if page > 1:
-                base_url = f"https://javgg.net/page/{page}/"
+            # Keep scraping pages until we have enough videos or no more videos
+            while True:
+                print(f"\n📄 Scraping page {page}...")
+                
+                # Navigate to JavaGG homepage or specific page
+                base_url = "https://javgg.net"
+                if page > 1:
+                    base_url = f"https://javgg.net/page/{page}/"
+                
+                scraper.driver.get(base_url)
+                time.sleep(3)
+                
+                # Find all video links
+                from bs4 import BeautifulSoup
+                soup = BeautifulSoup(scraper.driver.page_source, 'html.parser')
+                
+                video_links = soup.find_all('a', href=lambda x: x and '/jav/' in x)
+                
+                if not video_links:
+                    print(f"  ℹ️ No more videos found on page {page}")
+                    break
+                
+                page_new_count = 0
+                for link in video_links:
+                    url = link.get('href')
+                    if url and url.startswith('http'):
+                        # Extract video code
+                        code = url.rstrip('/').split('/')[-1].upper()
+                        
+                        # Skip if already processed
+                        if code in self.progress['processed_videos']:
+                            continue
+                        
+                        # Skip if in failed list (unless retry time passed)
+                        if code in self.progress['failed_videos']:
+                            continue
+                        
+                        new_urls.append(url)
+                        page_new_count += 1
+                        
+                        # Check if we've reached the limit (if set)
+                        if max_videos > 0 and len(new_urls) >= max_videos:
+                            break
+                
+                print(f"  ✅ Found {page_new_count} new videos on page {page}")
+                
+                # Update page number for next run
+                self.progress['last_scraped_page'] = page + 1
+                self.save_progress()
+                
+                # Check if we've reached the limit (if set)
+                if max_videos > 0 and len(new_urls) >= max_videos:
+                    break
+                
+                # If no new videos found on this page, we've caught up
+                if page_new_count == 0:
+                    print(f"  ℹ️ No new videos on page {page} - caught up!")
+                    break
+                
+                # Move to next page
+                page += 1
             
-            scraper.driver.get(base_url)
-            time.sleep(3)
-            
-            # Find all video links
-            from bs4 import BeautifulSoup
-            soup = BeautifulSoup(scraper.driver.page_source, 'html.parser')
-            
-            video_links = soup.find_all('a', href=lambda x: x and '/jav/' in x)
-            
-            for link in video_links:
-                url = link.get('href')
-                if url and url.startswith('http'):
-                    # Extract video code
-                    code = url.rstrip('/').split('/')[-1].upper()
-                    
-                    # Skip if already processed
-                    if code in self.progress['processed_videos']:
-                        continue
-                    
-                    # Skip if in failed list (unless retry time passed)
-                    if code in self.progress['failed_videos']:
-                        continue
-                    
-                    new_urls.append(url)
-                    
-                    if len(new_urls) >= max_videos:
-                        break
-            
-            print(f"\n✅ Found {len(new_urls)} new videos to process")
+            print(f"\n✅ Total found: {len(new_urls)} new videos to process")
             
         finally:
             scraper.close()
@@ -426,14 +459,19 @@ class WorkflowManager:
         self.progress['pending_enrichment'] = still_pending
         self.save_progress()
     
-    def run(self, max_videos: int = 10):
+    def run(self, max_videos: int = 0):
         """
         Run the complete workflow
+        max_videos: 0 = unlimited, otherwise limit to N videos
         """
         print("\n" + "="*70)
         print("JAVGG COMPLETE WORKFLOW")
         print("="*70)
         print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        if max_videos == 0:
+            print("Mode: UNLIMITED - Processing all new videos until done or timeout")
+        else:
+            print(f"Mode: LIMITED - Processing up to {max_videos} videos")
         
         # Retry pending enrichments first
         if self.progress['pending_enrichment']:
@@ -470,7 +508,7 @@ if __name__ == '__main__':
     import argparse
     
     parser = argparse.ArgumentParser(description='JavaGG Complete Workflow')
-    parser.add_argument('--max-videos', type=int, default=10, help='Maximum videos to process')
+    parser.add_argument('--max-videos', type=int, default=0, help='Maximum videos to process (0 = unlimited)')
     parser.add_argument('--base-dir', type=str, default=None, help='Base directory')
     
     args = parser.parse_args()

@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       max_videos:
-        description: 'Maximum videos to process'
+        description: 'Maximum videos to process (0 = unlimited)'
         required: false
-        default: '10'
+        default: '0'
 
 jobs:
   process-videos:
@@ -47,7 +47,7 @@ jobs:
       
       - name: Run workflow
         env:
-          MAX_VIDEOS: ${{ github.event.inputs.max_videos || '10' }}
+          MAX_VIDEOS: ${{ github.event.inputs.max_videos || '0' }}
         run: |
           cd javgg
           python complete_workflow.py --max-videos $MAX_VIDEOS
