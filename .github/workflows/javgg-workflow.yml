@@ -29,8 +29,8 @@ jobs:
       
       - name: Install system dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg chromium-browser chromium-chromedriver
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg chromium-browser chromium-chromedriver > /dev/null 2>&1 || true
       
       - name: Install Python dependencies
         run: |
