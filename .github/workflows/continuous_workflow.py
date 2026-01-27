@@ -144,6 +144,7 @@ class ContinuousWorkflow:
         """Extract video code from URL with validation and URL decoding"""
         import re
         from urllib.parse import unquote
+        import hashlib
         
         match = re.search(r'/(video|fc2ppv|xvideo)/([^/]+)', url)
         if match:
@@ -173,8 +174,12 @@ class ContinuousWorkflow:
                 if clean_match:
                     return clean_match.group(1).upper()
                 
-                safe_print(f"⚠️ Could not extract valid code from: {raw_code[:50]}")
-                return 'unknown'
+                # For videos with only Japanese titles, generate a unique code from URL
+                # Use first 8 chars of MD5 hash of the decoded title
+                hash_code = hashlib.md5(decoded.encode('utf-8')).hexdigest()[:8].upper()
+                generated_code = f"JPN-{hash_code}"
+                safe_print(f"  ℹ️ Generated code for Japanese-only title: {generated_code}")
+                return generated_code
         
         return 'unknown'
     
@@ -462,11 +467,6 @@ class ContinuousWorkflow:
         code = video_data.get('code', 'unknown')
         
         try:
-            # Skip videos with unknown codes (no valid code extracted)
-            if code == 'unknown':
-                safe_print(f"⚠️ Skipping video with unknown code: {url[:80]}...")
-                return False
-            
             safe_print(f"\n{'='*70}")
             safe_print(f"🎯 Processing: {code}")
             safe_print(f"{'='*70}")
