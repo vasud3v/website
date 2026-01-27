@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+
+# Downloaded files and temporary data
+downloaded_files/
+*/downloaded_files/
+
+# Database backups
+database/*.backup
+
+# Test and debug files
+javgg/test_*.py
+javgg/check_*.py
+javgg/analyze_*.py
+javgg/find_*.py
+javgg/update_*.py
+javgg/*.txt
+javgg/*.html
+javgg/__pycache__/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
