@@ -52,6 +52,10 @@ class WorkflowManager:
         # Progress tracking
         self.progress_file = self.database_dir / 'workflow_progress.json'
         self.load_progress()
+        
+        # Ensure progress file exists immediately
+        if not self.progress_file.exists():
+            self.save_progress()
     
     def load_progress(self):
         """Load workflow progress"""
@@ -66,8 +70,6 @@ class WorkflowManager:
                 'pending_enrichment': [],
                 'last_run': None
             }
-            # Save initial progress file
-            self.save_progress()
     
     def save_progress(self):
         """Save workflow progress"""
@@ -115,19 +117,21 @@ class WorkflowManager:
                 from bs4 import BeautifulSoup
                 soup = BeautifulSoup(scraper.driver.page_source, 'html.parser')
                 
+                # Debug: print all links first
+                all_links = soup.find_all('a', href=True)
+                print(f"  Debug: Total links on page: {len(all_links)}")
+                if all_links and len(all_links) > 0:
+                    print(f"  Debug: Sample links:")
+                    for link in all_links[:10]:
+                        href = link.get('href')
+                        print(f"    - {href}")
+                
                 # Try multiple patterns to find video links
                 video_links = soup.find_all('a', href=lambda x: x and ('/jav/' in x or '/video/' in x or 'javgg.net' in x))
                 
                 print(f"  Found {len(video_links)} potential video links")
                 
-                if not video_links:
-                    # Debug: print some links to see what's available
-                    all_links = soup.find_all('a', href=True)
-                    print(f"  Debug: Total links on page: {len(all_links)}")
-                    if all_links:
-                        print(f"  Debug: Sample links:")
-                        for link in all_links[:5]:
-                            print(f"    - {link.get('href')}")
+                if not video_links or len(video_links) == 0:
                     print(f"  ℹ️ No video links found on page {page}")
                     break
                 
