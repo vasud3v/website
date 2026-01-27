@@ -132,7 +132,7 @@ class ContinuousWorkflow:
         return 'unknown'
     
     def scrape_video(self, video_url):
-        """Scrape a single video"""
+        """Scrape a single video with timeout"""
         try:
             safe_print(f"🎬 Scraping: {video_url}")
             
@@ -140,7 +140,7 @@ class ContinuousWorkflow:
                 ['python', 'javmix/javmix_scraper.py', '--url', video_url, '--output', 'database/scraped_video.json'],
                 capture_output=True,
                 text=True,
-                timeout=300
+                timeout=120  # 2 minutes max for scraping
             )
             
             if result.returncode == 0:
@@ -152,8 +152,17 @@ class ContinuousWorkflow:
                     scraped_file.unlink()  # Clean up
                     safe_print(f"✅ Scraped: {video_url}")
                     return video_data
+                else:
+                    safe_print(f"⚠️ Scraper succeeded but no output file: {video_url}")
+            else:
+                safe_print(f"❌ Scraper failed with code {result.returncode}: {video_url}")
+                if result.stderr:
+                    safe_print(f"   Error: {result.stderr[:200]}")
             
-            safe_print(f"❌ Failed to scrape: {video_url}")
+            return None
+            
+        except subprocess.TimeoutExpired:
+            safe_print(f"⏰ Scraping timeout (120s): {video_url}")
             return None
         except Exception as e:
             safe_print(f"❌ Error scraping {video_url}: {e}")
@@ -383,14 +392,18 @@ class ContinuousWorkflow:
             
             # Step 0: Scrape if needed
             if video_data.get('needs_scraping', False):
-                video_data = self.scrape_video(url)
-                if not video_data:
+                scraped_data = self.scrape_video(url)
+                if not scraped_data:
+                    safe_print(f"⚠️ Skipping {code} - scraping failed")
                     self.stats['errors'] += 1
                     return False
+                video_data = scraped_data
+                code = video_data.get('code', code)  # Update code from scraped data
             
             # Step 1: Download
             video_path = self.download_video(video_data)
             if not video_path:
+                safe_print(f"⚠️ Skipping {code} - download failed")
                 self.stats['errors'] += 1
                 return False
             
@@ -471,6 +484,8 @@ class ContinuousWorkflow:
             
         except Exception as e:
             safe_print(f"❌ Error processing {code}: {e}")
+            import traceback
+            traceback.print_exc()
             self.stats['errors'] += 1
             return False
     
