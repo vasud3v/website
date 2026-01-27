@@ -1,0 +1,51 @@
+[
+  {
+    "code": "TOTAL",
+    "source_url": null,
+    "retry_count": 1,
+    "last_error": "Video title is required",
+    "last_attempt": "2026-01-27T13:20:06.993575"
+  },
+  {
+    "code": "REGULAR",
+    "source_url": null,
+    "retry_count": 1,
+    "last_error": "Video title is required",
+    "last_attempt": "2026-01-27T13:20:34.008124"
+  },
+  {
+    "code": "XVIDEO",
+    "source_url": null,
+    "retry_count": 1,
+    "last_error": "Video title is required",
+    "last_attempt": "2026-01-27T13:20:52.840279"
+  },
+  {
+    "code": "EXTRACTION_TIME",
+    "source_url": null,
+    "retry_count": 1,
+    "last_error": "Video title is required",
+    "last_attempt": "2026-01-27T13:21:10.035236"
+  },
+  {
+    "code": "EXTRACTION_TIME_MINUTES",
+    "source_url": null,
+    "retry_count": 1,
+    "last_error": "Video title is required",
+    "last_attempt": "2026-01-27T13:21:27.676551"
+  },
+  {
+    "code": "WORKERS",
+    "source_url": null,
+    "retry_count": 1,
+    "last_error": "Video title is required",
+    "last_attempt": "2026-01-27T13:22:21.265078"
+  },
+  {
+    "code": "URLS",
+    "source_url": null,
+    "retry_count": 1,
+    "last_error": "Video title is required",
+    "last_attempt": "2026-01-27T13:22:38.180329"
+  }
+]

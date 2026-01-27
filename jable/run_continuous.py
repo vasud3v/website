@@ -1916,8 +1916,10 @@ def process_one_video(scraper, url, num, total):
         traceback.print_exc()
         
         # Cleanup on any exception
-        if code:
-            cleanup_and_release(code)
+        # Use locals().get() to avoid UnboundLocalError if code wasn't initialized
+        current_code = locals().get('code')
+        if current_code:
+            cleanup_and_release(current_code)
         
         # Clean up thumbnail if it exists locally
         if 'thumbnail_local' in locals() and thumbnail_local and os.path.exists(thumbnail_local):
