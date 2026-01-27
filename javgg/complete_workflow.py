@@ -79,13 +79,9 @@ class WorkflowManager:
     
     def scrape_new_videos(self, max_videos: int = 0) -> List[str]:
         """
-        Scrape new video URLs from JavaGG
+        Scrape new video URLs from JavaGG /new-post/ page
         max_videos: 0 = unlimited, otherwise limit to N videos
         Returns list of video URLs
-        
-        NOTE: JavaGG homepage is protected/blocked for bots.
-        For now, this returns an empty list. Videos should be added manually
-        or discovered through other means (RSS, sitemap, etc.)
         """
         print("\n" + "="*70)
         print("STEP 1: SCRAPING NEW VIDEOS FROM JAVGG")
@@ -95,17 +91,91 @@ class WorkflowManager:
             print(f"MODE: LIMITED - Processing up to {max_videos} videos")
         print("="*70)
         
-        # TODO: Implement alternative discovery methods:
-        # - RSS feed parsing
-        # - Sitemap parsing  
-        # - API if available
-        # - Manual video list
+        scraper = JavaGGScraper(headless=True)
+        new_urls = []
         
-        print("\n⚠️ Homepage scraping is blocked by JavaGG")
-        print("   Alternative methods needed (RSS, sitemap, manual list)")
-        print("   For now, returning empty list")
+        try:
+            # Initialize driver
+            scraper._init_driver()
+            
+            # Get latest videos from /new-post/ page
+            page = self.progress['last_scraped_page']
+            
+            # Keep scraping pages until we have enough videos or no more videos
+            while True:
+                print(f"\n📄 Scraping page {page}...")
+                
+                # Navigate to JavaGG new-post page
+                base_url = "https://javgg.net/new-post/"
+                if page > 1:
+                    base_url = f"https://javgg.net/new-post/page/{page}/"
+                
+                scraper.driver.get(base_url)
+                time.sleep(5)  # Wait for JavaScript to load
+                
+                # Scroll down to trigger lazy loading
+                scraper.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(2)
+                
+                # Find all video links
+                from bs4 import BeautifulSoup
+                soup = BeautifulSoup(scraper.driver.page_source, 'html.parser')
+                
+                # Look for links with /jav/ in them
+                video_links = soup.find_all('a', href=lambda x: x and '/jav/' in x)
+                
+                print(f"  Found {len(video_links)} video links")
+                
+                if not video_links or len(video_links) == 0:
+                    print(f"  ℹ️ No video links found on page {page}")
+                    break
+                
+                page_new_count = 0
+                for link in video_links:
+                    url = link.get('href')
+                    if url and url.startswith('http'):
+                        # Extract video code
+                        code = url.rstrip('/').split('/')[-1].upper()
+                        
+                        # Skip if already processed
+                        if code in self.progress['processed_videos']:
+                            continue
+                        
+                        # Skip if in failed list
+                        if code in self.progress['failed_videos']:
+                            continue
+                        
+                        new_urls.append(url)
+                        page_new_count += 1
+                        
+                        # Check if we've reached the limit (if set)
+                        if max_videos > 0 and len(new_urls) >= max_videos:
+                            break
+                
+                print(f"  ✅ Found {page_new_count} new videos on page {page}")
+                
+                # Update page number for next run
+                self.progress['last_scraped_page'] = page + 1
+                self.save_progress()
+                
+                # Check if we've reached the limit (if set)
+                if max_videos > 0 and len(new_urls) >= max_videos:
+                    break
+                
+                # If no new videos found on this page, we've caught up
+                if page_new_count == 0:
+                    print(f"  ℹ️ No new videos on page {page} - caught up!")
+                    break
+                
+                # Move to next page
+                page += 1
+            
+            print(f"\n✅ Total found: {len(new_urls)} new videos to process")
+            
+        finally:
+            scraper.close()
         
-        return []
+        return new_urls
     
     def download_video(self, video_url: str, video_code: str) -> Optional[str]:
         """
