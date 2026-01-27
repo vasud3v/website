@@ -206,6 +206,8 @@ class ContinuousWorkflow:
                 ['python', 'javmix/javmix_scraper.py', '--url', video_url, '--output', str(scraped_file)],
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',  # Replace invalid characters instead of crashing
                 timeout=120  # 2 minutes max for scraping
             )
             
@@ -308,6 +310,8 @@ class ContinuousWorkflow:
                     ],
                     capture_output=True,
                     text=True,
+                    encoding='utf-8',
+                    errors='replace',  # Replace invalid characters
                     timeout=1800  # 30 minutes max
                 )
                 
