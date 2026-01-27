@@ -17,11 +17,29 @@ import re
 import time
 import json
 import hashlib
+import sys
+import os
 from datetime import datetime
 from typing import Optional, List, Dict, Tuple
 from dataclasses import dataclass, asdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
+
+# Fix Windows console encoding for emoji support
+if sys.platform == 'win32':
+    try:
+        # Try to set UTF-8 encoding
+        if hasattr(sys.stdout, 'reconfigure'):
+            sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+            sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+        else:
+            # Fallback for older Python versions
+            import codecs
+            sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'replace')
+            sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'replace')
+    except Exception:
+        # If all else fails, just continue - emojis will be replaced with ?
+        pass
 
 from bs4 import BeautifulSoup
 from seleniumbase import Driver
@@ -140,13 +158,13 @@ class JavmixScraper:
         try:
             from deep_translator import GoogleTranslator
             self.translator = GoogleTranslator(source='ja', target='en')
-            print("  🌐 Translation service initialized")
+            print("  [i] Translation service initialized")
         except ImportError:
-            print("  ⚠️ deep-translator not installed. Install with: pip install deep-translator")
-            print("  ⚠️ Translations will be skipped")
+            print("  [!] deep-translator not installed. Install with: pip install deep-translator")
+            print("  [!] Translations will be skipped")
             self.translator = None
         except Exception as e:
-            print(f"  ⚠️ Translation service unavailable: {e}")
+            print(f"  [!] Translation service unavailable: {e}")
             self.translator = None
     
     def _translate_text(self, text: str, max_length: int = 5000) -> str:

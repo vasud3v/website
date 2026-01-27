@@ -18,6 +18,19 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
+# Fix Windows console encoding
+if sys.platform == 'win32':
+    try:
+        if hasattr(sys.stdout, 'reconfigure'):
+            sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+            sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+        else:
+            import codecs
+            sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'replace')
+            sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'replace')
+    except Exception:
+        pass
+
 # Add paths
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "javmix"))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "javdatabase"))
@@ -248,15 +261,18 @@ class ContinuousWorkflow:
             
             # Priority: iplayerhls > streamtape > others
             download_url = None
+            host_used = None
             for host in ['iplayerhls', 'streamtape', 'doodstream']:
                 if host in embed_urls:
                     download_url = embed_urls[host]
+                    host_used = host
                     break
             
             if not download_url:
                 # Get first available URL, but check if dict is not empty
                 if len(embed_urls) > 0:
-                    download_url = list(embed_urls.values())[0]
+                    host_used = list(embed_urls.keys())[0]
+                    download_url = embed_urls[host_used]
                 else:
                     safe_print(f"⚠️ Empty embed_urls dict for {code}")
                     return None
@@ -264,26 +280,24 @@ class ContinuousWorkflow:
             # Download using appropriate downloader
             output_file = self.download_dir / f"{safe_code}.mp4"
             
-            safe_print(f"  🔗 URL: {download_url}")
-            safe_print(f"  📦 Using {self.max_workers} parallel connections")
+            safe_print(f"  🔗 Host: {host_used}")
+            safe_print(f"  🔗 URL: {download_url[:80]}...")
             
-            # Try aria2c first (supports parallel chunk downloading)
+            # For embed URLs, we need to use yt-dlp which can extract the actual video
+            # aria2c won't work with embed pages
+            safe_print(f"  📦 Using yt-dlp with {min(self.max_workers, 16)} concurrent fragments")
+            
             try:
                 result = subprocess.run(
                     [
-                        'aria2c',
-                        '--max-connection-per-server=16',
-                        '--split=16',
-                        '--min-split-size=1M',
-                        '--max-concurrent-downloads=1',
-                        '--continue=true',
-                        '--max-tries=5',
-                        '--retry-wait=3',
-                        '--timeout=60',
-                        '--connect-timeout=30',
-                        '--allow-overwrite=true',
-                        '--auto-file-renaming=false',
-                        '--console-log-level=warn',
+                        'yt-dlp',
+                        '--concurrent-fragments', str(min(self.max_workers, 16)),
+                        '--retries', '10',
+                        '--fragment-retries', '10',
+                        '--no-part',
+                        '--no-check-certificate',  # Some hosts have SSL issues
+                        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                        '--referer', 'https://javmix.tv/',
                         '-o', str(output_file),
                         download_url
                     ],
@@ -293,34 +307,25 @@ class ContinuousWorkflow:
                 )
                 
                 if result.returncode == 0 and output_file.exists():
-                    safe_print(f"✅ Downloaded with aria2c: {code} ({output_file.stat().st_size / 1024 / 1024:.1f} MB)")
+                    file_size_mb = output_file.stat().st_size / 1024 / 1024
+                    safe_print(f"✅ Downloaded: {code} ({file_size_mb:.1f} MB)")
                     return str(output_file)
+                else:
+                    safe_print(f"❌ yt-dlp failed with code {result.returncode}: {code}")
+                    if result.stderr:
+                        # Show last 500 chars of error
+                        error_msg = result.stderr[-500:] if len(result.stderr) > 500 else result.stderr
+                        safe_print(f"   Error: {error_msg}")
+                    return None
+                    
+            except subprocess.TimeoutExpired:
+                safe_print(f"⏰ Download timeout (30min): {code}")
+                return None
             except FileNotFoundError:
-                safe_print(f"  ⚠️ aria2c not found, falling back to yt-dlp")
+                safe_print(f"❌ yt-dlp not found. Please install: pip install yt-dlp")
+                return None
             except Exception as e:
-                safe_print(f"  ⚠️ aria2c failed: {e}, falling back to yt-dlp")
-            
-            # Fallback to yt-dlp with concurrent fragments
-            result = subprocess.run(
-                [
-                    'yt-dlp',
-                    '--concurrent-fragments', str(min(self.max_workers, 16)),
-                    '--retries', '10',
-                    '--fragment-retries', '10',
-                    '--no-part',
-                    '-o', str(output_file),
-                    download_url
-                ],
-                capture_output=True,
-                text=True,
-                timeout=1800  # 30 minutes max
-            )
-            
-            if result.returncode == 0 and output_file.exists():
-                safe_print(f"✅ Downloaded with yt-dlp: {code} ({output_file.stat().st_size / 1024 / 1024:.1f} MB)")
-                return str(output_file)
-            else:
-                safe_print(f"❌ Failed to download: {code}")
+                safe_print(f"❌ Download error: {e}")
                 return None
                 
         except Exception as e:
@@ -457,6 +462,11 @@ class ContinuousWorkflow:
         code = video_data.get('code', 'unknown')
         
         try:
+            # Skip videos with unknown codes (no valid code extracted)
+            if code == 'unknown':
+                safe_print(f"⚠️ Skipping video with unknown code: {url[:80]}...")
+                return False
+            
             safe_print(f"\n{'='*70}")
             safe_print(f"🎯 Processing: {code}")
             safe_print(f"{'='*70}")
