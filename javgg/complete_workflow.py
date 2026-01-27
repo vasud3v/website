@@ -111,7 +111,11 @@ class WorkflowManager:
                     base_url = f"https://javgg.net/page/{page}/"
                 
                 scraper.driver.get(base_url)
-                time.sleep(3)
+                time.sleep(5)  # Wait longer for JavaScript to load
+                
+                # Scroll down to trigger lazy loading
+                scraper.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(2)
                 
                 # Find all video links
                 from bs4 import BeautifulSoup

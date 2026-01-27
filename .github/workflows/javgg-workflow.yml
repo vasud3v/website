@@ -15,6 +15,8 @@ jobs:
   process-videos:
     runs-on: ubuntu-latest
     timeout-minutes: 330  # 5.5 hours (safe margin before 6h limit)
+    permissions:
+      contents: write  # Allow pushing to repository
     
     steps:
       - name: Checkout repository
