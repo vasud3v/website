@@ -557,9 +557,20 @@ class JavaGGScraper:
             return VideoData(
                 code=code,
                 title=title,
-                thumbnail_url=thumbnail_url,
+                title_japanese="",
                 embed_url=embed_url,
-                m3u8_url=m3u8_url,
+                m3u8_url=m3u8_url or "",
+                thumbnail_url=thumbnail_url or "",
+                release_date="",
+                release_date_formatted="",
+                duration="",
+                duration_minutes=0,
+                studio="",
+                studio_japanese="",
+                director="",
+                series="",
+                models=[],
+                tags=[],
                 scraped_at=datetime.now().isoformat()
             )
             
@@ -582,30 +593,29 @@ class JavaGGScraper:
                 # Start loading (won't wait for full load due to page_load_strategy='none')
                 self.driver.get(video_url)
                 
-                # Wait minimal time for initial load
-                time.sleep(3)
-                
-                # Force stop page loading (like jable scraper)
-                try:
-                    self.driver.execute_script("window.stop();")
-                    print(f"  ✓ Stopped page load")
-                except:
-                    pass
-                
-                # Wait for body to appear
+                # Wait for body to appear first
                 print(f"  ⏳ Waiting for page body...")
-                for _ in range(10):  # 10 x 0.5s = 5 seconds max
+                body_loaded = False
+                for _ in range(20):  # 20 x 0.5s = 10 seconds max
                     try:
                         if self.driver.find_element("tag name", "body"):
                             print(f"  ✓ Page body loaded")
+                            body_loaded = True
                             break
                     except:
                         pass
                     time.sleep(0.5)
                 
-                # Wait for JavaScript to render (fixed time, no challenge waiting)
-                print(f"  ⏳ Waiting for content to render...")
-                time.sleep(5)
+                if not body_loaded:
+                    print(f"  ⚠️ Page body not loaded after 10s")
+                    return None
+                
+                # DON'T call window.stop() - let JavaScript execute!
+                # The page needs JS to inject iframes
+                
+                # Wait for JavaScript to execute and inject content
+                print(f"  ⏳ Waiting for JavaScript to execute...")
+                time.sleep(15)  # Increased from 8 to 15 - give JS more time!
                 
             except Exception as e:
                 print(f"  ⚠️ Page load error: {str(e)[:100]}")
