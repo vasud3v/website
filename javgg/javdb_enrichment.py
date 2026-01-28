@@ -12,7 +12,7 @@ from typing import Optional, Dict
 try:
     from javdb_scraper_improved import scrape_javdb_metadata, VideoMetadata
     JAVDB_AVAILABLE = True
-    print("✓ Using improved JAVDatabase scraper")
+    print("[OK] Using improved JAVDatabase scraper")
 except ImportError:
     # Fallback to original scraper
     javdb_path = Path(__file__).parent.parent / "javdatabase"

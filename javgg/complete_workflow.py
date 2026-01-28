@@ -15,6 +15,7 @@ import sys
 import json
 import time
 import shutil
+import subprocess
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Optional
@@ -91,12 +92,15 @@ class WorkflowManager:
             print(f"MODE: LIMITED - Processing up to {max_videos} videos")
         print("="*70)
         
+        print("\nInitializing scraper...")
         scraper = JavaGGScraper(headless=True)
         new_urls = []
         
         try:
+            print("Initializing browser driver...")
             # Initialize driver
             scraper._init_driver()
+            print("Browser driver ready!")
             
             # Get latest videos from /new-post/ page
             page = self.progress['last_scraped_page']
@@ -111,11 +115,11 @@ class WorkflowManager:
                     base_url = f"https://javgg.net/new-post/page/{page}/"
                 
                 scraper.driver.get(base_url)
-                time.sleep(5)  # Wait for JavaScript to load
+                time.sleep(3)  # Reduced from 5 to 3 seconds
                 
                 # Scroll down to trigger lazy loading
                 scraper.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(2)
+                time.sleep(1)  # Reduced from 2 to 1 second
                 
                 # Find all video links
                 from bs4 import BeautifulSoup
@@ -133,20 +137,27 @@ class WorkflowManager:
                 page_new_count = 0
                 for link in video_links:
                     url = link.get('href')
-                    if url and url.startswith('http'):
+                    if url:
+                        # Make sure URL is absolute
+                        if not url.startswith('http'):
+                            url = 'https://javgg.net' + url if url.startswith('/') else 'https://javgg.net/' + url
+                        
                         # Extract video code
                         code = url.rstrip('/').split('/')[-1].upper()
                         
                         # Skip if already processed
                         if code in self.progress['processed_videos']:
+                            print(f"  ⏭️ Skipping {code} (already processed)")
                             continue
                         
                         # Skip if in failed list
                         if code in self.progress['failed_videos']:
+                            print(f"  ⏭️ Skipping {code} (previously failed)")
                             continue
                         
                         new_urls.append(url)
                         page_new_count += 1
+                        print(f"  ✅ Added: {code}")
                         
                         # Check if we've reached the limit (if set)
                         if max_videos > 0 and len(new_urls) >= max_videos:
@@ -154,18 +165,23 @@ class WorkflowManager:
                 
                 print(f"  ✅ Found {page_new_count} new videos on page {page}")
                 
-                # Update page number for next run
-                self.progress['last_scraped_page'] = page + 1
-                self.save_progress()
-                
                 # Check if we've reached the limit (if set)
                 if max_videos > 0 and len(new_urls) >= max_videos:
+                    # Don't increment page - we'll continue from here next time
+                    print(f"  ℹ️ Reached max_videos limit, staying on page {page}")
                     break
                 
                 # If no new videos found on this page, we've caught up
                 if page_new_count == 0:
                     print(f"  ℹ️ No new videos on page {page} - caught up!")
+                    # Move to next page since this one is done
+                    self.progress['last_scraped_page'] = page + 1
+                    self.save_progress()
                     break
+                
+                # All videos on this page were processed, move to next page
+                self.progress['last_scraped_page'] = page + 1
+                self.save_progress()
                 
                 # Move to next page
                 page += 1
@@ -179,7 +195,7 @@ class WorkflowManager:
     
     def download_video(self, video_url: str, video_code: str) -> Optional[str]:
         """
-        Download video trying multiple servers
+        Download video trying multiple methods
         Returns path to downloaded video file
         """
         print(f"\n📥 Downloading video: {video_code}")
@@ -194,34 +210,56 @@ class WorkflowManager:
                 print(f"❌ Failed to scrape video metadata")
                 return None
             
-            # Try to download using m3u8 or embed URL
             video_file = self.download_dir / f"{video_code}.mp4"
             
-            # Use yt-dlp to download
-            import subprocess
+            # Skip download if file already exists and is large enough
+            if video_file.exists() and video_file.stat().st_size > 10 * 1024 * 1024:  # > 10MB
+                print(f"  ✅ Already downloaded: {video_file.name} ({video_file.stat().st_size / 1024 / 1024:.1f} MB)")
+                return str(video_file)
             
-            download_url = video_data.m3u8_url or video_data.embed_url
-            
+            download_url = video_data.embed_url
             print(f"  🔗 Download URL: {download_url[:60]}...")
             
+            # Method 1: Try yt-dlp with embed URL
+            print(f"  📥 Trying yt-dlp...")
             cmd = [
                 'yt-dlp',
                 '-o', str(video_file),
                 '--no-warnings',
                 '--quiet',
-                '--concurrent-fragments', '32',  # 32 parallel workers for faster downloads
+                '--no-check-certificate',
+                '--concurrent-fragments', '16',
                 download_url
             ]
             
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
             
-            if result.returncode == 0 and video_file.exists():
+            if result.returncode == 0 and video_file.exists() and video_file.stat().st_size > 1024 * 1024:
                 print(f"  ✅ Downloaded: {video_file.name} ({video_file.stat().st_size / 1024 / 1024:.1f} MB)")
                 return str(video_file)
-            else:
-                print(f"  ❌ Download failed: {result.stderr}")
-                return None
+            
+            # Method 2: Try gallery-dl
+            print(f"  📥 Trying gallery-dl...")
+            cmd = [
+                'gallery-dl',
+                '--filename', video_code + '.mp4',
+                '--destination', str(self.download_dir),
+                download_url
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            
+            if result.returncode == 0 and video_file.exists() and video_file.stat().st_size > 1024 * 1024:
+                print(f"  ✅ Downloaded: {video_file.name} ({video_file.stat().st_size / 1024 / 1024:.1f} MB)")
+                return str(video_file)
+            
+            print(f"  ❌ All download methods failed")
+            print(f"     yt-dlp error: {result.stderr[:100] if result.stderr else 'Unknown'}")
+            return None
                 
+        except subprocess.TimeoutExpired:
+            print(f"  ❌ Download timeout (5 minutes)")
+            return None
         except Exception as e:
             print(f"  ❌ Error downloading: {str(e)}")
             return None
@@ -539,10 +577,14 @@ class WorkflowManager:
         else:
             print(f"Mode: LIMITED - Processing up to {max_videos} videos")
         
+        print("\nChecking pending enrichments...")
         # Retry pending enrichments first
         if self.progress['pending_enrichment']:
             self.retry_pending_enrichments()
+        else:
+            print("  No pending enrichments")
         
+        print("\nStarting video scraping...")
         # Scrape new videos
         video_urls = self.scrape_new_videos(max_videos)
         

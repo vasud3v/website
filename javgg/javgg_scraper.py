@@ -70,7 +70,7 @@ class JavaGGScraper:
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
             options.add_argument('--disable-software-rasterizer')
-            options.page_load_strategy = 'eager'  # Don't wait for full page load
+            options.page_load_strategy = 'eager'
             options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
             
             driver = webdriver.Chrome(options=options)
@@ -81,56 +81,88 @@ class JavaGGScraper:
             try:
                 driver.get(embed_url)
             except Exception as e:
-                # Page load timeout is OK, we just need the initial content
                 if 'timeout' not in str(e).lower():
                     raise
             
-            time.sleep(3)
+            time.sleep(5)  # Wait longer for page to load
             
-            # Trigger video play using JavaScript
+            # Try multiple methods to trigger video and find M3U8
             print(f"  ▶️ Triggering video play...")
+            
+            # Method 1: Click play button
             try:
-                # Try to find and play video
+                driver.execute_script("""
+                    var playBtn = document.querySelector('.vjs-big-play-button, .play-button, button[aria-label*="Play"]');
+                    if (playBtn) playBtn.click();
+                """)
+                time.sleep(2)
+            except:
+                pass
+            
+            # Method 2: Play video element directly
+            try:
                 driver.execute_script("""
                     var video = document.querySelector('video');
                     if (video) {
+                        video.muted = true;
                         video.play();
-                        return true;
                     }
-                    return false;
                 """)
-                print(f"  ✅ Video play triggered")
-                time.sleep(5)  # Wait for M3U8 to load
-            except Exception as e:
-                print(f"  ⚠️ Could not trigger play: {e}")
                 time.sleep(3)
+            except:
+                pass
             
-            # Check logs for M3U8
-            print(f"  🔍 Checking network logs...")
+            # Method 3: Check for jwplayer
             try:
-                logs = driver.get_log('performance')
-                
-                for log in logs:
-                    try:
-                        message = json.loads(log['message'])
-                        method = message.get('message', {}).get('method', '')
-                        
-                        if method == 'Network.responseReceived':
-                            response = message.get('message', {}).get('params', {}).get('response', {})
-                            url = response.get('url', '')
+                driver.execute_script("""
+                    if (typeof jwplayer !== 'undefined') {
+                        var player = jwplayer();
+                        if (player) player.play();
+                    }
+                """)
+                time.sleep(2)
+            except:
+                pass
+            
+            print(f"  🔍 Checking network logs for M3U8...")
+            
+            # Wait and check logs multiple times
+            m3u8_url = None
+            for attempt in range(3):
+                try:
+                    logs = driver.get_log('performance')
+                    
+                    for log in logs:
+                        try:
+                            message = json.loads(log['message'])
+                            method = message.get('message', {}).get('method', '')
                             
-                            if 'master.m3u8' in url or ('.m3u8' in url and 'stream' in url):
-                                print(f"  ✅ Found M3U8: {url[:80]}...")
-                                driver.quit()
-                                return url
-                    except:
-                        continue
-            except Exception as e:
-                print(f"  ⚠️ Log check error: {e}")
+                            if method == 'Network.responseReceived':
+                                response = message.get('message', {}).get('params', {}).get('response', {})
+                                url = response.get('url', '')
+                                
+                                # Look for M3U8 URLs
+                                if '.m3u8' in url:
+                                    print(f"  ✅ Found M3U8: {url[:80]}...")
+                                    m3u8_url = url
+                                    break
+                        except:
+                            continue
+                    
+                    if m3u8_url:
+                        break
+                    
+                    time.sleep(2)
+                except:
+                    pass
             
             driver.quit()
-            print(f"  ℹ️ No M3U8 found, will use embed URL directly")
-            return None
+            
+            if m3u8_url:
+                return m3u8_url
+            else:
+                print(f"  ⚠️ No M3U8 found in network logs")
+                return None
             
         except Exception as e:
             error_msg = str(e)[:100]
@@ -161,7 +193,7 @@ class JavaGGScraper:
             
             # Load page
             self.driver.get(video_url)
-            time.sleep(5)
+            time.sleep(3)  # Reduced from 5 to 3 seconds
             
             soup = BeautifulSoup(self.driver.page_source, 'html.parser')
             
@@ -214,11 +246,10 @@ class JavaGGScraper:
                 print(f"  ❌ No embed URL found")
                 return None
             
-            # Extract M3U8 URL from embed (optional - yt-dlp can handle embeds directly)
-            m3u8_url = self._extract_m3u8_from_embed(embed_url)
-            if not m3u8_url:
-                print(f"  ℹ️ Using embed URL directly (yt-dlp will extract)")
-                m3u8_url = embed_url  # yt-dlp can extract from embed URLs
+            # Skip M3U8 extraction - just use embed URL
+            # yt-dlp and other tools can often extract from embed pages
+            m3u8_url = embed_url
+            print(f"  ℹ️ Will use embed URL for download")
             
             # Extract thumbnail
             thumbnail_url = ""

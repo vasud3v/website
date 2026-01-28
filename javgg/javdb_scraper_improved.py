@@ -64,7 +64,7 @@ def scrape_actress_profile(actress_url: str, driver) -> Dict:
     try:
         print(f"       Fetching actress profile: {actress_url}")
         driver.get(actress_url)
-        time.sleep(1.5)
+        time.sleep(1)  # Reduced from 1.5 to 1 second
         
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         page_text = soup.get_text()
@@ -251,7 +251,7 @@ def scrape_javdb_metadata(video_code: str, headless: bool = True, fetch_actress_
     try:
         print(f"  🌐 Initializing browser...")
         driver = Driver(uc=True, headless=headless, incognito=True)
-        time.sleep(2)
+        time.sleep(1)  # Reduced from 2 to 1 second
         print(f"  ✅ Browser ready")
         
         # Convert code to URL format
@@ -260,7 +260,7 @@ def scrape_javdb_metadata(video_code: str, headless: bool = True, fetch_actress_
         
         print(f"  📄 Loading: {direct_url}")
         driver.get(direct_url)
-        time.sleep(3)
+        time.sleep(2)  # Reduced from 3 to 2 seconds
         
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         
