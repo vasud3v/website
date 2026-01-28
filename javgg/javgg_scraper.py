@@ -9,6 +9,7 @@ import time
 import json
 import os
 import subprocess
+import requests
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List
@@ -163,130 +164,177 @@ class JavaGGScraper:
         else:
             self.driver = webdriver.Chrome(options=options)
     
+    def _unpack_js(self, p, a, c, k):
+        """Unpack JavaScript packed with Dean Edwards' packer"""
+        
+        def base_repr(num, base):
+            """Convert number to base representation"""
+            if num == 0:
+                return '0'
+            
+            digits = '0123456789abcdefghijklmnopqrstuvwxyz'
+            result = ''
+            
+            while num > 0:
+                result = digits[num % base] + result
+                num //= base
+            
+            return result
+        
+        # Replace tokens from highest to lowest
+        while c > 0:
+            c -= 1
+            if c < len(k) and k[c]:
+                # Get the token representation in the given base
+                token = base_repr(c, a) if c >= a else str(c)
+                # Replace with word boundaries
+                pattern = r'\b' + re.escape(token) + r'\b'
+                p = re.sub(pattern, k[c], p)
+        
+        return p
+    
     def _extract_m3u8_from_embed(self, embed_url: str) -> Optional[str]:
-        """Extract M3U8 URL from embed page - IMPROVED VERSION"""
+        """Extract M3U8 URL from embed page - REQUESTS-BASED VERSION"""
         print(f"  🔍 Extracting M3U8 from embed...")
         
-        # Use the main driver instead of creating a new one
+        # Use requests instead of Selenium to bypass anti-bot protection
         try:
-            print(f"  📄 Loading embed page...")
-            self.driver.get(embed_url)
+            print(f"  📄 Fetching embed page with requests...")
             
-            # Wait for video player to initialize
-            time.sleep(5)
+            # Set up headers to mimic a real browser
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Referer': 'https://javgg.net/',
+            }
             
-            # Try to play the video to trigger M3U8 loading
-            print(f"  ▶️ Triggering video play...")
-            try:
-                self.driver.execute_script("""
-                    // Try multiple methods to play video
-                    var video = document.querySelector('video');
-                    if (video) {
-                        video.muted = true;
-                        video.play();
-                    }
-                    
-                    // Try jwplayer
-                    if (typeof jwplayer !== 'undefined') {
-                        try {
-                            jwplayer().play();
-                        } catch(e) {}
-                    }
-                    
-                    // Try videojs
-                    if (typeof videojs !== 'undefined') {
-                        try {
-                            var player = videojs('video');
-                            player.play();
-                        } catch(e) {}
-                    }
-                    
-                    // Click play button
-                    var playBtn = document.querySelector('.vjs-big-play-button, .play-button, button[aria-label*="Play"]');
-                    if (playBtn) playBtn.click();
-                """)
-                time.sleep(3)
-            except Exception as e:
-                print(f"  ⚠️ Could not trigger play: {str(e)[:50]}")
+            # Create session for connection pooling
+            session = requests.Session()
             
-            # Method 1: Check page source for M3U8 URLs
-            print(f"  🔍 Checking page source...")
-            page_source = self.driver.page_source
+            # Fetch the embed page
+            response = session.get(embed_url, headers=headers, timeout=15)
+            response.raise_for_status()
             
-            # Look for M3U8 URLs with various patterns
+            # Handle gzip compression manually if needed
+            page_source = response.text
+            
+            # If response looks binary/corrupted, try to decompress
+            if len(page_source) < 1000 or not '<' in page_source[:100]:
+                try:
+                    import gzip
+                    page_source = gzip.decompress(response.content).decode('utf-8')
+                    print(f"  ✅ Decompressed gzip content")
+                except:
+                    # Not gzipped or decompression failed
+                    page_source = response.content.decode('utf-8', errors='ignore')
+            
+            print(f"  ✅ Fetched {len(page_source)} bytes")
+            
+            # Look for packed JavaScript
+            print(f"  🔍 Searching for packed JavaScript...")
+            packed_pattern = r"eval\(function\(p,a,c,k,e,d\)\{[^}]+\}\('(.+?)',(\d+),(\d+),'(.+?)'\.split\('\|'\)\)\)"
+            
+            match = re.search(packed_pattern, page_source, re.DOTALL)
+            
+            if match:
+                print(f"  ✅ Found packed JavaScript")
+                
+                # Extract components
+                p = match.group(1)  # The packed code
+                a = int(match.group(2))  # Base (usually 36)
+                c = int(match.group(3))  # Count
+                k = match.group(4).split('|')  # Dictionary
+                
+                print(f"  🔓 Unpacking (base={a}, count={c})...")
+                
+                # Unpack
+                deobfuscated = self._unpack_js(p, a, c, k)
+                
+                print(f"  ✅ Deobfuscated {len(deobfuscated)} bytes")
+                
+                # Look for M3U8 URLs in deobfuscated code
+                print(f"  🔍 Searching for M3U8 URLs...")
+                m3u8_patterns = [
+                    r'(https?://[^\s"\'<>]+\.m3u8[^\s"\'<>]*)',
+                    r'"(https?://[^"]+\.m3u8[^"]*)"',
+                    r"'(https?://[^']+\.m3u8[^']*)'",
+                    r':\s*"([^"]+\.m3u8[^"]*)"',
+                ]
+                
+                found_urls = []
+                for pattern in m3u8_patterns:
+                    m3u8_matches = re.findall(pattern, deobfuscated, re.IGNORECASE)
+                    if m3u8_matches:
+                        for m3u8_match in m3u8_matches:
+                            if isinstance(m3u8_match, tuple):
+                                m3u8_url = m3u8_match[-1] if m3u8_match[-1] else m3u8_match[0]
+                            else:
+                                m3u8_url = m3u8_match
+                            
+                            if m3u8_url and '.m3u8' in m3u8_url:
+                                # Make URL absolute if needed
+                                if m3u8_url.startswith('//'):
+                                    m3u8_url = 'https:' + m3u8_url
+                                elif m3u8_url.startswith('/'):
+                                    # Relative to embed domain
+                                    from urllib.parse import urlparse
+                                    parsed = urlparse(embed_url)
+                                    m3u8_url = f"{parsed.scheme}://{parsed.netloc}{m3u8_url}"
+                                
+                                if m3u8_url.startswith('http') and m3u8_url not in found_urls:
+                                    found_urls.append(m3u8_url)
+                
+                if found_urls:
+                    # Return the first URL (usually the best quality)
+                    print(f"  ✅ Found {len(found_urls)} M3U8 URL(s)")
+                    for i, url in enumerate(found_urls, 1):
+                        print(f"     [{i}] {url[:80]}...")
+                    return found_urls[0]
+            
+            # Fallback: Try to find M3U8 URLs directly in page source
+            print(f"  🔍 Checking page source directly...")
             m3u8_patterns = [
-                r'(https?://[^\s"\'<>]+\.m3u8[^\s"\'<>]*)',  # Standard M3U8
-                r'"(https?://[^"]+\.m3u8[^"]*)"',  # In quotes
-                r"'(https?://[^']+\.m3u8[^']*)'",  # In single quotes
-                r'src["\s:=]+(["\'])(https?://[^"\']+\.m3u8[^"\']*)\1',  # src attribute
-                r'file["\s:=]+(["\'])(https?://[^"\']+\.m3u8[^"\']*)\1',  # file attribute
+                r'(https?://[^\s"\'<>]+\.m3u8[^\s"\'<>]*)',
+                r'"(https?://[^"]+\.m3u8[^"]*)"',
+                r"'(https?://[^']+\.m3u8[^']*)'",
             ]
             
             for pattern in m3u8_patterns:
                 matches = re.findall(pattern, page_source, re.IGNORECASE)
-                if matches:
-                    # Handle tuple results from patterns with groups
-                    for match in matches:
-                        if isinstance(match, tuple):
-                            m3u8_url = match[-1]  # Get last group
-                        else:
-                            m3u8_url = match
-                        
-                        if m3u8_url and '.m3u8' in m3u8_url:
-                            print(f"  ✅ Found M3U8 in page source: {m3u8_url[:80]}...")
-                            return m3u8_url
-            
-            # Method 2: Check JavaScript variables
-            print(f"  🔍 Checking JavaScript variables...")
-            try:
-                m3u8_url = self.driver.execute_script("""
-                    // Check common variable names
-                    if (typeof videoUrl !== 'undefined') return videoUrl;
-                    if (typeof video_url !== 'undefined') return video_url;
-                    if (typeof streamUrl !== 'undefined') return streamUrl;
-                    if (typeof stream_url !== 'undefined') return stream_url;
-                    if (typeof sources !== 'undefined' && sources.length > 0) return sources[0].src || sources[0].file;
+                for match in matches:
+                    if isinstance(match, tuple):
+                        m3u8_url = match[-1]
+                    else:
+                        m3u8_url = match
                     
-                    // Check video element src
-                    var video = document.querySelector('video');
-                    if (video && video.src) return video.src;
-                    if (video && video.currentSrc) return video.currentSrc;
-                    
-                    // Check source elements
-                    var source = document.querySelector('video source');
-                    if (source && source.src) return source.src;
-                    
-                    return null;
-                """)
-                
-                if m3u8_url and '.m3u8' in m3u8_url:
-                    print(f"  ✅ Found M3U8 in JavaScript: {m3u8_url[:80]}...")
-                    return m3u8_url
-            except Exception as e:
-                print(f"  ⚠️ JavaScript check failed: {str(e)[:50]}")
-            
-            # Method 3: Check network requests (if available)
-            print(f"  🔍 Checking network logs...")
-            try:
-                logs = self.driver.get_log('performance')
-                for log in logs:
-                    try:
-                        message = json.loads(log['message'])
-                        if message.get('message', {}).get('method') == 'Network.responseReceived':
-                            url = message.get('message', {}).get('params', {}).get('response', {}).get('url', '')
-                            if '.m3u8' in url:
-                                print(f"  ✅ Found M3U8 in network logs: {url[:80]}...")
-                                return url
-                    except:
-                        continue
-            except Exception as e:
-                print(f"  ⚠️ Network log check failed: {str(e)[:50]}")
+                    if m3u8_url and '.m3u8' in m3u8_url and m3u8_url.startswith('http'):
+                        print(f"  ✅ Found M3U8 in page source: {m3u8_url[:80]}...")
+                        return m3u8_url
             
             print(f"  ⚠️ No M3U8 URL found")
+            
+            # Save for debugging
+            debug_file = os.path.join(self.download_dir, 'embed_page_debug.html')
+            with open(debug_file, 'w', encoding='utf-8') as f:
+                f.write(page_source)
+            print(f"  💾 Saved embed page to {debug_file}")
+            
             return None
             
+        except requests.exceptions.Timeout:
+            print(f"  ❌ Request timeout after 15 seconds")
+            return None
+        except requests.exceptions.RequestException as e:
+            print(f"  ❌ Request error: {str(e)[:100]}")
+            return None
         except Exception as e:
             print(f"  ❌ M3U8 extraction error: {str(e)[:100]}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def scrape_video(self, video_url: str) -> Optional[VideoData]:

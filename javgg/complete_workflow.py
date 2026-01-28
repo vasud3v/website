@@ -500,10 +500,10 @@ class WorkflowManager:
             
             # Try HLS downloader first if we have M3U8 URL
             if video_data.m3u8_url and '.m3u8' in video_data.m3u8_url:
-                print(f"  📥 Using HLS downloader...")
+                print(f"  📥 Using advanced HLS downloader (18 workers + anti-throttling)...")
                 try:
-                    from hls_downloader import JavaGGHLSDownloader
-                    hls_dl = JavaGGHLSDownloader(max_workers=16)
+                    from hls_downloader_advanced import AdvancedHLSDownloader
+                    hls_dl = AdvancedHLSDownloader(max_workers=18)
                     
                     # Download with timeout
                     import signal
@@ -511,13 +511,13 @@ class WorkflowManager:
                     def timeout_handler(signum, frame):
                         raise TimeoutError("HLS download timeout")
                     
-                    # Set 10 minute timeout (only on Unix)
+                    # Set 15 minute timeout (only on Unix)
                     if hasattr(signal, 'SIGALRM'):
                         signal.signal(signal.SIGALRM, timeout_handler)
-                        signal.alarm(600)  # 10 minutes
+                        signal.alarm(900)  # 15 minutes
                     
                     try:
-                        download_success = hls_dl.download(video_data.m3u8_url, str(video_file))
+                        download_success = hls_dl.download(video_data.m3u8_url, str(video_file), code=video_code)
                     finally:
                         if hasattr(signal, 'SIGALRM'):
                             signal.alarm(0)  # Cancel alarm
@@ -540,7 +540,7 @@ class WorkflowManager:
                         print(f"  ⚠️ HLS download failed")
                         
                 except TimeoutError:
-                    print(f"  ⚠️ HLS download timeout (10 minutes)")
+                    print(f"  ⚠️ HLS download timeout (15 minutes)")
                     if video_file.exists():
                         video_file.unlink()
                 except Exception as e:
@@ -584,7 +584,7 @@ class WorkflowManager:
                 )
                 
                 # Show visual progress bar
-                print(f"     ", end='', flush=True)
+                print(f"  ", end='', flush=True)
                 last_percent = 0
                 bar_width = 50
                 
@@ -608,14 +608,14 @@ class WorkflowManager:
                     # If no progress after initial timeout, kill it
                     if not has_progress and elapsed > initial_timeout:
                         process.kill()
-                        print(f"\n  ❌ No download started after {initial_timeout} seconds")
+                        print(f"\r  ❌ No download started after {initial_timeout} seconds{' ' * 30}")
                         print(f"  ⚠️ This embed URL may not be supported by yt-dlp")
                         return None
                     
                     # Check total timeout
                     if elapsed > download_timeout:
                         process.kill()
-                        print(f"\n  ❌ Download timeout ({download_timeout//60} minutes)")
+                        print(f"\r  ❌ Download timeout ({download_timeout//60} minutes){' ' * 30}")
                         return None
                     
                     line = line.strip()
@@ -624,18 +624,32 @@ class WorkflowManager:
                             downloaded, total = line.split('/')
                             percent = int((int(downloaded) / int(total)) * 100)
                             
-                            # Update progress bar every 2%
-                            if percent >= last_percent + 2:
+                            # Update progress bar every 1%
+                            if percent > last_percent:
                                 filled = int(bar_width * percent / 100)
                                 bar = '█' * filled + '░' * (bar_width - filled)
-                                print(f"\r     [{bar}] {percent}%", end='', flush=True)
+                                
+                                # Calculate speed and ETA
+                                if elapsed > 0:
+                                    speed_bps = int(downloaded) / elapsed
+                                    speed_mbps = speed_bps / (1024 * 1024)
+                                    remaining_bytes = int(total) - int(downloaded)
+                                    eta_seconds = remaining_bytes / speed_bps if speed_bps > 0 else 0
+                                    eta_min = int(eta_seconds // 60)
+                                    eta_sec = int(eta_seconds % 60)
+                                    
+                                    status = f"\r  [{bar}] {percent}% | {speed_mbps:.1f} MB/s | ETA {eta_min}:{eta_sec:02d}"
+                                else:
+                                    status = f"\r  [{bar}] {percent}%"
+                                
+                                print(status, end='', flush=True)
                                 last_percent = percent
                         except:
                             pass
                 
                 # Complete the progress bar
                 bar = '█' * bar_width
-                print(f"\r     [{bar}] 100%")
+                print(f"\r  [{bar}] 100% | Complete{' ' * 30}")
                 
                 process.wait(timeout=10)  # Wait up to 10 more seconds for process to finish
                 result_code = process.returncode
