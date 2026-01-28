@@ -57,12 +57,22 @@ class JavaGGScraper:
         if self.driver is None:
             print("🌐 Initializing browser...")
             
+            # Skip undetected-chromedriver in CI environments (doesn't work well)
+            is_ci = os.environ.get('CI') == 'true' or os.environ.get('GITHUB_ACTIONS') == 'true'
+            
             # Try multiple initialization methods
-            methods = [
-                self._init_with_uc_driver,
-                self._init_with_standard_chrome,
-                self._init_with_chromium
-            ]
+            if is_ci:
+                print("  ℹ️ CI environment detected, using standard Chrome")
+                methods = [
+                    self._init_with_standard_chrome,
+                    self._init_with_chromium
+                ]
+            else:
+                methods = [
+                    self._init_with_uc_driver,
+                    self._init_with_standard_chrome,
+                    self._init_with_chromium
+                ]
             
             last_error = None
             for method in methods:
