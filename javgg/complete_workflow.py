@@ -287,21 +287,35 @@ class WorkflowManager:
                 '--concurrent-fragments', '16',
                 '--retries', '5',
                 '--fragment-retries', '5',
+                '--progress',  # Show progress
+                '--newline',   # Each progress on new line
                 download_url
             ]
             
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+            # Run with real-time output
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1
+            )
             
-            if result.returncode == 0 and video_file.exists() and video_file.stat().st_size > 1024 * 1024:
+            # Print progress in real-time
+            for line in process.stdout:
+                line = line.strip()
+                if line and ('[download]' in line or '%' in line or 'ETA' in line):
+                    print(f"     {line}")
+            
+            process.wait()
+            result_code = process.returncode
+            
+            if result_code == 0 and video_file.exists() and video_file.stat().st_size > 1024 * 1024:
                 print(f"  ✅ Downloaded: {video_file.name} ({video_file.stat().st_size / 1024 / 1024:.1f} MB)")
                 return str(video_file)
             
             # If yt-dlp failed, log the error
             print(f"  ❌ yt-dlp failed")
-            if result.stderr:
-                error_lines = result.stderr.strip().split('\n')
-                print(f"     Error: {error_lines[-1][:100]}")  # Show last line of error
-            
             print(f"  ⚠️ Download not supported for this embed type")
             return None
                 
@@ -401,18 +415,31 @@ class WorkflowManager:
         try:
             # Upload full video to all hosting sites
             print(f"\n  📤 Uploading full video to hosting sites...")
+            print(f"     File: {os.path.basename(video_file)}")
+            print(f"     Size: {os.path.getsize(video_file) / 1024 / 1024:.1f} MB")
+            
             uploader = MultiHostUploader()
+            
+            # Show which hosts are configured
+            if uploader.uploaders:
+                print(f"     Hosts: {', '.join(uploader.uploaders.keys())}")
+            else:
+                print(f"     ⚠️ No upload hosts configured (check .env file)")
+            
             results = uploader.upload_to_all(video_file, title=video_code)
             
             # Extract URLs from results
             hosting_urls = {}
             for host, result in results.items():
                 if result.get('success'):
+                    print(f"     ✅ {host}: Success")
                     hosting_urls[host] = {
                         'embed_url': result.get('embed_url', ''),
                         'download_url': result.get('download_url', ''),
                         'file_code': result.get('file_code', '')
                     }
+                else:
+                    print(f"     ❌ {host}: Failed")
             
             urls['hosting'] = hosting_urls
             print(f"  ✅ Uploaded to {len(hosting_urls)} hosting sites")
