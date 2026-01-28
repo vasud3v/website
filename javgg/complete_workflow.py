@@ -104,10 +104,13 @@ class WorkflowManager:
             
             # Get latest videos from /new-post/ page
             page = self.progress['last_scraped_page']
+            max_pages = 10  # Limit to 10 pages per run to avoid timeout
+            pages_scraped = 0
             
             # Keep scraping pages until we have enough videos or no more videos
-            while True:
-                print(f"\n📄 Scraping page {page}...")
+            while pages_scraped < max_pages:
+                pages_scraped += 1
+                print(f"\n📄 Scraping page {page}... ({pages_scraped}/{max_pages})")
                 
                 # Navigate to JavaGG new-post page
                 base_url = "https://javgg.net/new-post/"
@@ -179,6 +182,8 @@ class WorkflowManager:
                     break
                 
                 page_new_count = 0
+                seen_codes = set()  # Track codes we've already added from this page
+                
                 for link in video_links:
                     url = link.get('href')
                     if url:
@@ -189,17 +194,24 @@ class WorkflowManager:
                         # Extract video code
                         code = url.rstrip('/').split('/')[-1].upper()
                         
+                        # Skip duplicates from same page
+                        if code in seen_codes:
+                            continue
+                        
                         # Skip if already processed
                         if code in self.progress['processed_videos']:
-                            print(f"  ⏭️ Skipping {code} (already processed)")
                             continue
                         
                         # Skip if in failed list
                         if code in self.progress['failed_videos']:
-                            print(f"  ⏭️ Skipping {code} (previously failed)")
+                            continue
+                        
+                        # Skip if already in new_urls (from previous pages)
+                        if url in new_urls:
                             continue
                         
                         new_urls.append(url)
+                        seen_codes.add(code)
                         page_new_count += 1
                         print(f"  ✅ Added: {code}")
                         
@@ -231,6 +243,7 @@ class WorkflowManager:
                 page += 1
             
             print(f"\n✅ Total found: {len(new_urls)} new videos to process")
+            print(f"   Scraped {pages_scraped} pages")
             
         finally:
             scraper.close()
