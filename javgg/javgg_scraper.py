@@ -76,8 +76,30 @@ class JavaGGScraper:
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
             options.add_argument('--disable-software-rasterizer')
+            options.add_argument('--headless')
             options.page_load_strategy = 'eager'
             options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
+            
+            # Try to find Chrome binary (GitHub Actions uses chromium-browser)
+            import shutil
+            chrome_paths = [
+                '/usr/bin/chromium-browser',  # GitHub Actions
+                '/usr/bin/chromium',
+                '/usr/bin/google-chrome',
+                '/usr/bin/chrome',
+                shutil.which('chromium-browser'),
+                shutil.which('chromium'),
+                shutil.which('google-chrome'),
+            ]
+            
+            chrome_binary = None
+            for path in chrome_paths:
+                if path and os.path.exists(path):
+                    chrome_binary = path
+                    break
+            
+            if chrome_binary:
+                options.binary_location = chrome_binary
             
             driver = webdriver.Chrome(options=options)
             driver.set_page_load_timeout(30)
