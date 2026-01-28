@@ -274,48 +274,39 @@ class WorkflowManager:
                 print(f"  ✅ Already downloaded: {video_file.name} ({video_file.stat().st_size / 1024 / 1024:.1f} MB)")
                 return str(video_file)
             
-            download_url = video_data.embed_url
+            download_url = video_data.m3u8_url or video_data.embed_url
             print(f"  🔗 Download URL: {download_url[:60]}...")
             
-            # Method 1: Try yt-dlp with embed URL
-            print(f"  📥 Trying yt-dlp...")
+            # Try yt-dlp with stream URL
+            print(f"  📥 Attempting download with yt-dlp...")
             cmd = [
                 'yt-dlp',
                 '-o', str(video_file),
                 '--no-warnings',
-                '--quiet',
                 '--no-check-certificate',
                 '--concurrent-fragments', '16',
+                '--retries', '5',
+                '--fragment-retries', '5',
                 download_url
             ]
             
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
             
             if result.returncode == 0 and video_file.exists() and video_file.stat().st_size > 1024 * 1024:
                 print(f"  ✅ Downloaded: {video_file.name} ({video_file.stat().st_size / 1024 / 1024:.1f} MB)")
                 return str(video_file)
             
-            # Method 2: Try gallery-dl
-            print(f"  📥 Trying gallery-dl...")
-            cmd = [
-                'gallery-dl',
-                '--filename', video_code + '.mp4',
-                '--destination', str(self.download_dir),
-                download_url
-            ]
+            # If yt-dlp failed, log the error
+            print(f"  ❌ yt-dlp failed")
+            if result.stderr:
+                error_lines = result.stderr.strip().split('\n')
+                print(f"     Error: {error_lines[-1][:100]}")  # Show last line of error
             
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-            
-            if result.returncode == 0 and video_file.exists() and video_file.stat().st_size > 1024 * 1024:
-                print(f"  ✅ Downloaded: {video_file.name} ({video_file.stat().st_size / 1024 / 1024:.1f} MB)")
-                return str(video_file)
-            
-            print(f"  ❌ All download methods failed")
-            print(f"     yt-dlp error: {result.stderr[:100] if result.stderr else 'Unknown'}")
+            print(f"  ⚠️ Download not supported for this embed type")
             return None
                 
         except subprocess.TimeoutExpired:
-            print(f"  ❌ Download timeout (5 minutes)")
+            print(f"  ❌ Download timeout (10 minutes)")
             return None
         except Exception as e:
             print(f"  ❌ Error downloading: {str(e)}")

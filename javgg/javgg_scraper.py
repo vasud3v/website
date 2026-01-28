@@ -252,10 +252,14 @@ class JavaGGScraper:
                 print(f"  ❌ No embed URL found")
                 return None
             
-            # Skip M3U8 extraction - just use embed URL
-            # yt-dlp and other tools can often extract from embed pages
-            m3u8_url = embed_url
-            print(f"  ℹ️ Will use embed URL for download")
+            # Try to extract M3U8 URL from embed (needed for download)
+            print(f"  🔍 Extracting stream URL from embed...")
+            m3u8_url = self._extract_m3u8_from_embed(embed_url)
+            
+            if m3u8_url:
+                print(f"  ✅ Found stream URL")
+            else:
+                print(f"  ⚠️ Could not extract stream URL, will try embed directly")
             
             # Extract thumbnail
             thumbnail_url = ""
