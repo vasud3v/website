@@ -39,22 +39,48 @@ jobs:
           echo "Installing system dependencies..."
           sudo apt-get update -qq
           
-          # Install Chrome and ChromeDriver
+          # Install Chrome
           echo "Installing Chrome..."
           wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
           echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
           sudo apt-get update -qq
           sudo apt-get install -y -qq google-chrome-stable
           
-          # Install ChromeDriver
+          # Install ChromeDriver (new method for Chrome 115+)
           echo "Installing ChromeDriver..."
-          CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+')
-          CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION%%.*}")
-          wget -q "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
-          unzip -q chromedriver_linux64.zip
-          sudo mv chromedriver /usr/local/bin/
+          CHROME_VERSION=$(google-chrome --version | grep -oP '\d+' | head -1)
+          echo "Chrome version: $CHROME_VERSION"
+          
+          # For Chrome 115+, use Chrome for Testing endpoints
+          if [ "$CHROME_VERSION" -ge 115 ]; then
+            echo "Using Chrome for Testing endpoints..."
+            CHROMEDRIVER_URL=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/latest-versions-per-milestone-with-downloads.json" | \
+              python3 -c "import sys, json; data=json.load(sys.stdin); print(data['milestones']['$CHROME_VERSION']['downloads']['chromedriver'][0]['url'])" 2>/dev/null || echo "")
+            
+            if [ -z "$CHROMEDRIVER_URL" ]; then
+              echo "Failed to get ChromeDriver URL, trying alternative..."
+              CHROMEDRIVER_URL="https://storage.googleapis.com/chrome-for-testing-public/$(curl -s https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_$CHROME_VERSION)/linux64/chromedriver-linux64.zip"
+            fi
+          else
+            # Old method for Chrome < 115
+            CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION")
+            CHROMEDRIVER_URL="https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
+          fi
+          
+          echo "Downloading from: $CHROMEDRIVER_URL"
+          wget -q "$CHROMEDRIVER_URL" -O chromedriver.zip
+          unzip -q chromedriver.zip
+          
+          # Handle different archive structures
+          if [ -f "chromedriver-linux64/chromedriver" ]; then
+            sudo mv chromedriver-linux64/chromedriver /usr/local/bin/
+            rm -rf chromedriver-linux64
+          elif [ -f "chromedriver" ]; then
+            sudo mv chromedriver /usr/local/bin/
+          fi
+          
           sudo chmod +x /usr/local/bin/chromedriver
-          rm chromedriver_linux64.zip
+          rm -f chromedriver.zip
           
           # Install ffmpeg
           echo "Installing ffmpeg..."
