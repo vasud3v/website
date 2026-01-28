@@ -550,6 +550,15 @@ class WorkflowManager:
             
             # Fallback to yt-dlp
             print(f"  📥 Attempting download with yt-dlp...")
+            
+            # Check if yt-dlp is available
+            try:
+                subprocess.run(['yt-dlp', '--version'], capture_output=True, timeout=5, check=True)
+            except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                print(f"  ⚠️ yt-dlp not available")
+                print(f"  ⚠️ Cannot download video without yt-dlp")
+                return None
+            
             cmd = [
                 'yt-dlp',
                 '-o', str(video_file),
@@ -563,42 +572,62 @@ class WorkflowManager:
                 download_url
             ]
             
-            # Run with progress bar
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1
-            )
-            
-            # Show visual progress bar
-            print(f"     ", end='', flush=True)
-            last_percent = 0
-            bar_width = 50
-            
-            for line in process.stdout:
-                line = line.strip()
-                if '/' in line:
-                    try:
-                        downloaded, total = line.split('/')
-                        percent = int((int(downloaded) / int(total)) * 100)
-                        
-                        # Update progress bar every 2%
-                        if percent >= last_percent + 2:
-                            filled = int(bar_width * percent / 100)
-                            bar = '█' * filled + '░' * (bar_width - filled)
-                            print(f"\r     [{bar}] {percent}%", end='', flush=True)
-                            last_percent = percent
-                    except:
-                        pass
-            
-            # Complete the progress bar
-            bar = '█' * bar_width
-            print(f"\r     [{bar}] 100%")
-            
-            process.wait()
-            result_code = process.returncode
+            # Run with progress bar and timeout
+            try:
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1
+                )
+                
+                # Show visual progress bar
+                print(f"     ", end='', flush=True)
+                last_percent = 0
+                bar_width = 50
+                
+                # Set timeout for the entire download (10 minutes)
+                import time
+                start_time = time.time()
+                timeout_seconds = 600
+                
+                for line in process.stdout:
+                    # Check timeout
+                    if time.time() - start_time > timeout_seconds:
+                        process.kill()
+                        print(f"\n  ❌ Download timeout (10 minutes)")
+                        return None
+                    
+                    line = line.strip()
+                    if '/' in line:
+                        try:
+                            downloaded, total = line.split('/')
+                            percent = int((int(downloaded) / int(total)) * 100)
+                            
+                            # Update progress bar every 2%
+                            if percent >= last_percent + 2:
+                                filled = int(bar_width * percent / 100)
+                                bar = '█' * filled + '░' * (bar_width - filled)
+                                print(f"\r     [{bar}] {percent}%", end='', flush=True)
+                                last_percent = percent
+                        except:
+                            pass
+                
+                # Complete the progress bar
+                bar = '█' * bar_width
+                print(f"\r     [{bar}] 100%")
+                
+                process.wait(timeout=10)  # Wait up to 10 more seconds for process to finish
+                result_code = process.returncode
+                
+            except subprocess.TimeoutExpired:
+                process.kill()
+                print(f"\n  ❌ Download process timeout")
+                return None
+            except Exception as e:
+                print(f"\n  ❌ Download error: {str(e)[:100]}")
+                return None
             
             if result_code == 0 and video_file.exists() and video_file.stat().st_size > 1024 * 1024:
                 print(f"  ✅ Downloaded: {video_file.name} ({video_file.stat().st_size / 1024 / 1024:.1f} MB)")
@@ -967,9 +996,11 @@ class WorkflowManager:
         print(f"PROCESSING VIDEO: {video_code}")
         print("="*70)
         
+        video_file = None
+        metadata = None
+        
         try:
             # Step 1: Download video
-            video_file = None
             try:
                 video_file = self.download_video(video_url, video_code)
             except Exception as e:
@@ -979,15 +1010,7 @@ class WorkflowManager:
                     print(f"  🔄 Browser crashed, recreating...")
                     self.cleanup_scraper()
             
-            if not video_file:
-                print(f"  ❌ Download failed, marking as failed")
-                if video_code not in self.progress['failed_videos']:
-                    self.progress['failed_videos'].append(video_code)
-                self.save_progress()
-                return False
-            
-            # Step 2: Enrich and save metadata
-            metadata = None
+            # Step 2: Enrich and save metadata (even if download failed)
             try:
                 metadata = self.enrich_and_save(video_url, video_code)
             except Exception as e:
@@ -998,12 +1021,33 @@ class WorkflowManager:
                     self.cleanup_scraper()
             
             if not metadata:
-                print(f"  ❌ Enrichment failed, cleaning up and marking as failed")
-                self.cleanup_files(video_code)
+                print(f"  ❌ Enrichment failed, marking as failed")
+                if video_file and os.path.exists(video_file):
+                    self.cleanup_files(video_code)
                 if video_code not in self.progress['failed_videos']:
                     self.progress['failed_videos'].append(video_code)
                 self.save_progress()
                 return False
+            
+            # If we have metadata but no video, save metadata only
+            if not video_file:
+                print(f"  ℹ️ Video download failed, but metadata saved")
+                print(f"  ℹ️ Skipping preview, upload, and cleanup")
+                
+                # Mark as processed (metadata saved)
+                if video_code not in self.progress['processed_videos']:
+                    self.progress['processed_videos'].append(video_code)
+                self.save_progress()
+                
+                # Commit changes
+                if len(self.progress['processed_videos']) % 5 == 0:
+                    try:
+                        self.commit_and_push_changes(f"Batch update: {len(self.progress['processed_videos'])} videos")
+                    except Exception as e:
+                        print(f"  ⚠️ Git commit error: {str(e)[:100]}")
+                
+                print(f"\n✅ Metadata saved for: {video_code} (no video file)")
+                return True
             
             # Step 3: Generate preview (with file size for optimization)
             preview_file = None
