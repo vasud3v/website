@@ -414,6 +414,40 @@ class JavaGGScraper:
                 print(f"  ⚠️ Page load timeout or error: {str(e)[:100]}")
                 time.sleep(2)
             
+            # Check for Cloudflare and wait if needed
+            print(f"  🔍 Checking for Cloudflare...")
+            max_cf_wait = 30
+            cf_waited = 0
+            cloudflare_passed = False
+            
+            while cf_waited < max_cf_wait:
+                try:
+                    title = self.driver.title
+                    current_url = self.driver.current_url
+                    
+                    # Check if Cloudflare challenge is gone
+                    if "Just a moment" not in title and "Cloudflare" not in title:
+                        # Also check if we're on the actual page
+                        if "javgg.net" in current_url and "/jav/" in current_url:
+                            print(f"  ✅ Cloudflare check passed after {cf_waited}s")
+                            cloudflare_passed = True
+                            break
+                except:
+                    pass
+                
+                time.sleep(2)
+                cf_waited += 2
+                
+                if cf_waited % 10 == 0:
+                    print(f"  ⏳ Still waiting for Cloudflare... ({cf_waited}s)")
+            
+            if not cloudflare_passed:
+                print(f"  ⚠️ Cloudflare check may have failed after {max_cf_wait}s")
+                print(f"  ⚠️ Page title: {self.driver.title}")
+            
+            # Additional wait for page to fully load after Cloudflare
+            time.sleep(3)
+            
             # Scroll to trigger lazy loading and JavaScript execution
             print(f"  📜 Scrolling to trigger content loading...")
             try:
@@ -492,6 +526,20 @@ class JavaGGScraper:
             
             # Get final page source
             soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+            
+            # Final check: are we still on Cloudflare page?
+            page_title = soup.find('title')
+            if page_title and "Just a moment" in page_title.text:
+                print(f"  ❌ Still blocked by Cloudflare after all waits")
+                print(f"  ⚠️ This video page has stricter Cloudflare protection")
+                
+                # Save debug info
+                debug_file = os.path.join(self.download_dir, f"{code}_cloudflare_blocked.html")
+                with open(debug_file, 'w', encoding='utf-8') as f:
+                    f.write(self.driver.page_source)
+                print(f"  💾 Saved Cloudflare page to {debug_file}")
+                
+                return None
             
             # Extract title (full from description)
             title = ""
