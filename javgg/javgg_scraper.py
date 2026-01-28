@@ -203,7 +203,12 @@ class JavaGGScraper:
             return None
     
     def scrape_video(self, video_url: str) -> Optional[VideoData]:
-        """Scrape video metadata"""
+        """Scrape video metadata with timeout"""
+        import signal
+        
+        def timeout_handler(signum, frame):
+            raise TimeoutError("Scraping timeout")
+        
         try:
             self._init_driver()
             
@@ -211,7 +216,12 @@ class JavaGGScraper:
             print(f"🎬 Scraping: {video_url}")
             print(f"{'='*70}")
             
-            # Extract code
+            # Set alarm for 60 seconds (only on Unix systems)
+            if hasattr(signal, 'SIGALRM'):
+                signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(60)  # 60 second timeout for entire scraping
+            
+            try:
             code_match = re.search(r'/jav/([^/\?#]+)', video_url)
             if not code_match:
                 return None
@@ -219,9 +229,17 @@ class JavaGGScraper:
             code = code_match.group(1).upper()
             print(f"  📝 Code: {code}")
             
-            # Load page
-            self.driver.get(video_url)
-            time.sleep(3)  # Reduced from 5 to 3 seconds
+            # Load page with timeout
+            print(f"  🌐 Loading page...")
+            try:
+                self.driver.set_page_load_timeout(30)  # 30 second timeout
+                self.driver.get(video_url)
+                time.sleep(3)
+                print(f"  ✅ Page loaded")
+            except Exception as e:
+                print(f"  ⚠️ Page load timeout or error: {str(e)[:100]}")
+                # Try to continue anyway if page partially loaded
+                time.sleep(2)
             
             soup = BeautifulSoup(self.driver.page_source, 'html.parser')
             
@@ -442,9 +460,16 @@ class JavaGGScraper:
                 scraped_at=datetime.now().isoformat()
             )
             
+        except TimeoutError:
+            print(f"  ❌ Scraping timeout (60 seconds)")
+            return None
         except Exception as e:
             print(f"  ❌ Error: {e}")
             return None
+        finally:
+            # Cancel alarm if set
+            if hasattr(signal, 'SIGALRM'):
+                signal.alarm(0)
     
     def download_video(self, video_data: VideoData) -> bool:
         """Download video using yt-dlp with 32 concurrent fragments"""
