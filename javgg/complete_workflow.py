@@ -1187,31 +1187,36 @@ class WorkflowManager:
         """
         Retry videos that failed JAVDatabase enrichment
         """
-        print("\n" + "="*70)
-        print("RETRYING PENDING ENRICHMENTS")
-        print("="*70)
-        
-        current_time = datetime.now().timestamp()
-        still_pending = []
-        
-        for item in self.progress['pending_enrichment']:
-            if current_time >= item['retry_after']:
-                print(f"\n🔄 Retrying: {item['code']}")
-                
-                # Try to enrich again
-                metadata = self.enrich_and_save(item['url'], item['code'])
-                
-                if metadata and metadata.get('javdb_available'):
-                    print(f"  ✅ Enrichment successful")
+        try:
+            print("\n" + "="*70)
+            print("RETRYING PENDING ENRICHMENTS")
+            print("="*70)
+            
+            current_time = datetime.now().timestamp()
+            still_pending = []
+            
+            for item in self.progress['pending_enrichment']:
+                if current_time >= item['retry_after']:
+                    print(f"\n🔄 Retrying: {item['code']}")
+                    
+                    # Try to enrich again
+                    metadata = self.enrich_and_save(item['url'], item['code'])
+                    
+                    if metadata and metadata.get('javdb_available'):
+                        print(f"  ✅ Enrichment successful")
+                    else:
+                        # Add back to pending with new retry time
+                        item['retry_after'] = current_time + 2 * 24 * 3600
+                        still_pending.append(item)
                 else:
-                    # Add back to pending with new retry time
-                    item['retry_after'] = current_time + 2 * 24 * 3600
                     still_pending.append(item)
-            else:
-                still_pending.append(item)
-        
-        self.progress['pending_enrichment'] = still_pending
-        self.save_progress()
+            
+            self.progress['pending_enrichment'] = still_pending
+            self.save_progress()
+        except Exception as e:
+            print(f"  ❌ Error in retry_pending_enrichments: {str(e)[:200]}")
+            import traceback
+            traceback.print_exc()
     
     def run(self, max_videos: int = 0):
         """
