@@ -60,17 +60,39 @@ class WorkflowManager:
         # Ensure progress file exists immediately
         if not self.progress_file.exists():
             self.save_progress()
+        
+        # Verify dependencies early
+        self.verify_dependencies()
     
     def get_scraper(self):
-        """Get or create reusable scraper instance"""
-        if self.scraper is None:
-            self.scraper = JavaGGScraper(headless=True)
+        """Get or create reusable scraper instance with retry logic"""
+        max_retries = 3
+        for attempt in range(max_retries):
             try:
-                self.scraper._init_driver()
+                if self.scraper is None:
+                    self.scraper = JavaGGScraper(headless=True)
+                    self.scraper._init_driver()
+                
+                # Test if browser is still alive
+                try:
+                    _ = self.scraper.driver.title
+                    return self.scraper
+                except:
+                    # Browser is dead, recreate
+                    print(f"  ⚠️ Browser is unresponsive, recreating...")
+                    self.cleanup_scraper()
+                    self.scraper = None
+                    
             except Exception as e:
-                print(f"⚠️ Failed to initialize browser: {e}")
+                print(f"  ⚠️ Failed to initialize browser (attempt {attempt+1}/{max_retries}): {str(e)[:100]}")
+                self.cleanup_scraper()
                 self.scraper = None
-                raise
+                
+                if attempt < max_retries - 1:
+                    time.sleep(5)
+                else:
+                    raise
+        
         return self.scraper
     
     def cleanup_scraper(self):
@@ -81,6 +103,51 @@ class WorkflowManager:
             except:
                 pass
             self.scraper = None
+    
+    def verify_dependencies(self):
+        """Verify all required dependencies are available"""
+        print("\n🔍 Verifying dependencies...")
+        
+        missing = []
+        
+        # Check ffmpeg
+        try:
+            result = subprocess.run(['ffmpeg', '-version'], capture_output=True, timeout=5)
+            if result.returncode == 0:
+                print("  ✅ ffmpeg available")
+            else:
+                missing.append("ffmpeg")
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            missing.append("ffmpeg")
+            print("  ⚠️ ffmpeg not found")
+        
+        # Check ffprobe
+        try:
+            result = subprocess.run(['ffprobe', '-version'], capture_output=True, timeout=5)
+            if result.returncode == 0:
+                print("  ✅ ffprobe available")
+            else:
+                missing.append("ffprobe")
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            missing.append("ffprobe")
+            print("  ⚠️ ffprobe not found")
+        
+        # Check yt-dlp
+        try:
+            result = subprocess.run(['yt-dlp', '--version'], capture_output=True, timeout=5)
+            if result.returncode == 0:
+                print("  ✅ yt-dlp available")
+            else:
+                missing.append("yt-dlp")
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            missing.append("yt-dlp")
+            print("  ⚠️ yt-dlp not found")
+        
+        if missing:
+            print(f"\n⚠️ WARNING: Missing dependencies: {', '.join(missing)}")
+            print(f"   Some features may not work properly")
+        else:
+            print("\n✅ All dependencies available")
     
     def load_progress(self):
         """Load workflow progress"""
@@ -97,10 +164,21 @@ class WorkflowManager:
             }
     
     def save_progress(self):
-        """Save workflow progress"""
+        """Save workflow progress with atomic write"""
         self.progress['last_run'] = datetime.now().isoformat()
-        with open(self.progress_file, 'w', encoding='utf-8') as f:
-            json.dump(self.progress, f, indent=2, ensure_ascii=False)
+        
+        # Atomic write: write to temp file first, then rename
+        temp_file = self.progress_file.with_suffix('.json.tmp')
+        try:
+            with open(temp_file, 'w', encoding='utf-8') as f:
+                json.dump(self.progress, f, indent=2, ensure_ascii=False)
+            
+            # Atomic rename
+            temp_file.replace(self.progress_file)
+        except Exception as e:
+            print(f"  ⚠️ Failed to save progress: {e}")
+            if temp_file.exists():
+                temp_file.unlink()
     
     def scrape_new_videos(self, max_videos: int = 0) -> List[str]:
         """
@@ -131,6 +209,9 @@ class WorkflowManager:
             pages_scraped = 0
             
             # Keep scraping pages until we have enough videos or no more videos
+            consecutive_empty_pages = 0
+            max_empty_pages = 3  # Stop after 3 consecutive empty pages
+            
             while pages_scraped < max_pages:
                 pages_scraped += 1
                 print(f"\n📄 Scraping page {page}... ({pages_scraped}/{max_pages})")
@@ -294,6 +375,18 @@ class WorkflowManager:
                 
                 print(f"  ✅ Found {page_new_count} new videos on page {page}")
                 
+                # Track consecutive empty pages
+                if page_new_count == 0:
+                    consecutive_empty_pages += 1
+                    print(f"  ⚠️ Empty page count: {consecutive_empty_pages}/{max_empty_pages}")
+                else:
+                    consecutive_empty_pages = 0  # Reset counter
+                
+                # Stop if too many consecutive empty pages
+                if consecutive_empty_pages >= max_empty_pages:
+                    print(f"  ℹ️ {max_empty_pages} consecutive empty pages - stopping scrape")
+                    break
+                
                 # Check if we've reached the limit (if set)
                 if max_videos > 0 and len(new_urls) >= max_videos:
                     # Don't increment page - we'll continue from here next time
@@ -306,7 +399,9 @@ class WorkflowManager:
                     # Move to next page since this one is done
                     self.progress['last_scraped_page'] = page + 1
                     self.save_progress()
-                    break
+                    # Don't break yet - check a few more pages
+                    page += 1
+                    continue
                 
                 # All videos on this page were processed, move to next page
                 self.progress['last_scraped_page'] = page + 1
@@ -324,6 +419,52 @@ class WorkflowManager:
         
         # Don't close scraper - reuse it
         return new_urls
+    
+    def validate_video_file(self, video_file: Path) -> bool:
+        """
+        Validate that a file is actually a video and not corrupted
+        Returns True if valid, False otherwise
+        """
+        try:
+            validate_cmd = [
+                'ffprobe', '-v', 'error',
+                '-show_format',
+                '-show_streams',
+                '-of', 'json',
+                str(video_file)
+            ]
+            validate_result = subprocess.run(validate_cmd, capture_output=True, text=True, timeout=10)
+            
+            if validate_result.returncode != 0:
+                print(f"  ⚠️ ffprobe failed to read file")
+                return False
+            
+            validate_data = json.loads(validate_result.stdout)
+            
+            # Check format name - should be mp4, mov, avi, etc. NOT png_pipe
+            format_name = validate_data.get('format', {}).get('format_name', '')
+            if 'png' in format_name.lower() or 'image' in format_name.lower():
+                print(f"  ⚠️ File is not a video (format: {format_name})")
+                return False
+            
+            # Check if there's a video stream
+            video_streams = [s for s in validate_data.get('streams', []) if s.get('codec_type') == 'video']
+            if not video_streams:
+                print(f"  ⚠️ No video stream found")
+                return False
+            
+            # Check video codec - should be h264, hevc, etc. NOT png
+            video_codec = video_streams[0].get('codec_name', '')
+            if video_codec.lower() in ['png', 'jpg', 'jpeg', 'gif', 'bmp']:
+                print(f"  ⚠️ File contains images, not video (codec: {video_codec})")
+                return False
+            
+            print(f"  ✅ Video file is valid (format: {format_name}, codec: {video_codec})")
+            return True
+            
+        except Exception as e:
+            print(f"  ⚠️ Validation error: {str(e)[:100]}")
+            return False
     
     def download_video(self, video_url: str, video_code: str) -> Optional[str]:
         """
@@ -358,35 +499,49 @@ class WorkflowManager:
                 try:
                     from hls_downloader import JavaGGHLSDownloader
                     hls_dl = JavaGGHLSDownloader(max_workers=16)
-                    if hls_dl.download(video_data.m3u8_url, str(video_file)):
+                    
+                    # Download with timeout
+                    import signal
+                    
+                    def timeout_handler(signum, frame):
+                        raise TimeoutError("HLS download timeout")
+                    
+                    # Set 10 minute timeout (only on Unix)
+                    if hasattr(signal, 'SIGALRM'):
+                        signal.signal(signal.SIGALRM, timeout_handler)
+                        signal.alarm(600)  # 10 minutes
+                    
+                    try:
+                        download_success = hls_dl.download(video_data.m3u8_url, str(video_file))
+                    finally:
+                        if hasattr(signal, 'SIGALRM'):
+                            signal.alarm(0)  # Cancel alarm
+                    
+                    if download_success:
                         # Validate the downloaded file
                         if video_file.exists() and video_file.stat().st_size > 1024 * 1024:
                             print(f"  ✅ Downloaded: {video_file.name} ({video_file.stat().st_size / 1024 / 1024:.1f} MB)")
                             
                             # Validate format
-                            validate_cmd = [
-                                'ffprobe', '-v', 'error',
-                                '-show_format',
-                                '-of', 'json',
-                                str(video_file)
-                            ]
-                            validate_result = subprocess.run(validate_cmd, capture_output=True, text=True, timeout=10)
-                            
-                            if validate_result.returncode == 0:
-                                validate_data = json.loads(validate_result.stdout)
-                                format_name = validate_data.get('format', {}).get('format_name', '')
-                                
-                                if 'png' not in format_name.lower() and 'image' not in format_name.lower():
-                                    print(f"  ✅ Video file is valid (format: {format_name})")
-                                    return str(video_file)
-                                else:
-                                    print(f"  ⚠️ Downloaded file is not a video (format: {format_name})")
-                                    video_file.unlink()
-                            else:
+                            if self.validate_video_file(video_file):
                                 return str(video_file)
+                            else:
+                                print(f"  ⚠️ Video validation failed, will try yt-dlp...")
+                                if video_file.exists():
+                                    video_file.unlink()
+                        else:
+                            print(f"  ⚠️ Downloaded file too small or missing")
+                    else:
+                        print(f"  ⚠️ HLS download failed")
+                        
+                except TimeoutError:
+                    print(f"  ⚠️ HLS download timeout (10 minutes)")
+                    if video_file.exists():
+                        video_file.unlink()
                 except Exception as e:
-                    print(f"  ⚠️ HLS downloader failed: {str(e)}")
-                    print(f"  ⏭️ Falling back to yt-dlp...")
+                    print(f"  ⚠️ HLS downloader failed: {str(e)[:100]}")
+                
+                print(f"  ⏭️ Falling back to yt-dlp...")
             
             # Fallback to yt-dlp
             print(f"  📥 Attempting download with yt-dlp...")
@@ -445,36 +600,15 @@ class WorkflowManager:
                 
                 # Validate the video file
                 print(f"  🔍 Validating video file...")
-                try:
-                    validate_cmd = [
-                        'ffprobe', '-v', 'error',
-                        '-show_format',
-                        '-of', 'json',
-                        str(video_file)
-                    ]
-                    validate_result = subprocess.run(validate_cmd, capture_output=True, text=True, timeout=10)
-                    
-                    if validate_result.returncode == 0:
-                        validate_data = json.loads(validate_result.stdout)
-                        format_name = validate_data.get('format', {}).get('format_name', '')
-                        
-                        # Check if it's actually a video format
-                        if 'png' in format_name.lower() or 'image' in format_name.lower():
-                            print(f"  ⚠️ Downloaded file is not a video (format: {format_name})")
-                            print(f"  ⚠️ This usually means the stream is encrypted or protected")
-                            print(f"  ⚠️ Deleting corrupted file...")
-                            video_file.unlink()
-                            return None
-                        
-                        print(f"  ✅ Video file is valid (format: {format_name})")
-                        return str(video_file)
-                    else:
-                        print(f"  ⚠️ Video validation failed")
-                        return str(video_file)  # Use anyway, might still work
-                            
-                except Exception as e:
-                    print(f"  ⚠️ Validation error: {str(e)}, using file as-is")
+                if self.validate_video_file(video_file):
                     return str(video_file)
+                else:
+                    print(f"  ⚠️ Downloaded file is corrupted or not a video")
+                    print(f"  ⚠️ This usually means the stream is encrypted or protected")
+                    print(f"  ⚠️ Deleting corrupted file...")
+                    if video_file.exists():
+                        video_file.unlink()
+                    return None
             
             # If yt-dlp failed, log the error
             print(f"  ❌ yt-dlp failed")
@@ -750,46 +884,77 @@ class WorkflowManager:
     
     def commit_and_push_changes(self, video_code: str):
         """
-        Commit and push database changes to GitHub after each video
+        Commit and push database changes to GitHub with retry logic
         This ensures we don't lose data if workflow times out
         """
-        try:
-            import subprocess
-            
-            # Check if running in GitHub Actions
-            if not os.getenv('GITHUB_ACTIONS'):
-                print(f"  ℹ️ Not in GitHub Actions, skipping git commit")
-                return
-            
-            print(f"\n💾 Committing changes for {video_code}...")
-            
-            # Add database files
-            subprocess.run(['git', 'add', 'database/combined_videos.json'], check=True)
-            subprocess.run(['git', 'add', 'database/workflow_progress.json'], check=True)
-            subprocess.run(['git', 'add', 'database/stats.json'], check=True, stderr=subprocess.DEVNULL)
-            subprocess.run(['git', 'add', 'database/progress_tracking.json'], check=True, stderr=subprocess.DEVNULL)
-            
-            # Check if there are changes
-            result = subprocess.run(['git', 'diff', '--staged', '--quiet'], capture_output=True)
-            
-            if result.returncode != 0:  # There are changes
-                # Commit
-                commit_msg = f"Update database: {video_code} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-                subprocess.run(['git', 'commit', '-m', commit_msg], check=True)
+        if not os.getenv('GITHUB_ACTIONS'):
+            print(f"  ℹ️ Not in GitHub Actions, skipping git commit")
+            return
+        
+        print(f"\n💾 Committing changes for {video_code}...")
+        
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                # Add database files
+                subprocess.run(['git', 'add', 'database/combined_videos.json'], check=True, timeout=30)
+                subprocess.run(['git', 'add', 'database/workflow_progress.json'], check=True, timeout=30)
+                subprocess.run(['git', 'add', 'database/stats.json'], check=True, stderr=subprocess.DEVNULL, timeout=30)
+                subprocess.run(['git', 'add', 'database/progress_tracking.json'], check=True, stderr=subprocess.DEVNULL, timeout=30)
                 
-                # Push
-                subprocess.run(['git', 'push'], check=True)
-                print(f"  ✅ Changes committed and pushed")
-            else:
-                print(f"  ℹ️ No changes to commit")
+                # Check if there are changes
+                result = subprocess.run(['git', 'diff', '--staged', '--quiet'], capture_output=True, timeout=30)
                 
-        except Exception as e:
-            print(f"  ⚠️ Git commit failed: {str(e)}")
-            # Don't fail the workflow if git commit fails
+                if result.returncode != 0:  # There are changes
+                    # Commit
+                    commit_msg = f"Update database: {video_code} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                    subprocess.run(['git', 'commit', '-m', commit_msg], check=True, timeout=30)
+                    
+                    # Push with retry
+                    push_success = False
+                    for push_attempt in range(3):
+                        try:
+                            subprocess.run(['git', 'push'], check=True, timeout=60)
+                            push_success = True
+                            break
+                        except subprocess.TimeoutExpired:
+                            print(f"  ⚠️ Push timeout (attempt {push_attempt+1}/3)")
+                            if push_attempt < 2:
+                                time.sleep(5)
+                        except subprocess.CalledProcessError as e:
+                            print(f"  ⚠️ Push failed (attempt {push_attempt+1}/3): {e}")
+                            if push_attempt < 2:
+                                # Pull first in case of conflicts
+                                try:
+                                    subprocess.run(['git', 'pull', '--rebase'], check=True, timeout=60)
+                                except:
+                                    pass
+                                time.sleep(5)
+                    
+                    if push_success:
+                        print(f"  ✅ Changes committed and pushed")
+                    else:
+                        print(f"  ⚠️ Push failed after 3 attempts")
+                else:
+                    print(f"  ℹ️ No changes to commit")
+                
+                return  # Success, exit retry loop
+                    
+            except subprocess.TimeoutExpired:
+                print(f"  ⚠️ Git operation timeout (attempt {attempt+1}/{max_retries})")
+                if attempt < max_retries - 1:
+                    time.sleep(5)
+            except Exception as e:
+                print(f"  ⚠️ Git commit failed (attempt {attempt+1}/{max_retries}): {str(e)[:100]}")
+                if attempt < max_retries - 1:
+                    time.sleep(5)
+        
+        print(f"  ⚠️ Git operations failed after {max_retries} attempts")
+        # Don't fail the workflow if git commit fails
     
     def process_video(self, video_url: str) -> bool:
         """
-        Process a single video through the complete workflow
+        Process a single video through the complete workflow with error recovery
         """
         video_code = video_url.rstrip('/').split('/')[-1].upper()
         
@@ -799,57 +964,102 @@ class WorkflowManager:
         
         try:
             # Step 1: Download video
-            video_file = self.download_video(video_url, video_code)
+            video_file = None
+            try:
+                video_file = self.download_video(video_url, video_code)
+            except Exception as e:
+                print(f"  ❌ Download error: {str(e)[:100]}")
+                # Try to recover browser if it crashed
+                if "browser" in str(e).lower() or "driver" in str(e).lower():
+                    print(f"  🔄 Browser crashed, recreating...")
+                    self.cleanup_scraper()
+            
             if not video_file:
-                self.progress['failed_videos'].append(video_code)
+                print(f"  ❌ Download failed, marking as failed")
+                if video_code not in self.progress['failed_videos']:
+                    self.progress['failed_videos'].append(video_code)
                 self.save_progress()
                 return False
             
             # Step 2: Enrich and save metadata
-            metadata = self.enrich_and_save(video_url, video_code)
+            metadata = None
+            try:
+                metadata = self.enrich_and_save(video_url, video_code)
+            except Exception as e:
+                print(f"  ❌ Enrichment error: {str(e)[:100]}")
+                # Try to recover browser if it crashed
+                if "browser" in str(e).lower() or "driver" in str(e).lower():
+                    print(f"  🔄 Browser crashed, recreating...")
+                    self.cleanup_scraper()
+            
             if not metadata:
+                print(f"  ❌ Enrichment failed, cleaning up and marking as failed")
                 self.cleanup_files(video_code)
-                self.progress['failed_videos'].append(video_code)
+                if video_code not in self.progress['failed_videos']:
+                    self.progress['failed_videos'].append(video_code)
                 self.save_progress()
                 return False
             
             # Step 3: Generate preview (with file size for optimization)
-            if video_file and os.path.exists(video_file):
-                file_size_mb = os.path.getsize(video_file) / 1024 / 1024
-                preview_file = self.generate_preview_video(video_file, video_code, file_size_mb)
-            else:
-                print(f"  ⚠️ Video file not found, skipping preview")
-                preview_file = None
+            preview_file = None
+            try:
+                if video_file and os.path.exists(video_file):
+                    file_size_mb = os.path.getsize(video_file) / 1024 / 1024
+                    preview_file = self.generate_preview_video(video_file, video_code, file_size_mb)
+                else:
+                    print(f"  ⚠️ Video file not found, skipping preview")
+            except Exception as e:
+                print(f"  ⚠️ Preview generation error: {str(e)[:100]}")
+                # Preview is optional, continue anyway
             
             # Step 4: Upload videos
-            urls = self.upload_videos(video_file, preview_file, video_code)
+            urls = {}
+            try:
+                urls = self.upload_videos(video_file, preview_file, video_code)
+            except Exception as e:
+                print(f"  ⚠️ Upload error: {str(e)[:100]}")
+                # Continue anyway, we can retry uploads later
             
             # Step 5: Update metadata with URLs
-            self.update_metadata_with_urls(video_code, urls)
+            try:
+                self.update_metadata_with_urls(video_code, urls)
+            except Exception as e:
+                print(f"  ⚠️ Metadata update error: {str(e)[:100]}")
             
             # Step 6: Cleanup files
-            self.cleanup_files(video_code)
+            try:
+                self.cleanup_files(video_code)
+            except Exception as e:
+                print(f"  ⚠️ Cleanup error: {str(e)[:100]}")
             
             # Mark as processed
-            self.progress['processed_videos'].append(video_code)
+            if video_code not in self.progress['processed_videos']:
+                self.progress['processed_videos'].append(video_code)
             self.save_progress()
             
             # Commit and push changes (batched every 5 videos for speed)
             if len(self.progress['processed_videos']) % 5 == 0:
-                self.commit_and_push_changes(f"Batch update: {len(self.progress['processed_videos'])} videos")
+                try:
+                    self.commit_and_push_changes(f"Batch update: {len(self.progress['processed_videos'])} videos")
+                except Exception as e:
+                    print(f"  ⚠️ Git commit error: {str(e)[:100]}")
             
             print(f"\n✅ Successfully processed: {video_code}")
             return True
             
         except Exception as e:
-            print(f"\n❌ Error processing {video_code}: {str(e)}")
+            print(f"\n❌ Unexpected error processing {video_code}: {str(e)[:200]}")
+            import traceback
+            traceback.print_exc()
             
-            # If browser crashed, recreate it
+            # Try to recover browser if it crashed
             if "browser" in str(e).lower() or "driver" in str(e).lower():
                 print(f"  🔄 Browser may have crashed, recreating...")
                 self.cleanup_scraper()
             
-            self.progress['failed_videos'].append(video_code)
+            # Mark as failed
+            if video_code not in self.progress['failed_videos']:
+                self.progress['failed_videos'].append(video_code)
             self.save_progress()
             return False
     
