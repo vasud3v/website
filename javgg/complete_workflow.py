@@ -116,7 +116,24 @@ class WorkflowManager:
                 
                 print(f"  Loading: {base_url}")
                 scraper.driver.get(base_url)
-                time.sleep(5)  # Increased wait time for GitHub Actions
+                
+                # Wait for Cloudflare check to complete
+                print(f"  Waiting for Cloudflare check...")
+                max_wait = 30  # Maximum 30 seconds
+                waited = 0
+                while waited < max_wait:
+                    time.sleep(2)
+                    waited += 2
+                    
+                    # Check if Cloudflare challenge is still showing
+                    if "Just a moment" not in scraper.driver.title:
+                        print(f"  ✅ Cloudflare check passed after {waited}s")
+                        break
+                    
+                    print(f"  ⏳ Still waiting for Cloudflare... ({waited}s)")
+                
+                # Additional wait for page to fully load
+                time.sleep(3)
                 
                 # Check if page loaded
                 print(f"  Current URL: {scraper.driver.current_url}")
@@ -151,6 +168,11 @@ class WorkflowManager:
                     print(f"  ⚠️ Saved page source to {debug_file} for debugging")
                     print(f"  Page title: {soup.find('title').text if soup.find('title') else 'N/A'}")
                     print(f"  Page URL: {scraper.driver.current_url}")
+                    
+                    # Check if still blocked by Cloudflare
+                    if "Just a moment" in scraper.driver.title or "Cloudflare" in scraper.driver.page_source:
+                        print(f"  ❌ Still blocked by Cloudflare - cannot proceed")
+                        break
                 
                 if not video_links or len(video_links) == 0:
                     print(f"  ℹ️ No video links found on page {page}")

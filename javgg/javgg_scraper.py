@@ -52,10 +52,16 @@ class JavaGGScraper:
         os.makedirs(download_dir, exist_ok=True)
     
     def _init_driver(self):
-        """Initialize browser"""
+        """Initialize browser with Cloudflare bypass"""
         if self.driver is None:
             print("🌐 Initializing browser...")
-            self.driver = Driver(uc=True, headless=self.headless, incognito=True)
+            # Use undetected-chromedriver with additional stealth options
+            self.driver = Driver(
+                uc=True, 
+                headless=self.headless, 
+                incognito=True,
+                agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            )
             print("  ✅ Browser ready")
     
     def _extract_m3u8_from_embed(self, embed_url: str) -> Optional[str]:
