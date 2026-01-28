@@ -10,6 +10,7 @@ import json
 import os
 import subprocess
 import requests
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List
@@ -19,6 +20,8 @@ from bs4 import BeautifulSoup
 from seleniumbase import Driver
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 
 
 @dataclass
@@ -59,27 +62,49 @@ class JavaGGScraper:
         self.driver = None
         os.makedirs(download_dir, exist_ok=True)
     
+    def _kill_stale_processes(self):
+        """Kill stale Chrome/Chromedriver processes"""
+        print("  🧹 Cleaning up stale browser processes...", flush=True)
+        try:
+            if os.name == 'nt':  # Windows
+                try:
+                    subprocess.run('taskkill /F /IM chrome.exe /T', shell=True, 
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    subprocess.run('taskkill /F /IM chromedriver.exe /T', shell=True, 
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                except Exception as e:
+                    print(f"  ⚠️ Warning: Failed to kill Windows processes: {e}")
+            else:  # Linux/Mac
+                try:
+                    subprocess.run(['pkill', '-f', 'chrome'], 
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    subprocess.run(['pkill', '-f', 'chromedriver'], 
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                except Exception as e:
+                    print(f"  ⚠️ Warning: Failed to kill Linux processes: {e}")
+        except Exception as outside_e:
+             print(f"  ⚠️ Critical error in process cleanup: {outside_e}")
+        
+        print("  ✅ Process cleanup finished", flush=True)
+
     def _init_driver(self):
         """Initialize browser with Cloudflare bypass - GitHub Actions compatible"""
+        
         if self.driver is None:
-            print("🌐 Initializing browser...")
+            # Kill stale processes first to prevent hangs
+            self._kill_stale_processes()
+            
+            print("🌐 Initializing browser...", flush=True)
             
             # In CI, try seleniumbase UC mode which works better than standard Chrome
             is_ci = os.environ.get('CI') == 'true' or os.environ.get('GITHUB_ACTIONS') == 'true'
             
-            if is_ci:
-                print("  ℹ️ CI environment detected, using SeleniumBase UC mode")
-                methods = [
-                    self._init_with_uc_driver,  # Try UC first in CI
-                    self._init_with_standard_chrome,
-                ]
-            else:
-                # Locally, skip UC mode as it's slow - use standard Chrome
-                print("  ℹ️ Local environment detected, using standard Chrome")
-                methods = [
-                    self._init_with_standard_chrome,
-                    self._init_with_chromium
-                ]
+            # Always try UC mode first as it handles Cloudflare correctly
+            print("  ℹ️ Using SeleniumBase UC mode for better Cloudflare bypass")
+            methods = [
+                self._init_with_uc_driver,
+                self._init_with_standard_chrome
+            ]
             
             last_error = None
             for method in methods:
@@ -116,9 +141,9 @@ class JavaGGScraper:
         try:
             self.driver = Driver(
                 uc=True, 
-                headless=self.headless, 
+                headless=False, # Force headful for better Cloudflare bypass
                 incognito=True,
-                agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+                # agent=None, # Let UC driver choose appropriate agent
                 disable_csp=True,
                 no_sandbox=True,
                 page_load_strategy='none'  # Don't wait for full page load
@@ -134,11 +159,15 @@ class JavaGGScraper:
     
     def _init_with_standard_chrome(self):
         """Try standard Chrome with stealth options"""
-        print("  Trying standard Chrome...")
-        from selenium.webdriver.chrome.service import Service
+        print("  Trying standard Chrome...", flush=True)
+
         
+        print("  DEBUG: Creating Chrome Options...", flush=True)
         options = Options()
-        options.add_argument('--headless=new')
+        if self.headless:
+            options.add_argument('--headless=new')
+        else:
+            print("  DEBUG: Running in HEADFUL mode", flush=True)
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-gpu')
@@ -151,7 +180,7 @@ class JavaGGScraper:
         options.add_argument('--disable-extensions')
         options.add_argument('--disable-popup-blocking')
         options.add_argument('--ignore-certificate-errors')
-        options.add_argument('--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36')
+        # options.add_argument('--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36')
         options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
         options.add_experimental_option('useAutomationExtension', False)
         
@@ -179,14 +208,31 @@ class JavaGGScraper:
         for path in chrome_paths:
             if path and os.path.exists(path):
                 options.binary_location = path
+                print(f"  DEBUG: Found Chrome binary at {path}", flush=True)
                 break
         
-        self.driver = webdriver.Chrome(options=options)
+        print("  DEBUG: Launching webdriver.Chrome with ChromeDriverManager...", flush=True)
+        try:
+            # Clean up PATH to avoid conflict with existing drivers
+            try:
+                # Remove local-packages/drivers from PATH if present to force new driver
+                current_path = os.environ.get('PATH', '')
+                new_path_dirs = [p for p in current_path.split(os.pathsep) if 'seleniumbase' not in p.lower()]
+                os.environ['PATH'] = os.pathsep.join(new_path_dirs)
+            except:
+                pass
+
+            service = Service(ChromeDriverManager().install())
+            self.driver = webdriver.Chrome(service=service, options=options)
+            print("  DEBUG: webdriver.Chrome launched successfully", flush=True)
+        except Exception as e:
+            print(f"  ❌ webdriver.Chrome launch failed: {e}", flush=True)
+            raise e
         
         # Execute CDP commands to hide automation
-        self.driver.execute_cdp_cmd('Network.setUserAgentOverride', {
-            "userAgent": 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36'
-        })
+        # self.driver.execute_cdp_cmd('Network.setUserAgentOverride', {
+        #    "userAgent": 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36'
+        # })
         self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         self.driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
             'source': '''
@@ -425,10 +471,10 @@ class JavaGGScraper:
             print(f"  📝 Code: {code}")
             
             # TRY METHOD 1: Requests-based scraping (bypasses Cloudflare better)
-            print(f"  🔄 Method 1: Trying requests-based scraping...")
+            print(f"  🔄 Method 1: Trying requests-based scraping...", flush=True)
             result = self._scrape_with_requests(video_url, code)
             if result:
-                print(f"  ✅ Successfully scraped with requests!")
+                print(f"  ✅ Successfully scraped with requests!", flush=True)
                 return result
             
             print(f"  ⚠️ Requests method failed, trying Selenium...")
@@ -437,10 +483,17 @@ class JavaGGScraper:
             return self._scrape_with_selenium(video_url, code)
             
         except TimeoutError:
-            print(f"  ❌ Scraping timeout")
+            print(f"  ❌ Scraping timeout", flush=True)
             return None
         except Exception as e:
-            print(f"  ❌ Scraping error: {str(e)[:200]}")
+            print(f"  ❌ Scraping error: {str(e)[:200]}", flush=True)
+            if "refused" in str(e) or "reset" in str(e) or "closed" in str(e) or "invalid session" in str(e) or "Max retries exceeded" in str(e):
+                 print("  🔄 Connection lost (global catch), forcing driver re-init...")
+                 try:
+                     if self.driver: self.driver.quit()
+                 except:
+                     pass
+                 self.driver = None
             return None
         finally:
             # Cancel alarm
@@ -454,7 +507,7 @@ class JavaGGScraper:
             
             # Headers to mimic real browser
             headers = {
-                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
                 'Accept-Language': 'en-US,en;q=0.9',
                 'Referer': 'https://javgg.net/',
@@ -465,12 +518,13 @@ class JavaGGScraper:
             time.sleep(random.uniform(1, 2))
             
             # Fetch page
-            print(f"    📡 Fetching {video_url[:50]}...")
+            # Fetch page
+            print(f"    📡 Fetching {video_url[:50]}...", flush=True)
             response = requests.get(video_url, headers=headers, timeout=20, allow_redirects=True)
             
-            print(f"    📊 Status: {response.status_code}")
-            print(f"    📏 Content length: {len(response.text)} bytes")
-            print(f"    🔗 Final URL: {response.url[:60]}...")
+            print(f"    📊 Status: {response.status_code}", flush=True)
+            print(f"    📏 Content length: {len(response.text)} bytes", flush=True)
+            print(f"    🔗 Final URL: {response.url[:60]}...", flush=True)
             
             # Check response - accept both 200 and 403 (some sites return 403 but still work)
             if response.status_code not in [200, 403]:
@@ -586,7 +640,18 @@ class JavaGGScraper:
             print(f"  🌐 Loading page with Selenium...")
             
             # Load the page
-            self.driver.get(video_url)
+            try:
+                self.driver.get(video_url)
+            except Exception as e:
+                print(f"  ❌ Selenium navigation failed: {e}")
+                if "refused" in str(e) or "reset" in str(e) or "closed" in str(e) or "invalid session" in str(e) or "Max retries exceeded" in str(e):
+                     print("  🔄 Connection lost, forcing driver re-init next time...")
+                     try:
+                         self.driver.quit()
+                     except:
+                         pass
+                     self.driver = None
+                return None
             
             # Wait for body
             print(f"  ⏳ Waiting for page body...")
@@ -613,12 +678,23 @@ class JavaGGScraper:
                 
                 # If title indicates blocking, wait longer
                 if "Checking" in page_title or "Just a moment" in page_title:
-                    print(f"  ⏳ Detected challenge page, waiting 20 seconds...")
-                    time.sleep(20)
+                    print(f"  ⏳ Detected challenge page, entering wait loop...")
+                    max_wait = 60
+                    waited = 0
+                    while waited < max_wait:
+                        time.sleep(2)
+                        waited += 2
+                        current_title = self.driver.title
+                        if "Checking" not in current_title and "Just a moment" not in current_title and "javgg" in self.driver.current_url:
+                            print(f"  ✅ Cloudflare check passed after {waited}s")
+                            break
+                        if waited % 10 == 0:
+                            print(f"  ⏳ Still checking... ({waited}s)")
+                    
                     page_title = self.driver.title
-                    print(f"  📄 New title: {page_title}")
-            except:
-                pass
+                    print(f"  📄 Final title: {page_title}")
+            except Exception as e:
+                print(f"  ⚠️ Error checking title: {e}")
             
             # Wait for JavaScript to execute
             print(f"  ⏳ Waiting 15 seconds for JavaScript...")
@@ -1077,7 +1153,7 @@ class JavaGGScraper:
         
         # Use yt-dlp with 32 concurrent fragments
         cmd = [
-            'yt-dlp',
+            sys.executable, '-m', 'yt_dlp',
             '--no-warnings',
             '--concurrent-fragments', '32',
             '--retries', '10',

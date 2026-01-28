@@ -26,21 +26,28 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from javgg_scraper import JavaGGScraper
 from javdb_enrichment import enrich_with_javdb
 from save_to_database import save_video_to_database
+print("DEBUG: Imported save_to_database", flush=True)
 from database_manager import DatabaseManager
+print("DEBUG: Imported DatabaseManager", flush=True)
 
 # Import preview generator
 sys.path.insert(0, str(Path(__file__).parent.parent / 'tools' / 'preview_generator'))
+print("DEBUG: Importing PreviewGenerator...", flush=True)
 from preview_generator import PreviewGenerator
+print("DEBUG: Imported PreviewGenerator", flush=True)
 
 # Import upload pipeline
 sys.path.insert(0, str(Path(__file__).parent.parent / 'upload_pipeline'))
+print("DEBUG: Importing MultiHostUploader...", flush=True)
 from upload_to_all_hosts import MultiHostUploader
+print("DEBUG: Imported MultiHostUploader", flush=True)
 
 
 class WorkflowManager:
     """Manages the complete workflow"""
     
     def __init__(self, base_dir: str = None):
+        print("DEBUG: Initializing WorkflowManager...", flush=True)
         self.base_dir = Path(base_dir) if base_dir else Path(__file__).parent.parent
         self.download_dir = self.base_dir / 'downloaded_files'
         self.database_dir = self.base_dir / 'database'
@@ -62,7 +69,9 @@ class WorkflowManager:
             self.save_progress()
         
         # Verify dependencies early
+        print("DEBUG: Calling verify_dependencies...", flush=True)
         self.verify_dependencies()
+        print("DEBUG: verify_dependencies complete", flush=True)
     
     def get_scraper(self):
         """Get or create reusable scraper instance with retry logic"""
@@ -139,14 +148,21 @@ class WorkflowManager:
         
         # Check yt-dlp
         try:
-            result = subprocess.run(['yt-dlp', '--version'], capture_output=True, timeout=5)
+            # Try running as module (more reliable)
+            import sys
+            result = subprocess.run([sys.executable, '-m', 'yt_dlp', '--version'], capture_output=True, timeout=5)
             if result.returncode == 0:
                 print("  ✅ yt-dlp available")
             else:
-                missing.append("yt-dlp")
+                # Fallback to command line
+                result = subprocess.run(['yt-dlp', '--version'], capture_output=True, timeout=5)
+                if result.returncode == 0:
+                     print("  ✅ yt-dlp available (cmd)")
+                else:
+                     missing.append("yt-dlp")
         except (FileNotFoundError, subprocess.TimeoutExpired):
-            missing.append("yt-dlp")
-            print("  ⚠️ yt-dlp not found")
+             missing.append("yt-dlp")
+             print("  ⚠️ yt-dlp not found")
         
         if missing:
             print(f"\n⚠️ WARNING: Missing dependencies: {', '.join(missing)}")
@@ -242,6 +258,18 @@ class WorkflowManager:
                     except Exception as e:
                         print(f"  ⚠️ Page load error: {str(e)[:100]}")
                     
+                    # Wait for body to load (since we use page_load_strategy='none')
+                    from selenium.webdriver.common.by import By
+                    from selenium.webdriver.support.ui import WebDriverWait
+                    from selenium.webdriver.support import expected_conditions as EC
+                    
+                    try:
+                        WebDriverWait(scraper.driver, 20).until(
+                            EC.presence_of_element_located((By.TAG_NAME, "body"))
+                        )
+                    except:
+                        pass
+                    
                     # Wait for Cloudflare check to complete
                     print(f"  Waiting for Cloudflare check...")
                     max_wait = 30  # Increased back to 30 seconds for GitHub Actions
@@ -261,15 +289,37 @@ class WorkflowManager:
                             if "Just a moment" not in title and "Cloudflare" not in title:
                                 # Also check if we're on the actual page
                                 if "javgg.net" in url and "/new-post" in url:
-                                    print(f"  ✅ Cloudflare check passed after {waited}s")
+                                    print(f"  ✅ Cloudflare check passed after {waited}s", flush=True)
                                     cloudflare_passed = True
                                     page_loaded = True
                                     break
-                        except:
-                            pass
+                            else:
+                                if waited % 10 == 0:
+                                     print(f"  Detail: Title='{title}' URL='{url}'", flush=True)
+
+                        except Exception as e:
+                            print(f"  ❌ Error checking Cloudflare status: {e}", flush=True)
+                            if "refused" in str(e) or "reset" in str(e) or "closed" in str(e) or "invalid session" in str(e):
+                                print("  🔄 Browser connection lost, attempting restart...", flush=True)
+                                try:
+                                    if scraper.driver:
+                                        try:
+                                            scraper.driver.quit()
+                                        except:
+                                            pass
+                                    scraper.driver = None  # Force re-init
+                                    scraper._init_driver()
+                                    scraper.driver.get(base_url)
+                                    print("  ✅ Browser restarted and navigated to URL", flush=True)
+                                    waited = 0  # Reset wait timer
+                                except Exception as restart_e:
+                                    print(f"  ❌ Failed to restart browser: {restart_e}", flush=True)
+                                    break
+
+
                         
                         if waited % 10 == 0:  # Print every 10 seconds
-                            print(f"  ⏳ Still waiting for Cloudflare... ({waited}s)")
+                            print(f"  ⏳ Still waiting for Cloudflare... ({waited}s)", flush=True)
                     
                     if cloudflare_passed:
                         break
@@ -361,6 +411,11 @@ class WorkflowManager:
                         if code in self.progress['processed_videos']:
                             continue
                         
+                        # Skip generic /jav/ link (category page)
+                        if code in ['JAV', 'JAVGG', 'NEW-POST'] or url.rstrip('/').endswith('/jav'):
+                            print(f"  Skipping category link: {url}")
+                            continue
+
                         # Skip if in failed list
                         if code in self.progress['failed_videos']:
                             continue
@@ -1196,7 +1251,8 @@ class WorkflowManager:
             still_pending = []
             
             for item in self.progress['pending_enrichment']:
-                if current_time >= item['retry_after']:
+                # Force retry for debugging
+                if True or current_time >= item['retry_after']:
                     print(f"\n🔄 Retrying: {item['code']}")
                     
                     # Try to enrich again
@@ -1223,8 +1279,9 @@ class WorkflowManager:
         Run the complete workflow - processes videos one at a time
         max_videos: 0 = unlimited, otherwise limit to N videos
         """
-        print("\n" + "="*70)
-        print("JAVGG COMPLETE WORKFLOW")
+        print("DEBUG: Enters run()", flush=True)
+        print("\n" + "="*70, flush=True)
+        print("JAVGG COMPLETE WORKFLOW", flush=True)
         print("="*70)
         print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         if max_videos == 0:
@@ -1252,27 +1309,40 @@ class WorkflowManager:
                 print(f"\n✅ Reached max_videos limit ({max_videos})")
                 break
             
-            # Scrape just 1 video at a time
+            # Scrape videos in batches (e.g. 20 at a time) to avoid reloading page constantly
             print(f"\n{'='*70}")
-            print(f"LOOKING FOR NEXT VIDEO (Processed: {total_processed}/{max_videos if max_videos > 0 else '∞'})")
+            print(f"LOOKING FOR NEXT BATCH OF VIDEOS (Processed: {total_processed}/{max_videos if max_videos > 0 else '∞'})")
+            print(f"Fetching up to 20 videos...")
             print(f"{'='*70}")
             
-            video_urls = self.scrape_new_videos(max_videos=1)
+            video_urls = self.scrape_new_videos(max_videos=20)
             
             if not video_urls:
                 print("\n✅ No more new videos to process")
                 break
             
-            # Process the single video
-            video_url = video_urls[0]
-            total_processed += 1
+            print(f"\n✅ Found {len(video_urls)} videos in this batch")
             
-            print(f"\n{'='*70}")
-            print(f"VIDEO {total_processed}/{max_videos if max_videos > 0 else '∞'}")
-            print(f"{'='*70}")
+            # Process the batch
+            for i, video_url in enumerate(video_urls):
+                # Check global limit again inside batch
+                if max_videos > 0 and total_processed >= max_videos:
+                    print(f"\n✅ Reached max_videos limit ({max_videos})")
+                    break
+
+                total_processed += 1
+                
+                print(f"\n{'='*70}")
+                print(f"VIDEO {total_processed}/{max_videos if max_videos > 0 else '∞'} (Batch {i+1}/{len(video_urls)})")
+                print(f"{'='*70}")
+                
+                if self.process_video(video_url):
+                    success_count += 1
             
-            if self.process_video(video_url):
-                success_count += 1
+            # Check global limit break
+            if max_videos > 0 and total_processed >= max_videos:
+                break
+
         
         # Summary
         print("\n" + "="*70)
@@ -1301,4 +1371,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     workflow = WorkflowManager(base_dir=args.base_dir)
+    print("DEBUG: Created WorkflowManager", flush=True)
     workflow.run(max_videos=args.max_videos)
+    print("DEBUG: Finished run", flush=True)
