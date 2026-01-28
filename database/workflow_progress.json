@@ -1,7 +1,9 @@
 {
   "last_scraped_page": 1,
   "processed_videos": [],
-  "failed_videos": [],
+  "failed_videos": [
+    "FNS-182"
+  ],
   "pending_enrichment": [],
-  "last_run": "2026-01-28T10:54:55.980480"
+  "last_run": "2026-01-28T20:00:17.698329"
 }
