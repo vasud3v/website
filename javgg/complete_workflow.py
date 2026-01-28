@@ -303,7 +303,43 @@ class WorkflowManager:
             download_url = video_data.m3u8_url or video_data.embed_url
             print(f"  🔗 Download URL: {download_url[:60]}...")
             
-            # Try yt-dlp with stream URL
+            # Try HLS downloader first if we have M3U8 URL
+            if video_data.m3u8_url and '.m3u8' in video_data.m3u8_url:
+                print(f"  📥 Using HLS downloader...")
+                try:
+                    from hls_downloader import JavaGGHLSDownloader
+                    hls_dl = JavaGGHLSDownloader(max_workers=16)
+                    if hls_dl.download(video_data.m3u8_url, str(video_file)):
+                        # Validate the downloaded file
+                        if video_file.exists() and video_file.stat().st_size > 1024 * 1024:
+                            print(f"  ✅ Downloaded: {video_file.name} ({video_file.stat().st_size / 1024 / 1024:.1f} MB)")
+                            
+                            # Validate format
+                            validate_cmd = [
+                                'ffprobe', '-v', 'error',
+                                '-show_format',
+                                '-of', 'json',
+                                str(video_file)
+                            ]
+                            validate_result = subprocess.run(validate_cmd, capture_output=True, text=True, timeout=10)
+                            
+                            if validate_result.returncode == 0:
+                                validate_data = json.loads(validate_result.stdout)
+                                format_name = validate_data.get('format', {}).get('format_name', '')
+                                
+                                if 'png' not in format_name.lower() and 'image' not in format_name.lower():
+                                    print(f"  ✅ Video file is valid (format: {format_name})")
+                                    return str(video_file)
+                                else:
+                                    print(f"  ⚠️ Downloaded file is not a video (format: {format_name})")
+                                    video_file.unlink()
+                            else:
+                                return str(video_file)
+                except Exception as e:
+                    print(f"  ⚠️ HLS downloader failed: {str(e)}")
+                    print(f"  ⏭️ Falling back to yt-dlp...")
+            
+            # Fallback to yt-dlp
             print(f"  📥 Attempting download with yt-dlp...")
             cmd = [
                 'yt-dlp',
