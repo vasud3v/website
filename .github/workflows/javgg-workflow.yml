@@ -39,19 +39,13 @@ jobs:
           echo "Installing system dependencies..."
           sudo apt-get update -qq
           
-          # Install Chromium and chromedriver
-          echo "Installing Chromium..."
-          sudo apt-get install -y -qq chromium-browser chromium-chromedriver
-          
-          # Verify installation
-          echo "Verifying Chromium installation..."
-          which chromium-browser || echo "chromium-browser not found"
-          which chromedriver || echo "chromedriver not found"
-          chromium-browser --version || echo "Cannot get chromium version"
-          
           # Install ffmpeg
           echo "Installing ffmpeg..."
           sudo apt-get install -y -qq ffmpeg
+          
+          # Use pre-installed Chrome/Chromium from GitHub Actions runner
+          echo "Using pre-installed Chrome from runner..."
+          which google-chrome || which chromium-browser || echo "Browser check"
           
           echo "System dependencies installed"
       
@@ -68,17 +62,11 @@ jobs:
       - name: Verify browser setup
         run: |
           echo "=== Browser Setup Verification ==="
-          echo "Chromium binary:"
-          ls -la /usr/bin/chromium* || echo "No chromium binaries found"
+          echo "Chrome/Chromium binary:"
+          which google-chrome || which chromium-browser || echo "Checking browsers..."
           echo ""
-          echo "Chromedriver:"
-          ls -la /usr/bin/chromedriver* || echo "No chromedriver found"
-          echo ""
-          echo "Chromium version:"
-          chromium-browser --version || echo "Cannot run chromium-browser"
-          echo ""
-          echo "Chromedriver version:"
-          chromedriver --version || echo "Cannot run chromedriver"
+          echo "Chrome version:"
+          google-chrome --version || chromium-browser --version || echo "Browser version check"
           echo "==================================="
       
       - name: Configure Git
