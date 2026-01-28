@@ -57,15 +57,14 @@ class JavaGGScraper:
         if self.driver is None:
             print("🌐 Initializing browser...")
             
-            # Skip undetected-chromedriver in CI environments (doesn't work well)
+            # In CI, try seleniumbase UC mode which works better than standard Chrome
             is_ci = os.environ.get('CI') == 'true' or os.environ.get('GITHUB_ACTIONS') == 'true'
             
-            # Try multiple initialization methods
             if is_ci:
-                print("  ℹ️ CI environment detected, using standard Chrome")
+                print("  ℹ️ CI environment detected, using SeleniumBase UC mode")
                 methods = [
+                    self._init_with_uc_driver,  # Try UC first in CI
                     self._init_with_standard_chrome,
-                    self._init_with_chromium
                 ]
             else:
                 methods = [
@@ -103,14 +102,15 @@ class JavaGGScraper:
     
     def _init_with_uc_driver(self):
         """Try undetected-chromedriver (best for Cloudflare)"""
-        print("  Trying undetected-chromedriver...")
+        print("  Trying SeleniumBase UC mode...")
         self.driver = Driver(
             uc=True, 
             headless=self.headless, 
             incognito=True,
-            agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
             disable_csp=True,
-            no_sandbox=True
+            no_sandbox=True,
+            page_load_strategy='none'  # Don't wait for full page load
         )
     
     def _init_with_standard_chrome(self):
