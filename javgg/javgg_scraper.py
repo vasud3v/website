@@ -46,8 +46,15 @@ class VideoData:
 class JavaGGScraper:
     """Core scraper for javgg.net"""
     
-    def __init__(self, headless: bool = False, download_dir: str = "downloaded_files"):
-        self.headless = headless
+    def __init__(self, headless: bool = True, download_dir: str = "downloaded_files"):
+        # Force non-headless locally for better success rate
+        is_ci = os.environ.get('CI') == 'true' or os.environ.get('GITHUB_ACTIONS') == 'true'
+        if not is_ci:
+            print("  ℹ️ Running locally - forcing non-headless mode for better compatibility")
+            self.headless = False
+        else:
+            self.headless = headless
+        
         self.download_dir = download_dir
         self.driver = None
         os.makedirs(download_dir, exist_ok=True)
@@ -67,8 +74,9 @@ class JavaGGScraper:
                     self._init_with_standard_chrome,
                 ]
             else:
+                # Locally, skip UC mode as it's slow - use standard Chrome
+                print("  ℹ️ Local environment detected, using standard Chrome")
                 methods = [
-                    self._init_with_uc_driver,
                     self._init_with_standard_chrome,
                     self._init_with_chromium
                 ]
@@ -104,18 +112,8 @@ class JavaGGScraper:
         """Try undetected-chromedriver (best for Cloudflare)"""
         print("  Trying SeleniumBase UC mode...")
         
-        # In CI, UC mode often fails, so add timeout
-        import signal
-        
-        def timeout_handler(signum, frame):
-            raise TimeoutError("UC driver initialization timeout")
-        
+        # UC mode can be slow to start, increase timeout
         try:
-            # Set 10 second timeout for UC initialization
-            if hasattr(signal, 'SIGALRM'):
-                signal.signal(signal.SIGALRM, timeout_handler)
-                signal.alarm(10)
-            
             self.driver = Driver(
                 uc=True, 
                 headless=self.headless, 
@@ -126,14 +124,12 @@ class JavaGGScraper:
                 page_load_strategy='none'  # Don't wait for full page load
             )
             
-            # Cancel timeout
-            if hasattr(signal, 'SIGALRM'):
-                signal.alarm(0)
-                
-        except (TimeoutError, Exception) as e:
-            # Cancel timeout
-            if hasattr(signal, 'SIGALRM'):
-                signal.alarm(0)
+            # Test if driver works
+            _ = self.driver.current_url
+            print("  ✅ UC driver initialized successfully")
+            
+        except Exception as e:
+            print(f"  ⚠️ UC driver failed: {str(e)[:100]}")
             raise e
     
     def _init_with_standard_chrome(self):
