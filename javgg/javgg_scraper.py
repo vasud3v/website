@@ -378,23 +378,21 @@ class JavaGGScraper:
             return None
     
     def scrape_video(self, video_url: str) -> Optional[VideoData]:
-        """Scrape video metadata with timeout"""
+        """Scrape video metadata with timeout - tries requests first, then Selenium"""
         import signal
         
         def timeout_handler(signum, frame):
             raise TimeoutError("Scraping timeout")
         
         try:
-            self._init_driver()
+            # Set alarm for 90 seconds (only on Unix systems)
+            if hasattr(signal, 'SIGALRM'):
+                signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(90)  # 90 second timeout for entire scraping
             
             print(f"\n{'='*70}")
             print(f"🎬 Scraping: {video_url}")
             print(f"{'='*70}")
-            
-            # Set alarm for 60 seconds (only on Unix systems)
-            if hasattr(signal, 'SIGALRM'):
-                signal.signal(signal.SIGALRM, timeout_handler)
-                signal.alarm(60)  # 60 second timeout for entire scraping
             
             # Extract code
             code_match = re.search(r'/jav/([^/\?#]+)', video_url)
@@ -404,20 +402,145 @@ class JavaGGScraper:
             code = code_match.group(1).upper()
             print(f"  📝 Code: {code}")
             
+            # TRY METHOD 1: Requests-based scraping (bypasses Cloudflare better)
+            print(f"  🔄 Method 1: Trying requests-based scraping...")
+            result = self._scrape_with_requests(video_url, code)
+            if result:
+                print(f"  ✅ Successfully scraped with requests!")
+                return result
+            
+            print(f"  ⚠️ Requests method failed, trying Selenium...")
+            
+            # TRY METHOD 2: Selenium-based scraping (fallback)
+            return self._scrape_with_selenium(video_url, code)
+            
+        except TimeoutError:
+            print(f"  ❌ Scraping timeout")
+            return None
+        except Exception as e:
+            print(f"  ❌ Scraping error: {str(e)[:200]}")
+            return None
+        finally:
+            # Cancel alarm
+            if hasattr(signal, 'SIGALRM'):
+                signal.alarm(0)
+    
+    def _scrape_with_requests(self, video_url: str, code: str) -> Optional[VideoData]:
+        """Try to scrape using requests library (faster, better Cloudflare bypass)"""
+        try:
+            import requests
+            from requests.adapters import HTTPAdapter
+            from urllib3.util.retry import Retry
+            
+            # Create session with retries
+            session = requests.Session()
+            retry = Retry(total=3, backoff_factor=1, status_forcelist=[500, 502, 503, 504])
+            adapter = HTTPAdapter(max_retries=retry)
+            session.mount('http://', adapter)
+            session.mount('https://', adapter)
+            
+            # Headers to mimic real browser
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Cache-Control': 'max-age=0',
+            }
+            
+            # Add random delay
+            import random
+            time.sleep(random.uniform(1, 3))
+            
+            # Fetch page
+            response = session.get(video_url, headers=headers, timeout=15, allow_redirects=True)
+            
+            # Check if we got blocked
+            if response.status_code == 403 or 'Just a moment' in response.text or 'Cloudflare' in response.text[:1000]:
+                print(f"    ⚠️ Blocked by Cloudflare (status: {response.status_code})")
+                return None
+            
+            if response.status_code != 200:
+                print(f"    ⚠️ HTTP {response.status_code}")
+                return None
+            
+            # Parse HTML
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Extract title
+            title_elem = soup.find('h1', class_='entry-title') or soup.find('h1')
+            title = title_elem.text.strip() if title_elem else code
+            
+            # Extract thumbnail
+            thumbnail_url = None
+            og_image = soup.find('meta', property='og:image')
+            if og_image:
+                thumbnail_url = og_image.get('content')
+            
+            # Extract embed URL from iframe
+            embed_url = None
+            iframes = soup.find_all('iframe')
+            for iframe in iframes:
+                src = iframe.get('src', '')
+                if 'embed' in src or 'player' in src:
+                    if not src.startswith('http'):
+                        src = 'https:' + src if src.startswith('//') else 'https://javgg.net' + src
+                    embed_url = src
+                    break
+            
+            if not embed_url:
+                print(f"    ⚠️ No embed URL found")
+                return None
+            
+            print(f"    ✅ Found embed URL: {embed_url[:60]}...")
+            
+            # Try to extract M3U8 from embed
+            m3u8_url = self._extract_m3u8_from_embed(embed_url)
+            
+            return VideoData(
+                code=code,
+                title=title,
+                thumbnail_url=thumbnail_url,
+                embed_url=embed_url,
+                m3u8_url=m3u8_url,
+                scraped_at=datetime.now().isoformat()
+            )
+            
+        except Exception as e:
+            print(f"    ⚠️ Requests error: {str(e)[:100]}")
+            return None
+    
+    def _scrape_with_selenium(self, video_url: str, code: str) -> Optional[VideoData]:
+        """Scrape using Selenium (fallback method)"""
+    def _scrape_with_selenium(self, video_url: str, code: str) -> Optional[VideoData]:
+        """Scrape using Selenium (fallback method)"""
+        try:
+            self._init_driver()
+            
             # Load page with timeout
-            print(f"  🌐 Loading page...")
+            print(f"  🌐 Loading page with Selenium...")
             try:
-                self.driver.set_page_load_timeout(20)
+                self.driver.set_page_load_timeout(30)
                 self.driver.get(video_url)
-                time.sleep(3)  # Initial wait for page load
+                
+                # Random delay to appear more human (2-5 seconds)
+                import random
+                delay = random.uniform(2, 5)
+                time.sleep(delay)
                 print(f"  ✅ Page loaded")
             except Exception as e:
                 print(f"  ⚠️ Page load timeout or error: {str(e)[:100]}")
-                time.sleep(2)
+                time.sleep(3)
             
             # Check for Cloudflare and wait if needed
             print(f"  🔍 Checking for Cloudflare...")
-            max_cf_wait = 30
+            max_cf_wait = 60  # Increased from 30 to 60 seconds for GitHub Actions
             cf_waited = 0
             cloudflare_passed = False
             
@@ -436,8 +559,8 @@ class JavaGGScraper:
                 except:
                     pass
                 
-                time.sleep(2)
-                cf_waited += 2
+                time.sleep(3)  # Increased from 2 to 3 seconds
+                cf_waited += 3
                 
                 if cf_waited % 10 == 0:
                     print(f"  ⏳ Still waiting for Cloudflare... ({cf_waited}s)")
@@ -845,16 +968,9 @@ class JavaGGScraper:
                 scraped_at=datetime.now().isoformat()
             )
             
-        except TimeoutError:
-            print(f"  ❌ Scraping timeout (60 seconds)")
-            return None
         except Exception as e:
-            print(f"  ❌ Error: {e}")
+            print(f"  ❌ Selenium scraping error: {str(e)[:100]}")
             return None
-        finally:
-            # Cancel alarm if set
-            if hasattr(signal, 'SIGALRM'):
-                signal.alarm(0)
     
     def download_video(self, video_data: VideoData) -> bool:
         """Download video using yt-dlp with 32 concurrent fragments"""
