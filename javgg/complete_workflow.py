@@ -287,11 +287,12 @@ class WorkflowManager:
                 '--concurrent-fragments', '16',
                 '--retries', '5',
                 '--fragment-retries', '5',
-                '--progress',  # Show progress
+                '--quiet',  # Suppress progress output
+                '--progress-template', '%(progress.downloaded_bytes)s/%(progress.total_bytes)s',
                 download_url
             ]
             
-            # Run with real-time output on same line
+            # Run with minimal output
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -300,20 +301,20 @@ class WorkflowManager:
                 bufsize=1
             )
             
-            # Print progress on same line
-            last_line = ""
+            # Show progress at intervals (every 10%)
+            last_percent = 0
             for line in process.stdout:
                 line = line.strip()
-                if line and ('[download]' in line or '%' in line or 'ETA' in line):
-                    # Clear previous line and print new one
-                    if last_line:
-                        print('\r' + ' ' * len(last_line), end='', flush=True)
-                    print(f"\r     {line}", end='', flush=True)
-                    last_line = line
-            
-            # Move to next line after download completes
-            if last_line:
-                print()
+                if '/' in line:
+                    try:
+                        downloaded, total = line.split('/')
+                        percent = int((int(downloaded) / int(total)) * 100)
+                        # Show progress every 10%
+                        if percent >= last_percent + 10:
+                            print(f"     Progress: {percent}%")
+                            last_percent = percent
+                    except:
+                        pass
             
             process.wait()
             result_code = process.returncode
