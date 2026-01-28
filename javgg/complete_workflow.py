@@ -334,7 +334,7 @@ class WorkflowManager:
             video_dict = video_data.__dict__.copy()
             
             # Enrich with JAVDatabase
-            enriched_data = enrich_with_javdb(video_dict, headless=True, fetch_actress_details=True)
+            enriched_data = enrich_with_javdb(video_dict, headless=True)
             
             # Check if JAVDatabase enrichment failed
             if not enriched_data.get('javdb_available'):

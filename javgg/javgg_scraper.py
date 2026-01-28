@@ -112,7 +112,7 @@ class JavaGGScraper:
                 if 'timeout' not in str(e).lower():
                     raise
             
-            time.sleep(5)  # Wait longer for page to load
+            time.sleep(3)  # Reduced from 5 to 3 seconds
             
             # Try multiple methods to trigger video and find M3U8
             print(f"  ▶️ Triggering video play...")
@@ -123,7 +123,7 @@ class JavaGGScraper:
                     var playBtn = document.querySelector('.vjs-big-play-button, .play-button, button[aria-label*="Play"]');
                     if (playBtn) playBtn.click();
                 """)
-                time.sleep(2)
+                time.sleep(1)  # Reduced from 2 to 1
             except:
                 pass
             
@@ -136,7 +136,7 @@ class JavaGGScraper:
                         video.play();
                     }
                 """)
-                time.sleep(3)
+                time.sleep(2)  # Reduced from 3 to 2
             except:
                 pass
             
@@ -148,15 +148,15 @@ class JavaGGScraper:
                         if (player) player.play();
                     }
                 """)
-                time.sleep(2)
+                time.sleep(1)  # Reduced from 2 to 1
             except:
                 pass
             
             print(f"  🔍 Checking network logs for M3U8...")
             
-            # Wait and check logs multiple times
+            # Wait and check logs - reduced iterations
             m3u8_url = None
-            for attempt in range(3):
+            for attempt in range(2):  # Reduced from 3 to 2 attempts
                 try:
                     logs = driver.get_log('performance')
                     
@@ -180,7 +180,7 @@ class JavaGGScraper:
                     if m3u8_url:
                         break
                     
-                    time.sleep(2)
+                    time.sleep(1)  # Reduced from 2 to 1
                 except:
                     pass
             
