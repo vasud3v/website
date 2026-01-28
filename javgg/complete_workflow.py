@@ -65,7 +65,12 @@ class WorkflowManager:
         """Get or create reusable scraper instance"""
         if self.scraper is None:
             self.scraper = JavaGGScraper(headless=True)
-            self.scraper._init_driver()
+            try:
+                self.scraper._init_driver()
+            except Exception as e:
+                print(f"⚠️ Failed to initialize browser: {e}")
+                self.scraper = None
+                raise
         return self.scraper
     
     def cleanup_scraper(self):
@@ -358,46 +363,33 @@ class WorkflowManager:
                 try:
                     validate_cmd = [
                         'ffprobe', '-v', 'error',
-                        '-select_streams', 'v:0',
-                        '-show_entries', 'stream=codec_type',
-                        '-of', 'default=noprint_wrappers=1:nokey=1',
+                        '-show_format',
+                        '-of', 'json',
                         str(video_file)
                     ]
                     validate_result = subprocess.run(validate_cmd, capture_output=True, text=True, timeout=10)
                     
-                    if validate_result.returncode == 0 and 'video' in validate_result.stdout:
-                        print(f"  ✅ Video file is valid")
+                    if validate_result.returncode == 0:
+                        validate_data = json.loads(validate_result.stdout)
+                        format_name = validate_data.get('format', {}).get('format_name', '')
+                        
+                        # Check if it's actually a video format
+                        if 'png' in format_name.lower() or 'image' in format_name.lower():
+                            print(f"  ⚠️ Downloaded file is not a video (format: {format_name})")
+                            print(f"  ⚠️ This usually means the stream is encrypted or protected")
+                            print(f"  ⚠️ Deleting corrupted file...")
+                            video_file.unlink()
+                            return None
+                        
+                        print(f"  ✅ Video file is valid (format: {format_name})")
                         return str(video_file)
                     else:
-                        print(f"  ⚠️ Video file may be corrupted, attempting to fix...")
-                        
-                        # Try to re-encode the file
-                        fixed_file = self.download_dir / f"{video_code}_fixed.mp4"
-                        fix_cmd = [
-                            'ffmpeg', '-i', str(video_file),
-                            '-c', 'copy',
-                            '-movflags', '+faststart',
-                            '-y',
-                            str(fixed_file)
-                        ]
-                        
-                        fix_result = subprocess.run(fix_cmd, capture_output=True, text=True, timeout=300)
-                        
-                        if fix_result.returncode == 0 and fixed_file.exists():
-                            # Replace original with fixed version
-                            video_file.unlink()
-                            fixed_file.rename(video_file)
-                            print(f"  ✅ Video file fixed and validated")
-                            return str(video_file)
-                        else:
-                            print(f"  ⚠️ Could not fix video file, using as-is")
-                            return str(video_file)
+                        print(f"  ⚠️ Video validation failed")
+                        return str(video_file)  # Use anyway, might still work
                             
                 except Exception as e:
                     print(f"  ⚠️ Validation error: {str(e)}, using file as-is")
                     return str(video_file)
-                
-                return str(video_file)
             
             # If yt-dlp failed, log the error
             print(f"  ❌ yt-dlp failed")
@@ -495,8 +487,8 @@ class WorkflowManager:
             try:
                 validate_cmd = [
                     'ffprobe', '-v', 'error',
-                    '-select_streams', 'v:0',
-                    '-show_entries', 'stream=codec_name,codec_type',
+                    '-show_format',
+                    '-show_streams',
                     '-of', 'json',
                     str(video_file)
                 ]
@@ -507,12 +499,26 @@ class WorkflowManager:
                     return None
                 
                 validate_data = json.loads(validate_result.stdout)
-                if not validate_data.get('streams') or validate_data['streams'][0].get('codec_type') != 'video':
-                    print(f"  ⚠️ File is not a valid video - skipping preview")
-                    print(f"     Detected format: {validate_data.get('streams', [{}])[0].get('codec_name', 'unknown')}")
+                
+                # Check format name - should be mp4, mov, avi, etc. NOT png_pipe
+                format_name = validate_data.get('format', {}).get('format_name', '')
+                if 'png' in format_name.lower() or 'image' in format_name.lower():
+                    print(f"  ⚠️ File is not a video (detected as {format_name}) - skipping preview")
                     return None
                 
-                print(f"  ✅ Video format validated")
+                # Check if there's a video stream
+                video_streams = [s for s in validate_data.get('streams', []) if s.get('codec_type') == 'video']
+                if not video_streams:
+                    print(f"  ⚠️ No video stream found - skipping preview")
+                    return None
+                
+                # Check video codec - should be h264, hevc, etc. NOT png
+                video_codec = video_streams[0].get('codec_name', '')
+                if video_codec.lower() in ['png', 'jpg', 'jpeg', 'gif', 'bmp']:
+                    print(f"  ⚠️ File contains images, not video (codec: {video_codec}) - skipping preview")
+                    return None
+                
+                print(f"  ✅ Video format validated (format: {format_name}, codec: {video_codec})")
                 
             except Exception as e:
                 print(f"  ⚠️ Validation error: {str(e)} - skipping preview")
@@ -723,8 +729,12 @@ class WorkflowManager:
                 return False
             
             # Step 3: Generate preview (with file size for optimization)
-            file_size_mb = os.path.getsize(video_file) / 1024 / 1024
-            preview_file = self.generate_preview_video(video_file, video_code, file_size_mb)
+            if video_file and os.path.exists(video_file):
+                file_size_mb = os.path.getsize(video_file) / 1024 / 1024
+                preview_file = self.generate_preview_video(video_file, video_code, file_size_mb)
+            else:
+                print(f"  ⚠️ Video file not found, skipping preview")
+                preview_file = None
             
             # Step 4: Upload videos
             urls = self.upload_videos(video_file, preview_file, video_code)
@@ -748,6 +758,12 @@ class WorkflowManager:
             
         except Exception as e:
             print(f"\n❌ Error processing {video_code}: {str(e)}")
+            
+            # If browser crashed, recreate it
+            if "browser" in str(e).lower() or "driver" in str(e).lower():
+                print(f"  🔄 Browser may have crashed, recreating...")
+                self.cleanup_scraper()
+            
             self.progress['failed_videos'].append(video_code)
             self.save_progress()
             return False
