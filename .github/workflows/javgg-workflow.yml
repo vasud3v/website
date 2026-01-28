@@ -36,16 +36,50 @@ jobs:
       
       - name: Install system dependencies
         run: |
+          echo "Installing system dependencies..."
           sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg chromium-browser chromium-chromedriver > /dev/null 2>&1 || true
+          
+          # Install Chromium and chromedriver
+          echo "Installing Chromium..."
+          sudo apt-get install -y -qq chromium-browser chromium-chromedriver
+          
+          # Verify installation
+          echo "Verifying Chromium installation..."
+          which chromium-browser || echo "chromium-browser not found"
+          which chromedriver || echo "chromedriver not found"
+          chromium-browser --version || echo "Cannot get chromium version"
+          
+          # Install ffmpeg
+          echo "Installing ffmpeg..."
+          sudo apt-get install -y -qq ffmpeg
+          
+          echo "System dependencies installed"
       
       - name: Install Python dependencies
         run: |
+          echo "Installing Python dependencies..."
           python -m pip install --upgrade pip
           pip install -r javgg/requirements.txt
           pip install -r tools/preview_generator/requirements.txt || true
           pip install -r upload_pipeline/requirements.txt || true
           pip install yt-dlp
+          echo "Python dependencies installed"
+      
+      - name: Verify browser setup
+        run: |
+          echo "=== Browser Setup Verification ==="
+          echo "Chromium binary:"
+          ls -la /usr/bin/chromium* || echo "No chromium binaries found"
+          echo ""
+          echo "Chromedriver:"
+          ls -la /usr/bin/chromedriver* || echo "No chromedriver found"
+          echo ""
+          echo "Chromium version:"
+          chromium-browser --version || echo "Cannot run chromium-browser"
+          echo ""
+          echo "Chromedriver version:"
+          chromedriver --version || echo "Cannot run chromedriver"
+          echo "==================================="
       
       - name: Configure Git
         run: |

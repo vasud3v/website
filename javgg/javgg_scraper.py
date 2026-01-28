@@ -52,29 +52,116 @@ class JavaGGScraper:
         os.makedirs(download_dir, exist_ok=True)
     
     def _init_driver(self):
-        """Initialize browser with Cloudflare bypass"""
+        """Initialize browser with Cloudflare bypass - GitHub Actions compatible"""
         if self.driver is None:
             print("🌐 Initializing browser...")
-            # Use undetected-chromedriver with additional stealth options
-            try:
-                self.driver = Driver(
-                    uc=True, 
-                    headless=self.headless, 
-                    incognito=True,
-                    agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    # Additional options for better Cloudflare bypass
-                    disable_csp=True,
-                    no_sandbox=True
-                )
-                
-                # Set additional timeouts
-                self.driver.set_page_load_timeout(60)
-                self.driver.set_script_timeout(30)
-                
-                print("  ✅ Browser ready")
-            except Exception as e:
-                print(f"  ⚠️ Browser initialization error: {str(e)[:100]}")
-                raise
+            
+            # Try multiple initialization methods
+            methods = [
+                self._init_with_uc_driver,
+                self._init_with_standard_chrome,
+                self._init_with_chromium
+            ]
+            
+            last_error = None
+            for method in methods:
+                try:
+                    method()
+                    if self.driver:
+                        # Set additional timeouts
+                        self.driver.set_page_load_timeout(60)
+                        self.driver.set_script_timeout(30)
+                        print("  ✅ Browser ready")
+                        return
+                except Exception as e:
+                    last_error = e
+                    print(f"  ⚠️ Method failed: {str(e)[:80]}")
+                    if self.driver:
+                        try:
+                            self.driver.quit()
+                        except:
+                            pass
+                        self.driver = None
+            
+            # All methods failed
+            print(f"  ❌ All browser initialization methods failed")
+            if last_error:
+                raise last_error
+            else:
+                raise Exception("Failed to initialize browser")
+    
+    def _init_with_uc_driver(self):
+        """Try undetected-chromedriver (best for Cloudflare)"""
+        print("  Trying undetected-chromedriver...")
+        self.driver = Driver(
+            uc=True, 
+            headless=self.headless, 
+            incognito=True,
+            agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            disable_csp=True,
+            no_sandbox=True
+        )
+    
+    def _init_with_standard_chrome(self):
+        """Try standard Chrome with stealth options"""
+        print("  Trying standard Chrome...")
+        from selenium.webdriver.chrome.service import Service
+        
+        options = Options()
+        options.add_argument('--headless=new')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--disable-blink-features=AutomationControlled')
+        options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option('useAutomationExtension', False)
+        
+        # Try to find Chrome/Chromium binary
+        import shutil
+        chrome_paths = [
+            '/usr/bin/chromium-browser',
+            '/usr/bin/chromium',
+            '/usr/bin/google-chrome',
+            shutil.which('chromium-browser'),
+            shutil.which('google-chrome'),
+        ]
+        
+        for path in chrome_paths:
+            if path and os.path.exists(path):
+                options.binary_location = path
+                break
+        
+        self.driver = webdriver.Chrome(options=options)
+    
+    def _init_with_chromium(self):
+        """Try Chromium specifically (GitHub Actions)"""
+        print("  Trying Chromium...")
+        from selenium.webdriver.chrome.service import Service
+        
+        options = Options()
+        options.add_argument('--headless=new')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--disable-software-rasterizer')
+        options.add_argument('--disable-blink-features=AutomationControlled')
+        options.add_argument('--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option('useAutomationExtension', False)
+        
+        # Force Chromium binary
+        options.binary_location = '/usr/bin/chromium-browser'
+        
+        # Try chromium-chromedriver
+        service = None
+        if os.path.exists('/usr/bin/chromedriver'):
+            service = Service('/usr/bin/chromedriver')
+        
+        if service:
+            self.driver = webdriver.Chrome(service=service, options=options)
+        else:
+            self.driver = webdriver.Chrome(options=options)
     
     def _extract_m3u8_from_embed_fast(self, embed_url: str) -> Optional[str]:
         """Fast M3U8 extraction with minimal waits"""

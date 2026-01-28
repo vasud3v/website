@@ -84,14 +84,19 @@ class WorkflowManager:
                     self.scraper = None
                     
             except Exception as e:
-                print(f"  ⚠️ Failed to initialize browser (attempt {attempt+1}/{max_retries}): {str(e)[:100]}")
+                error_msg = str(e)[:200]
+                print(f"  ⚠️ Failed to initialize browser (attempt {attempt+1}/{max_retries}): {error_msg}")
                 self.cleanup_scraper()
                 self.scraper = None
                 
                 if attempt < max_retries - 1:
-                    time.sleep(5)
+                    print(f"  ⏳ Waiting 10 seconds before retry...")
+                    time.sleep(10)
                 else:
-                    raise
+                    print(f"\n❌ CRITICAL: Cannot initialize browser after {max_retries} attempts")
+                    print(f"   This usually means Chrome/Chromium is not properly installed")
+                    print(f"   or there's a system-level issue in GitHub Actions")
+                    raise Exception(f"Browser initialization failed: {error_msg}")
         
         return self.scraper
     
