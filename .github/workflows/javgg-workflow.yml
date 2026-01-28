@@ -111,6 +111,33 @@ jobs:
           which chromedriver
           echo "==================================="
       
+      - name: Test browser initialization
+        run: |
+          echo "Testing browser initialization..."
+          python3 -c "
+          from selenium import webdriver
+          from selenium.webdriver.chrome.options import Options
+          import sys
+          
+          print('Creating Chrome options...')
+          options = Options()
+          options.add_argument('--headless=new')
+          options.add_argument('--no-sandbox')
+          options.add_argument('--disable-dev-shm-usage')
+          options.add_argument('--disable-gpu')
+          
+          print('Initializing Chrome driver...')
+          try:
+              driver = webdriver.Chrome(options=options)
+              print('✅ Browser initialized successfully')
+              print(f'Browser version: {driver.capabilities[\"browserVersion\"]}')
+              driver.quit()
+              print('✅ Browser closed successfully')
+          except Exception as e:
+              print(f'❌ Browser initialization failed: {e}')
+              sys.exit(1)
+          "
+      
       - name: Configure Git
         run: |
           git config --global user.name "GitHub Actions Bot"
@@ -126,7 +153,7 @@ jobs:
           cd javgg || exit 1
           echo "Changed to javgg directory"
           echo "Running: python complete_workflow.py --max-videos $MAX_VIDEOS"
-          timeout 5h python -u complete_workflow.py --max-videos $MAX_VIDEOS 2>&1 | grep -v "libpxbackend" | grep -v "libgiolibproxy" || true
+          timeout 5h python -u complete_workflow.py --max-videos $MAX_VIDEOS 2>&1 || true
           echo "Workflow completed or timed out"
       
       - name: Commit and push changes
