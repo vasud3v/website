@@ -622,7 +622,7 @@ class WorkflowManager:
     
     def run(self, max_videos: int = 0):
         """
-        Run the complete workflow
+        Run the complete workflow - processes videos one at a time
         max_videos: 0 = unlimited, otherwise limit to N videos
         """
         print("\n" + "="*70)
@@ -630,9 +630,9 @@ class WorkflowManager:
         print("="*70)
         print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         if max_videos == 0:
-            print("Mode: UNLIMITED - Processing all new videos until done or timeout")
+            print("Mode: UNLIMITED - Processing videos one by one until done or timeout")
         else:
-            print(f"Mode: LIMITED - Processing up to {max_videos} videos")
+            print(f"Mode: LIMITED - Processing up to {max_videos} videos one by one")
         
         print("\nChecking pending enrichments...")
         # Retry pending enrichments first
@@ -641,30 +641,47 @@ class WorkflowManager:
         else:
             print("  No pending enrichments")
         
-        print("\nStarting video scraping...")
-        # Scrape new videos
-        video_urls = self.scrape_new_videos(max_videos)
+        print("\nStarting video processing (one at a time)...")
         
-        if not video_urls:
-            print("\n✅ No new videos to process")
-            return
-        
-        # Process each video
+        # Process videos one at a time
         success_count = 0
-        for i, url in enumerate(video_urls, 1):
+        total_processed = 0
+        
+        # Keep processing until we hit the limit or run out of videos
+        while True:
+            # Check if we've reached the limit
+            if max_videos > 0 and total_processed >= max_videos:
+                print(f"\n✅ Reached max_videos limit ({max_videos})")
+                break
+            
+            # Scrape just 1 video at a time
             print(f"\n{'='*70}")
-            print(f"VIDEO {i}/{len(video_urls)}")
+            print(f"LOOKING FOR NEXT VIDEO (Processed: {total_processed}/{max_videos if max_videos > 0 else '∞'})")
             print(f"{'='*70}")
             
-            if self.process_video(url):
+            video_urls = self.scrape_new_videos(max_videos=1)
+            
+            if not video_urls:
+                print("\n✅ No more new videos to process")
+                break
+            
+            # Process the single video
+            video_url = video_urls[0]
+            total_processed += 1
+            
+            print(f"\n{'='*70}")
+            print(f"VIDEO {total_processed}/{max_videos if max_videos > 0 else '∞'}")
+            print(f"{'='*70}")
+            
+            if self.process_video(video_url):
                 success_count += 1
         
         # Summary
         print("\n" + "="*70)
         print("WORKFLOW COMPLETE")
         print("="*70)
-        print(f"✅ Successfully processed: {success_count}/{len(video_urls)}")
-        print(f"❌ Failed: {len(video_urls) - success_count}")
+        print(f"✅ Successfully processed: {success_count}/{total_processed}")
+        print(f"❌ Failed: {total_processed - success_count}")
         print(f"⏳ Pending enrichment: {len(self.progress['pending_enrichment'])}")
         print(f"End time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
