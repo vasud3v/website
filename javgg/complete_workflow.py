@@ -114,21 +114,43 @@ class WorkflowManager:
                 if page > 1:
                     base_url = f"https://javgg.net/new-post/page/{page}/"
                 
+                print(f"  Loading: {base_url}")
                 scraper.driver.get(base_url)
-                time.sleep(3)  # Reduced from 5 to 3 seconds
+                time.sleep(5)  # Increased wait time for GitHub Actions
+                
+                # Check if page loaded
+                print(f"  Current URL: {scraper.driver.current_url}")
+                print(f"  Page title: {scraper.driver.title}")
                 
                 # Scroll down to trigger lazy loading
                 scraper.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(1)  # Reduced from 2 to 1 second
+                time.sleep(2)  # Increased wait time for lazy loading
+                
+                # Scroll again to ensure all content loads
+                scraper.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(2)
                 
                 # Find all video links
                 from bs4 import BeautifulSoup
                 soup = BeautifulSoup(scraper.driver.page_source, 'html.parser')
                 
+                # Debug: Save page source if no links found
+                all_links = soup.find_all('a', href=True)
+                print(f"  Debug: Total links on page: {len(all_links)}")
+                
                 # Look for links with /jav/ in them
                 video_links = soup.find_all('a', href=lambda x: x and '/jav/' in x)
                 
                 print(f"  Found {len(video_links)} video links")
+                
+                # If no links found, save page source for debugging
+                if len(video_links) == 0:
+                    debug_file = self.download_dir / f"debug_page_{page}.html"
+                    with open(debug_file, 'w', encoding='utf-8') as f:
+                        f.write(scraper.driver.page_source)
+                    print(f"  ⚠️ Saved page source to {debug_file} for debugging")
+                    print(f"  Page title: {soup.find('title').text if soup.find('title') else 'N/A'}")
+                    print(f"  Page URL: {scraper.driver.current_url}")
                 
                 if not video_links or len(video_links) == 0:
                     print(f"  ℹ️ No video links found on page {page}")

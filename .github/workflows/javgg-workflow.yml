@@ -55,9 +55,12 @@ jobs:
       - name: Run workflow
         env:
           MAX_VIDEOS: ${{ github.event.inputs.max_videos || '0' }}
+          # Suppress browser warnings
+          PYTHONUNBUFFERED: '1'
+          GIO_MODULE_DIR: '/dev/null'
         run: |
           cd javgg
-          python complete_workflow.py --max-videos $MAX_VIDEOS
+          python complete_workflow.py --max-videos $MAX_VIDEOS 2>&1 | grep -v "libpxbackend" | grep -v "libgiolibproxy" || true
       
       - name: Commit and push changes
         run: |
