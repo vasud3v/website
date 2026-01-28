@@ -702,42 +702,32 @@ class WorkflowManager:
         
         video_dict = None
         
-        if is_github_actions:
-            # In GitHub Actions, skip javgg scraping and use JAVDatabase directly
-            print(f"  ℹ️ GitHub Actions detected - using JAVDatabase directly")
-            video_dict = {
-                'code': video_code,
-                'title': video_code,
-                'source_url': video_url,
-                'scraped_at': datetime.now().isoformat()
-            }
-        else:
-            # Local environment - try javgg scraping
-            scraper = self.get_scraper()
+        # Try javgg scraping first (works locally and sometimes in CI)
+        scraper = self.get_scraper()
+        
+        try:
+            print(f"  🔍 Attempting JavaGG scraping...")
+            video_data = scraper.scrape_video(video_url)
             
-            try:
-                # Scrape JavaGG
-                video_data = scraper.scrape_video(video_url)
-                
-                if not video_data:
-                    print(f"  ⚠️ JavaGG scraping failed, falling back to JAVDatabase only")
-                    video_dict = {
-                        'code': video_code,
-                        'title': video_code,
-                        'source_url': video_url,
-                        'scraped_at': datetime.now().isoformat()
-                    }
-                else:
-                    # Convert to dict
-                    video_dict = video_data.__dict__.copy()
-            except Exception as e:
-                print(f"  ⚠️ JavaGG scraping error: {str(e)[:100]}")
+            if video_data:
+                print(f"  ✅ JavaGG scraping successful!")
+                video_dict = video_data.__dict__.copy()
+            else:
+                print(f"  ⚠️ JavaGG scraping failed, using minimal data")
                 video_dict = {
                     'code': video_code,
                     'title': video_code,
                     'source_url': video_url,
                     'scraped_at': datetime.now().isoformat()
                 }
+        except Exception as e:
+            print(f"  ⚠️ JavaGG scraping error: {str(e)[:100]}")
+            video_dict = {
+                'code': video_code,
+                'title': video_code,
+                'source_url': video_url,
+                'scraped_at': datetime.now().isoformat()
+            }
         
         if not video_dict:
             print(f"  ❌ Failed to create video data")
@@ -756,7 +746,10 @@ class WorkflowManager:
                     'url': video_url,
                     'retry_after': (datetime.now().timestamp() + 2 * 24 * 3600)  # 2 days
                 })
-                return None
+                # Still save what we have
+                save_video_to_database(video_dict, enriched=False)
+                print(f"  ✅ Basic metadata saved (will retry JAVDatabase later)")
+                return video_dict
             
             # Save to database
             save_video_to_database(enriched_data, enriched=enriched_data.get('javdb_available', False))
@@ -769,7 +762,14 @@ class WorkflowManager:
             print(f"  ❌ Error enriching: {str(e)[:200]}")
             import traceback
             traceback.print_exc()
-            return None
+            
+            # Try to save basic data at least
+            try:
+                save_video_to_database(video_dict, enriched=False)
+                print(f"  ✅ Saved basic metadata despite error")
+                return video_dict
+            except:
+                return None
         
         # Don't close scraper - reuse it
     

@@ -587,137 +587,175 @@ class JavaGGScraper:
         try:
             self._init_driver()
             
-            # Load page with timeout
-            print(f"  🌐 Loading page...")
-            try:
-                # Start loading (won't wait for full load due to page_load_strategy='none')
-                self.driver.get(video_url)
-                
-                # Wait for body to appear first
-                print(f"  ⏳ Waiting for page body...")
-                body_loaded = False
-                for _ in range(20):  # 20 x 0.5s = 10 seconds max
-                    try:
-                        if self.driver.find_element("tag name", "body"):
-                            print(f"  ✓ Page body loaded")
-                            body_loaded = True
-                            break
-                    except:
-                        pass
-                    time.sleep(0.5)
-                
-                if not body_loaded:
-                    print(f"  ⚠️ Page body not loaded after 10s")
-                    return None
-                
-                # DON'T call window.stop() - let JavaScript execute!
-                # The page needs JS to inject iframes
-                
-                # Wait for JavaScript to execute and inject content
-                print(f"  ⏳ Waiting for JavaScript to execute...")
-                time.sleep(15)  # Increased from 8 to 15 - give JS more time!
-                
-            except Exception as e:
-                print(f"  ⚠️ Page load error: {str(e)[:100]}")
-                time.sleep(2)
+            print(f"  🌐 Loading page with Selenium...")
             
-            # Scroll to trigger lazy loading and JavaScript execution
-            print(f"  📜 Scrolling to trigger content loading...")
+            # Load the page
+            self.driver.get(video_url)
+            
+            # Wait for body
+            print(f"  ⏳ Waiting for page body...")
+            body_loaded = False
+            for i in range(20):
+                try:
+                    body = self.driver.find_element("tag name", "body")
+                    if body:
+                        body_loaded = True
+                        print(f"  ✓ Page body loaded after {i * 0.5}s")
+                        break
+                except:
+                    pass
+                time.sleep(0.5)
+            
+            if not body_loaded:
+                print(f"  ❌ Page body failed to load")
+                return None
+            
+            # Check page title to see if we're blocked
             try:
-                # Scroll down
+                page_title = self.driver.title
+                print(f"  📄 Page title: {page_title}")
+                
+                # If title indicates blocking, wait longer
+                if "Checking" in page_title or "Just a moment" in page_title:
+                    print(f"  ⏳ Detected challenge page, waiting 20 seconds...")
+                    time.sleep(20)
+                    page_title = self.driver.title
+                    print(f"  📄 New title: {page_title}")
+            except:
+                pass
+            
+            # Wait for JavaScript to execute
+            print(f"  ⏳ Waiting 15 seconds for JavaScript...")
+            time.sleep(15)
+            
+            # Scroll to trigger lazy loading
+            print(f"  📜 Scrolling page...")
+            try:
                 self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight / 2);")
                 time.sleep(2)
-                
-                # Scroll to video player area if it exists
-                self.driver.execute_script("""
-                    var player = document.querySelector('.video-player, .player, #player, .video-container, .entry-content');
-                    if (player) {
-                        player.scrollIntoView({behavior: 'smooth', block: 'center'});
-                    }
-                """)
-                time.sleep(3)
-                
-                # Scroll back up
+                self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(2)
                 self.driver.execute_script("window.scrollTo(0, 0);")
                 time.sleep(2)
             except Exception as e:
                 print(f"  ⚠️ Scroll error: {str(e)[:100]}")
             
-            # Wait for iframe to load (might be dynamic)
-            print(f"  ⏳ Waiting for video player to load...")
-            max_wait = 30  # Increased from 15 to 30 for JS-heavy pages
-            iframe_found = False
+            # Now check for iframes
+            print(f"  🔍 Checking for iframes...")
+            page_source = self.driver.page_source
+            soup = BeautifulSoup(page_source, 'html.parser')
             
-            for wait_time in range(max_wait):
-                # Check page source for iframes
+            # Debug: Save page source
+            debug_file = os.path.join(self.download_dir, f"{code}_selenium_page.html")
+            with open(debug_file, 'w', encoding='utf-8') as f:
+                f.write(page_source)
+            print(f"  💾 Saved page source to {debug_file}")
+            
+            # Find iframes
+            iframes = soup.find_all('iframe')
+            print(f"  🎬 Found {len(iframes)} iframes")
+            
+            if len(iframes) == 0:
+                # Try waiting more and checking again
+                print(f"  ⏳ No iframes yet, waiting 10 more seconds...")
+                time.sleep(10)
+                
+                # Try clicking on video area
+                try:
+                    self.driver.execute_script("""
+                        var videoArea = document.querySelector('.entry-content, .video-container, .player-container, .video-player');
+                        if (videoArea) {
+                            videoArea.click();
+                            console.log('Clicked video area');
+                        }
+                    """)
+                    time.sleep(5)
+                except:
+                    pass
+                
                 page_source = self.driver.page_source
                 soup = BeautifulSoup(page_source, 'html.parser')
                 iframes = soup.find_all('iframe')
-                
-                if iframes:
-                    iframe_found = True
-                    print(f"  ✅ Video player loaded ({wait_time}s)")
-                    break
-                
-                # Try to trigger iframe loading with JavaScript every 5 seconds
-                if wait_time % 5 == 0:
-                    try:
-                        # Try to find and click play button or video container
-                        self.driver.execute_script("""
-                            // Try to trigger video player initialization
-                            var playBtn = document.querySelector('.play-button, .vjs-big-play-button, button[aria-label*="play"]');
-                            if (playBtn) playBtn.click();
-                            
-                            // Try to focus on video container
-                            var videoContainer = document.querySelector('.video-player, .player, #player');
-                            if (videoContainer) videoContainer.click();
-                            
-                            // Scroll to video area
-                            var videoArea = document.querySelector('.entry-content, .video-container, .player-container');
-                            if (videoArea) videoArea.scrollIntoView({behavior: 'smooth', block: 'center'});
-                        """)
-                        print(f"    🔄 Triggered player load attempt ({wait_time}s)")
-                    except:
-                        pass
-                
-                time.sleep(1)
+                print(f"  🎬 Now found {len(iframes)} iframes")
             
-            if not iframe_found:
-                print(f"  ⚠️ No iframes found after {max_wait}s wait")
-                print(f"  🔍 Checking page structure...")
+            if len(iframes) == 0:
+                print(f"  ❌ No iframes found after all attempts")
                 
-                # Check if page has video-related elements
-                video_elements = soup.find_all(['video', 'div'], class_=re.compile(r'video|player', re.I))
-                if video_elements:
-                    print(f"  📍 Found {len(video_elements)} video-related elements (but no iframes)")
+                # Check if page has any video-related content
+                video_divs = soup.find_all(['div', 'section'], class_=lambda x: x and ('video' in x.lower() or 'player' in x.lower()))
+                print(f"  🔍 Found {len(video_divs)} video-related divs")
                 
-                # Check for JavaScript errors or blocks
+                # Check console for errors
                 try:
-                    console_logs = self.driver.get_log('browser')
-                    if console_logs:
-                        print(f"  🔍 Browser console has {len(console_logs)} messages")
-                        for log in console_logs[:3]:  # Show first 3
+                    logs = self.driver.get_log('browser')
+                    if logs:
+                        print(f"  🔍 Browser console has {len(logs)} messages")
+                        for log in logs[:5]:
                             if 'error' in log.get('level', '').lower():
-                                print(f"     ❌ {log.get('message', '')[:80]}")
+                                print(f"    ❌ {log.get('message', '')[:100]}")
                 except:
                     pass
-            
-            # Get final page source
-            soup = BeautifulSoup(self.driver.page_source, 'html.parser')
-            
-            # Final check: are we still on Cloudflare page?
-            page_title = soup.find('title')
-            if page_title and "Just a moment" in page_title.text:
-                print(f"  ❌ Still blocked by Cloudflare after all waits")
-                print(f"  ⚠️ This video page has stricter Cloudflare protection")
-                
-                # Save debug info
-                debug_file = os.path.join(self.download_dir, f"{code}_cloudflare_blocked.html")
-                with open(debug_file, 'w', encoding='utf-8') as f:
-                    f.write(self.driver.page_source)
-                print(f"  💾 Saved Cloudflare page to {debug_file}")
                 
                 return None
+            
+            # Extract embed URL from iframe
+            embed_url = None
+            for iframe in iframes:
+                src = iframe.get('src', '') or iframe.get('data-src', '')
+                if src:
+                    print(f"  🔗 iframe src: {src[:80]}...")
+                    if 'embed' in src or 'player' in src or 'stream' in src:
+                        if not src.startswith('http'):
+                            src = 'https:' + src if src.startswith('//') else 'https://javgg.net' + src
+                        embed_url = src
+                        print(f"  ✅ Selected embed URL: {embed_url[:80]}...")
+                        break
+            
+            if not embed_url:
+                print(f"  ❌ No valid embed URL found in iframes")
+                return None
+            
+            # Extract other metadata
+            title = code
+            title_elem = soup.find('h1', class_='entry-title') or soup.find('h1')
+            if title_elem:
+                title = title_elem.text.strip()
+            
+            thumbnail_url = ""
+            og_image = soup.find('meta', property='og:image')
+            if og_image:
+                thumbnail_url = og_image.get('content', '')
+            
+            # Try to extract M3U8 from embed
+            m3u8_url = self._extract_m3u8_from_embed(embed_url)
+            
+            print(f"  ✅ Selenium scraping successful")
+            
+            return VideoData(
+                code=code,
+                title=title,
+                title_japanese="",
+                embed_url=embed_url,
+                m3u8_url=m3u8_url or "",
+                thumbnail_url=thumbnail_url,
+                release_date="",
+                release_date_formatted="",
+                duration="",
+                duration_minutes=0,
+                studio="",
+                studio_japanese="",
+                director="",
+                series="",
+                models=[],
+                tags=[],
+                scraped_at=datetime.now().isoformat()
+            )
+            
+        except Exception as e:
+            print(f"  ❌ Selenium scraping error: {str(e)[:200]}")
+            import traceback
+            traceback.print_exc()
+            return None
             
             # Extract title (full from description)
             title = ""
