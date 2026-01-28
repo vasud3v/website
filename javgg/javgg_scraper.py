@@ -414,6 +414,23 @@ class JavaGGScraper:
                 print(f"  ⚠️ Page load timeout or error: {str(e)[:100]}")
                 time.sleep(1)  # Reduced from 2 to 1
             
+            # Wait for iframe to load (might be dynamic)
+            print(f"  ⏳ Waiting for video player to load...")
+            max_wait = 10
+            iframe_found = False
+            for wait_time in range(max_wait):
+                soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+                iframes = soup.find_all('iframe')
+                if iframes:
+                    iframe_found = True
+                    print(f"  ✅ Video player loaded ({wait_time}s)")
+                    break
+                time.sleep(1)
+            
+            if not iframe_found:
+                print(f"  ⚠️ No iframes found after {max_wait}s wait")
+            
+            # Get final page source
             soup = BeautifulSoup(self.driver.page_source, 'html.parser')
             
             # Extract title (full from description)
@@ -448,21 +465,70 @@ class JavaGGScraper:
             
             # Extract embed URL (REAL VIDEO)
             embed_url = ""
+            
+            # Debug: Show all iframes found
+            all_iframes = soup.find_all('iframe')
+            print(f"  🔍 Found {len(all_iframes)} total iframes")
+            
+            # Try multiple methods to find embed iframe
+            
+            # Method 1: Look for iframes with metaframe class
             iframes = soup.find_all('iframe', class_=re.compile(r'metaframe'))
+            if iframes:
+                print(f"  📍 Found {len(iframes)} metaframe iframes")
+            
+            # Method 2: Look for iframes with known hosts
             if not iframes:
-                iframes = soup.find_all('iframe', src=True)
+                embed_hosts = ['jav-vids.xyz', 'javggvideo.xyz', 'javstreamhg.xyz', 'streamhg', 'javstream']
+                for iframe in all_iframes:
+                    iframe_src = iframe.get('src', '') or iframe.get('data-src', '')
+                    if iframe_src and any(host in iframe_src.lower() for host in embed_hosts):
+                        iframes.append(iframe)
+                if iframes:
+                    print(f"  📍 Found {len(iframes)} iframes with known hosts")
             
-            embed_hosts = ['jav-vids.xyz', 'javggvideo.xyz', 'javstreamhg.xyz']
+            # Method 3: Look for any iframe with src
+            if not iframes:
+                iframes = [iframe for iframe in all_iframes if iframe.get('src') or iframe.get('data-src')]
+                if iframes:
+                    print(f"  📍 Found {len(iframes)} iframes with src")
             
+            # Extract embed URL from found iframes
             for iframe in iframes:
-                iframe_src = iframe.get('src', '')
-                if any(host in iframe_src.lower() for host in embed_hosts):
+                iframe_src = iframe.get('src', '') or iframe.get('data-src', '')
+                if iframe_src:
+                    # Skip non-video iframes (ads, social media, etc.)
+                    skip_patterns = ['facebook', 'twitter', 'instagram', 'google', 'doubleclick', 'ads']
+                    if any(pattern in iframe_src.lower() for pattern in skip_patterns):
+                        continue
+                    
+                    # Make URL absolute if needed
+                    if iframe_src.startswith('//'):
+                        iframe_src = 'https:' + iframe_src
+                    elif iframe_src.startswith('/'):
+                        iframe_src = 'https://javgg.net' + iframe_src
+                    
                     embed_url = iframe_src
                     print(f"  ✅ Embed URL: {embed_url[:80]}...")
                     break
             
             if not embed_url:
                 print(f"  ❌ No embed URL found")
+                
+                # Debug: Save page source
+                debug_file = os.path.join(self.download_dir, f"{code}_no_embed.html")
+                with open(debug_file, 'w', encoding='utf-8') as f:
+                    f.write(self.driver.page_source)
+                print(f"  💾 Saved page source to {debug_file} for debugging")
+                
+                # Show iframe details for debugging
+                if all_iframes:
+                    print(f"  🔍 Debug - All iframes found:")
+                    for i, iframe in enumerate(all_iframes[:5]):  # Show first 5
+                        src = iframe.get('src', '') or iframe.get('data-src', '') or 'NO SRC'
+                        iframe_class = iframe.get('class', [])
+                        print(f"     [{i+1}] class={iframe_class}, src={src[:60]}...")
+                
                 return None
             
             # Try to extract M3U8 URL from embed (needed for download)
