@@ -136,6 +136,9 @@ class JavaGGScraper:
         options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
         options.add_experimental_option('useAutomationExtension', False)
         
+        # CRITICAL: Use 'none' page load strategy like jable scraper
+        options.page_load_strategy = 'none'
+        
         # Add preferences to appear more like a real browser
         prefs = {
             "credentials_enable_service": False,
@@ -528,74 +531,59 @@ class JavaGGScraper:
             self._init_driver()
             
             # Load page with timeout
-            print(f"  🌐 Loading page with Selenium...")
+            print(f"  🌐 Loading page...")
             try:
-                self.driver.set_page_load_timeout(30)
+                # Start loading (won't wait for full load due to page_load_strategy='none')
                 self.driver.get(video_url)
                 
-                # Random delay to appear more human (2-5 seconds)
-                import random
-                delay = random.uniform(2, 5)
-                time.sleep(delay)
-                print(f"  ✅ Page loaded")
-            except Exception as e:
-                print(f"  ⚠️ Page load timeout or error: {str(e)[:100]}")
+                # Wait minimal time for initial load
                 time.sleep(3)
-            
-            # Check for Cloudflare and wait if needed
-            print(f"  🔍 Checking for browser challenge...")
-            max_cf_wait = 90  # Increased to 90 seconds for JavaScript challenges
-            cf_waited = 0
-            challenge_passed = False
-            
-            while cf_waited < max_cf_wait:
+                
+                # Force stop page loading (like jable scraper)
                 try:
-                    title = self.driver.title
-                    current_url = self.driver.current_url
-                    
-                    # Check if challenge is gone (Cloudflare or custom JS check)
-                    if "Just a moment" not in title and "Checking Browser" not in title and "Cloudflare" not in title:
-                        # Also check if we're on the actual page
-                        if "javgg.net" in current_url and "/jav/" in current_url:
-                            print(f"  ✅ Browser challenge passed after {cf_waited}s")
-                            challenge_passed = True
-                            break
+                    self.driver.execute_script("window.stop();")
+                    print(f"  ✓ Stopped page load")
                 except:
                     pass
                 
-                time.sleep(3)
-                cf_waited += 3
+                # Wait for body to appear
+                print(f"  ⏳ Waiting for page body...")
+                for _ in range(10):  # 10 x 0.5s = 5 seconds max
+                    try:
+                        if self.driver.find_element("tag name", "body"):
+                            print(f"  ✓ Page body loaded")
+                            break
+                    except:
+                        pass
+                    time.sleep(0.5)
                 
-                if cf_waited % 15 == 0:  # Print every 15 seconds
-                    print(f"  ⏳ Still waiting for browser challenge... ({cf_waited}s)")
-            
-            if not challenge_passed:
-                print(f"  ⚠️ Browser challenge may have failed after {max_cf_wait}s")
-                print(f"  ⚠️ Page title: {self.driver.title}")
-            
-            # Additional wait for page to fully load after challenge
-            print(f"  ⏳ Waiting for page content to load...")
-            time.sleep(5)  # Increased from 3 to 5
+                # Wait for JavaScript to render (fixed time, no challenge waiting)
+                print(f"  ⏳ Waiting for content to render...")
+                time.sleep(5)
+                
+            except Exception as e:
+                print(f"  ⚠️ Page load error: {str(e)[:100]}")
+                time.sleep(2)
             
             # Scroll to trigger lazy loading and JavaScript execution
             print(f"  📜 Scrolling to trigger content loading...")
             try:
                 # Scroll down
                 self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight / 2);")
-                time.sleep(1)
+                time.sleep(2)
                 
                 # Scroll to video player area if it exists
                 self.driver.execute_script("""
-                    var player = document.querySelector('.video-player, .player, #player, .video-container');
+                    var player = document.querySelector('.video-player, .player, #player, .video-container, .entry-content');
                     if (player) {
                         player.scrollIntoView({behavior: 'smooth', block: 'center'});
                     }
                 """)
-                time.sleep(2)
+                time.sleep(3)
                 
                 # Scroll back up
                 self.driver.execute_script("window.scrollTo(0, 0);")
-                time.sleep(1)
+                time.sleep(2)
             except Exception as e:
                 print(f"  ⚠️ Scroll error: {str(e)[:100]}")
             
