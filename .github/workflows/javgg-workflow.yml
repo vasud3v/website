@@ -39,13 +39,26 @@ jobs:
           echo "Installing system dependencies..."
           sudo apt-get update -qq
           
+          # Install Chrome and ChromeDriver
+          echo "Installing Chrome..."
+          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq google-chrome-stable
+          
+          # Install ChromeDriver
+          echo "Installing ChromeDriver..."
+          CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+')
+          CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION%%.*}")
+          wget -q "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
+          unzip -q chromedriver_linux64.zip
+          sudo mv chromedriver /usr/local/bin/
+          sudo chmod +x /usr/local/bin/chromedriver
+          rm chromedriver_linux64.zip
+          
           # Install ffmpeg
           echo "Installing ffmpeg..."
           sudo apt-get install -y -qq ffmpeg
-          
-          # Use pre-installed Chrome/Chromium from GitHub Actions runner
-          echo "Using pre-installed Chrome from runner..."
-          which google-chrome || which chromium-browser || echo "Browser check"
           
           echo "System dependencies installed"
       
@@ -62,11 +75,14 @@ jobs:
       - name: Verify browser setup
         run: |
           echo "=== Browser Setup Verification ==="
-          echo "Chrome/Chromium binary:"
-          which google-chrome || which chromium-browser || echo "Checking browsers..."
-          echo ""
           echo "Chrome version:"
-          google-chrome --version || chromium-browser --version || echo "Browser version check"
+          google-chrome --version
+          echo ""
+          echo "ChromeDriver version:"
+          chromedriver --version
+          echo ""
+          echo "ChromeDriver location:"
+          which chromedriver
           echo "==================================="
       
       - name: Configure Git
@@ -83,7 +99,8 @@ jobs:
           echo "Starting workflow..."
           cd javgg || exit 1
           echo "Changed to javgg directory"
-          timeout 5h python complete_workflow.py --max-videos $MAX_VIDEOS 2>&1 | grep -v "libpxbackend" | grep -v "libgiolibproxy" || true
+          echo "Running: python complete_workflow.py --max-videos $MAX_VIDEOS"
+          timeout 5h python -u complete_workflow.py --max-videos $MAX_VIDEOS 2>&1 | grep -v "libpxbackend" | grep -v "libgiolibproxy" || true
           echo "Workflow completed or timed out"
       
       - name: Commit and push changes
