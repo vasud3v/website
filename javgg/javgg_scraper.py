@@ -543,38 +543,39 @@ class JavaGGScraper:
                 time.sleep(3)
             
             # Check for Cloudflare and wait if needed
-            print(f"  🔍 Checking for Cloudflare...")
-            max_cf_wait = 60  # Increased from 30 to 60 seconds for GitHub Actions
+            print(f"  🔍 Checking for browser challenge...")
+            max_cf_wait = 90  # Increased to 90 seconds for JavaScript challenges
             cf_waited = 0
-            cloudflare_passed = False
+            challenge_passed = False
             
             while cf_waited < max_cf_wait:
                 try:
                     title = self.driver.title
                     current_url = self.driver.current_url
                     
-                    # Check if Cloudflare challenge is gone
-                    if "Just a moment" not in title and "Cloudflare" not in title:
+                    # Check if challenge is gone (Cloudflare or custom JS check)
+                    if "Just a moment" not in title and "Checking Browser" not in title and "Cloudflare" not in title:
                         # Also check if we're on the actual page
                         if "javgg.net" in current_url and "/jav/" in current_url:
-                            print(f"  ✅ Cloudflare check passed after {cf_waited}s")
-                            cloudflare_passed = True
+                            print(f"  ✅ Browser challenge passed after {cf_waited}s")
+                            challenge_passed = True
                             break
                 except:
                     pass
                 
-                time.sleep(3)  # Increased from 2 to 3 seconds
+                time.sleep(3)
                 cf_waited += 3
                 
-                if cf_waited % 10 == 0:
-                    print(f"  ⏳ Still waiting for Cloudflare... ({cf_waited}s)")
+                if cf_waited % 15 == 0:  # Print every 15 seconds
+                    print(f"  ⏳ Still waiting for browser challenge... ({cf_waited}s)")
             
-            if not cloudflare_passed:
-                print(f"  ⚠️ Cloudflare check may have failed after {max_cf_wait}s")
+            if not challenge_passed:
+                print(f"  ⚠️ Browser challenge may have failed after {max_cf_wait}s")
                 print(f"  ⚠️ Page title: {self.driver.title}")
             
-            # Additional wait for page to fully load after Cloudflare
-            time.sleep(3)
+            # Additional wait for page to fully load after challenge
+            print(f"  ⏳ Waiting for page content to load...")
+            time.sleep(5)  # Increased from 3 to 5
             
             # Scroll to trigger lazy loading and JavaScript execution
             print(f"  📜 Scrolling to trigger content loading...")
@@ -600,7 +601,7 @@ class JavaGGScraper:
             
             # Wait for iframe to load (might be dynamic)
             print(f"  ⏳ Waiting for video player to load...")
-            max_wait = 15  # Increased from 10 to 15
+            max_wait = 30  # Increased from 15 to 30 for JS-heavy pages
             iframe_found = False
             
             for wait_time in range(max_wait):
@@ -614,8 +615,8 @@ class JavaGGScraper:
                     print(f"  ✅ Video player loaded ({wait_time}s)")
                     break
                 
-                # Try to trigger iframe loading with JavaScript
-                if wait_time % 3 == 0:  # Every 3 seconds
+                # Try to trigger iframe loading with JavaScript every 5 seconds
+                if wait_time % 5 == 0:
                     try:
                         # Try to find and click play button or video container
                         self.driver.execute_script("""
@@ -626,7 +627,12 @@ class JavaGGScraper:
                             // Try to focus on video container
                             var videoContainer = document.querySelector('.video-player, .player, #player');
                             if (videoContainer) videoContainer.click();
+                            
+                            // Scroll to video area
+                            var videoArea = document.querySelector('.entry-content, .video-container, .player-container');
+                            if (videoArea) videoArea.scrollIntoView({behavior: 'smooth', block: 'center'});
                         """)
+                        print(f"    🔄 Triggered player load attempt ({wait_time}s)")
                     except:
                         pass
                 
