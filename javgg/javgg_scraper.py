@@ -221,7 +221,7 @@ class JavaGGScraper:
                 signal.signal(signal.SIGALRM, timeout_handler)
                 signal.alarm(60)  # 60 second timeout for entire scraping
             
-            try:
+            # Extract code
             code_match = re.search(r'/jav/([^/\?#]+)', video_url)
             if not code_match:
                 return None
