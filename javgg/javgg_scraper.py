@@ -406,29 +406,89 @@ class JavaGGScraper:
             # Load page with timeout
             print(f"  🌐 Loading page...")
             try:
-                self.driver.set_page_load_timeout(20)  # Reduced from 30 to 20
+                self.driver.set_page_load_timeout(20)
                 self.driver.get(video_url)
-                time.sleep(2)  # Reduced from 3 to 2
+                time.sleep(3)  # Initial wait for page load
                 print(f"  ✅ Page loaded")
             except Exception as e:
                 print(f"  ⚠️ Page load timeout or error: {str(e)[:100]}")
-                time.sleep(1)  # Reduced from 2 to 1
+                time.sleep(2)
+            
+            # Scroll to trigger lazy loading and JavaScript execution
+            print(f"  📜 Scrolling to trigger content loading...")
+            try:
+                # Scroll down
+                self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight / 2);")
+                time.sleep(1)
+                
+                # Scroll to video player area if it exists
+                self.driver.execute_script("""
+                    var player = document.querySelector('.video-player, .player, #player, .video-container');
+                    if (player) {
+                        player.scrollIntoView({behavior: 'smooth', block: 'center'});
+                    }
+                """)
+                time.sleep(2)
+                
+                # Scroll back up
+                self.driver.execute_script("window.scrollTo(0, 0);")
+                time.sleep(1)
+            except Exception as e:
+                print(f"  ⚠️ Scroll error: {str(e)[:100]}")
             
             # Wait for iframe to load (might be dynamic)
             print(f"  ⏳ Waiting for video player to load...")
-            max_wait = 10
+            max_wait = 15  # Increased from 10 to 15
             iframe_found = False
+            
             for wait_time in range(max_wait):
-                soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+                # Check page source for iframes
+                page_source = self.driver.page_source
+                soup = BeautifulSoup(page_source, 'html.parser')
                 iframes = soup.find_all('iframe')
+                
                 if iframes:
                     iframe_found = True
                     print(f"  ✅ Video player loaded ({wait_time}s)")
                     break
+                
+                # Try to trigger iframe loading with JavaScript
+                if wait_time % 3 == 0:  # Every 3 seconds
+                    try:
+                        # Try to find and click play button or video container
+                        self.driver.execute_script("""
+                            // Try to trigger video player initialization
+                            var playBtn = document.querySelector('.play-button, .vjs-big-play-button, button[aria-label*="play"]');
+                            if (playBtn) playBtn.click();
+                            
+                            // Try to focus on video container
+                            var videoContainer = document.querySelector('.video-player, .player, #player');
+                            if (videoContainer) videoContainer.click();
+                        """)
+                    except:
+                        pass
+                
                 time.sleep(1)
             
             if not iframe_found:
                 print(f"  ⚠️ No iframes found after {max_wait}s wait")
+                print(f"  🔍 Checking page structure...")
+                
+                # Check if page has video-related elements
+                video_elements = soup.find_all(['video', 'div'], class_=re.compile(r'video|player', re.I))
+                if video_elements:
+                    print(f"  📍 Found {len(video_elements)} video-related elements (but no iframes)")
+                
+                # Check for JavaScript errors or blocks
+                try:
+                    console_logs = self.driver.get_log('browser')
+                    if console_logs:
+                        print(f"  🔍 Browser console has {len(console_logs)} messages")
+                        for log in console_logs[:3]:  # Show first 3
+                            if 'error' in log.get('level', '').lower():
+                                print(f"     ❌ {log.get('message', '')[:80]}")
+                except:
+                    pass
             
             # Get final page source
             soup = BeautifulSoup(self.driver.page_source, 'html.parser')
@@ -515,6 +575,27 @@ class JavaGGScraper:
             if not embed_url:
                 print(f"  ❌ No embed URL found")
                 
+                # Debug: Check page title and URL to see if we're on the right page
+                page_title = soup.find('title')
+                if page_title:
+                    print(f"  🔍 Page title: {page_title.text[:80]}")
+                
+                current_url = self.driver.current_url
+                print(f"  🔍 Current URL: {current_url}")
+                
+                # Check if we got redirected or blocked
+                if current_url != video_url and not current_url.startswith(video_url):
+                    print(f"  ⚠️ Page was redirected - may be blocked or video removed")
+                
+                # Check for common block/error messages
+                page_text = soup.get_text().lower()
+                if 'not found' in page_text or '404' in page_text:
+                    print(f"  ⚠️ Video appears to be removed (404)")
+                elif 'access denied' in page_text or 'forbidden' in page_text:
+                    print(f"  ⚠️ Access denied - may be geo-blocked")
+                elif 'cloudflare' in page_text and 'checking' in page_text:
+                    print(f"  ⚠️ Still stuck on Cloudflare check")
+                
                 # Debug: Save page source
                 debug_file = os.path.join(self.download_dir, f"{code}_no_embed.html")
                 with open(debug_file, 'w', encoding='utf-8') as f:
@@ -528,6 +609,20 @@ class JavaGGScraper:
                         src = iframe.get('src', '') or iframe.get('data-src', '') or 'NO SRC'
                         iframe_class = iframe.get('class', [])
                         print(f"     [{i+1}] class={iframe_class}, src={src[:60]}...")
+                else:
+                    # Check for video or script tags that might indicate the player
+                    video_tags = soup.find_all('video')
+                    script_tags = soup.find_all('script', src=True)
+                    
+                    if video_tags:
+                        print(f"  🔍 Found {len(video_tags)} <video> tags (direct video, not iframe)")
+                    
+                    if script_tags:
+                        player_scripts = [s for s in script_tags if 'player' in s.get('src', '').lower() or 'video' in s.get('src', '').lower()]
+                        if player_scripts:
+                            print(f"  🔍 Found {len(player_scripts)} player-related scripts")
+                            for script in player_scripts[:3]:
+                                print(f"     - {script.get('src', '')[:60]}")
                 
                 return None
             
