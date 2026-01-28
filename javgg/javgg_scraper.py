@@ -103,15 +103,38 @@ class JavaGGScraper:
     def _init_with_uc_driver(self):
         """Try undetected-chromedriver (best for Cloudflare)"""
         print("  Trying SeleniumBase UC mode...")
-        self.driver = Driver(
-            uc=True, 
-            headless=self.headless, 
-            incognito=True,
-            agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
-            disable_csp=True,
-            no_sandbox=True,
-            page_load_strategy='none'  # Don't wait for full page load
-        )
+        
+        # In CI, UC mode often fails, so add timeout
+        import signal
+        
+        def timeout_handler(signum, frame):
+            raise TimeoutError("UC driver initialization timeout")
+        
+        try:
+            # Set 10 second timeout for UC initialization
+            if hasattr(signal, 'SIGALRM'):
+                signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(10)
+            
+            self.driver = Driver(
+                uc=True, 
+                headless=self.headless, 
+                incognito=True,
+                agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+                disable_csp=True,
+                no_sandbox=True,
+                page_load_strategy='none'  # Don't wait for full page load
+            )
+            
+            # Cancel timeout
+            if hasattr(signal, 'SIGALRM'):
+                signal.alarm(0)
+                
+        except (TimeoutError, Exception) as e:
+            # Cancel timeout
+            if hasattr(signal, 'SIGALRM'):
+                signal.alarm(0)
+            raise e
     
     def _init_with_standard_chrome(self):
         """Try standard Chrome with stealth options"""
@@ -482,25 +505,48 @@ class JavaGGScraper:
                 thumbnail_url = og_image.get('content')
                 print(f"    🖼️ Thumbnail: {thumbnail_url[:50] if thumbnail_url else 'None'}...")
             
-            # Extract embed URL from iframe
+            # NEW: Try to find embed URL in raw HTML (before JavaScript)
+            # Look for iframe src in script tags or data attributes
             embed_url = None
-            iframes = soup.find_all('iframe')
-            print(f"    🎬 Found {len(iframes)} iframes")
             
-            for iframe in iframes:
-                src = iframe.get('src', '')
-                print(f"      - iframe src: {src[:60]}...")
-                if 'embed' in src or 'player' in src or 'stream' in src:
-                    if not src.startswith('http'):
-                        src = 'https:' + src if src.startswith('//') else 'https://javgg.net' + src
-                    embed_url = src
+            # Method 1: Search in all script tags for embed URLs
+            scripts = soup.find_all('script')
+            for script in scripts:
+                script_text = script.string if script.string else ''
+                # Look for common embed patterns
+                embed_patterns = [
+                    r'["\']https?://[^"\']+/embed/[^"\']+["\']',
+                    r'["\']https?://[^"\']+/player/[^"\']+["\']',
+                    r'src\s*[:=]\s*["\']([^"\']+/(?:embed|player)/[^"\']+)["\']',
+                ]
+                for pattern in embed_patterns:
+                    matches = re.findall(pattern, script_text)
+                    if matches:
+                        # Clean up the match
+                        potential_url = matches[0].strip('"\'')
+                        if 'embed' in potential_url or 'player' in potential_url:
+                            embed_url = potential_url
+                            print(f"    ✅ Found embed URL in script: {embed_url[:60]}...")
+                            break
+                if embed_url:
                     break
             
+            # Method 2: Look for iframes (even if not loaded by JS yet)
             if not embed_url:
-                print(f"    ⚠️ No embed URL found in iframes")
-                # Try to find video player in other ways
-                video_divs = soup.find_all(['div', 'section'], class_=lambda x: x and ('player' in x.lower() or 'video' in x.lower()))
-                print(f"    🔍 Found {len(video_divs)} potential video containers")
+                iframes = soup.find_all('iframe')
+                print(f"    🎬 Found {len(iframes)} iframes in raw HTML")
+                
+                for iframe in iframes:
+                    src = iframe.get('src', '') or iframe.get('data-src', '')
+                    if src and ('embed' in src or 'player' in src or 'stream' in src):
+                        if not src.startswith('http'):
+                            src = 'https:' + src if src.startswith('//') else 'https://javgg.net' + src
+                        embed_url = src
+                        print(f"    ✅ Found embed URL in iframe: {embed_url[:60]}...")
+                        break
+            
+            if not embed_url:
+                print(f"    ⚠️ No embed URL found in raw HTML")
                 return None
             
             print(f"    ✅ Found embed URL: {embed_url[:60]}...")
