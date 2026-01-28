@@ -429,73 +429,75 @@ class JavaGGScraper:
         """Try to scrape using requests library (faster, better Cloudflare bypass)"""
         try:
             import requests
-            from requests.adapters import HTTPAdapter
-            from urllib3.util.retry import Retry
-            
-            # Create session with retries
-            session = requests.Session()
-            retry = Retry(total=3, backoff_factor=1, status_forcelist=[500, 502, 503, 504])
-            adapter = HTTPAdapter(max_retries=retry)
-            session.mount('http://', adapter)
-            session.mount('https://', adapter)
             
             # Headers to mimic real browser
             headers = {
                 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
                 'Accept-Language': 'en-US,en;q=0.9',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'DNT': '1',
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1',
-                'Sec-Fetch-Dest': 'document',
-                'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-Site': 'none',
-                'Cache-Control': 'max-age=0',
+                'Referer': 'https://javgg.net/',
             }
             
             # Add random delay
             import random
-            time.sleep(random.uniform(1, 3))
+            time.sleep(random.uniform(1, 2))
             
             # Fetch page
-            response = session.get(video_url, headers=headers, timeout=15, allow_redirects=True)
+            print(f"    📡 Fetching {video_url[:50]}...")
+            response = requests.get(video_url, headers=headers, timeout=20, allow_redirects=True)
             
-            # Check if we got blocked
-            if response.status_code == 403 or 'Just a moment' in response.text or 'Cloudflare' in response.text[:1000]:
-                print(f"    ⚠️ Blocked by Cloudflare (status: {response.status_code})")
-                return None
+            print(f"    📊 Status: {response.status_code}")
+            print(f"    📏 Content length: {len(response.text)} bytes")
+            print(f"    🔗 Final URL: {response.url[:60]}...")
             
+            # Check response
             if response.status_code != 200:
-                print(f"    ⚠️ HTTP {response.status_code}")
+                print(f"    ⚠️ Non-200 status code")
+                # Save response for debugging
+                debug_file = f"downloaded_files/{code}_debug_response.html"
+                with open(debug_file, 'w', encoding='utf-8') as f:
+                    f.write(response.text)
+                print(f"    💾 Saved response to {debug_file}")
                 return None
             
             # Parse HTML
             soup = BeautifulSoup(response.text, 'html.parser')
             
+            # Check what we actually got
+            page_title = soup.find('title')
+            print(f"    📄 Page title: {page_title.text if page_title else 'N/A'}")
+            
             # Extract title
             title_elem = soup.find('h1', class_='entry-title') or soup.find('h1')
             title = title_elem.text.strip() if title_elem else code
+            print(f"    📝 Video title: {title[:50]}...")
             
             # Extract thumbnail
             thumbnail_url = None
             og_image = soup.find('meta', property='og:image')
             if og_image:
                 thumbnail_url = og_image.get('content')
+                print(f"    🖼️ Thumbnail: {thumbnail_url[:50] if thumbnail_url else 'None'}...")
             
             # Extract embed URL from iframe
             embed_url = None
             iframes = soup.find_all('iframe')
+            print(f"    🎬 Found {len(iframes)} iframes")
+            
             for iframe in iframes:
                 src = iframe.get('src', '')
-                if 'embed' in src or 'player' in src:
+                print(f"      - iframe src: {src[:60]}...")
+                if 'embed' in src or 'player' in src or 'stream' in src:
                     if not src.startswith('http'):
                         src = 'https:' + src if src.startswith('//') else 'https://javgg.net' + src
                     embed_url = src
                     break
             
             if not embed_url:
-                print(f"    ⚠️ No embed URL found")
+                print(f"    ⚠️ No embed URL found in iframes")
+                # Try to find video player in other ways
+                video_divs = soup.find_all(['div', 'section'], class_=lambda x: x and ('player' in x.lower() or 'video' in x.lower()))
+                print(f"    🔍 Found {len(video_divs)} potential video containers")
                 return None
             
             print(f"    ✅ Found embed URL: {embed_url[:60]}...")
@@ -513,7 +515,9 @@ class JavaGGScraper:
             )
             
         except Exception as e:
-            print(f"    ⚠️ Requests error: {str(e)[:100]}")
+            print(f"    ⚠️ Requests error: {str(e)[:200]}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def _scrape_with_selenium(self, video_url: str, code: str) -> Optional[VideoData]:
