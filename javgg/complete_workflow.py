@@ -122,21 +122,22 @@ class WorkflowManager:
                 
                 # Wait for Cloudflare check to complete
                 print(f"  Waiting for Cloudflare check...")
-                max_wait = 30  # Maximum 30 seconds
+                max_wait = 15  # Reduced from 30 to 15 seconds
                 waited = 0
                 while waited < max_wait:
-                    time.sleep(2)
-                    waited += 2
+                    time.sleep(1)  # Check every second
+                    waited += 1
                     
                     # Check if Cloudflare challenge is still showing
                     if "Just a moment" not in scraper.driver.title:
                         print(f"  ✅ Cloudflare check passed after {waited}s")
                         break
                     
-                    print(f"  ⏳ Still waiting for Cloudflare... ({waited}s)")
+                    if waited % 5 == 0:  # Print every 5 seconds
+                        print(f"  ⏳ Still waiting for Cloudflare... ({waited}s)")
                 
                 # Additional wait for page to fully load
-                time.sleep(3)
+                time.sleep(2)  # Reduced from 3 to 2
                 
                 # Check if page loaded
                 print(f"  Current URL: {scraper.driver.current_url}")
@@ -144,11 +145,11 @@ class WorkflowManager:
                 
                 # Scroll down to trigger lazy loading
                 scraper.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(2)  # Increased wait time for lazy loading
+                time.sleep(1)  # Reduced from 2 to 1
                 
                 # Scroll again to ensure all content loads
                 scraper.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(2)
+                time.sleep(1)  # Reduced from 2 to 1
                 
                 # Find all video links
                 from bs4 import BeautifulSoup

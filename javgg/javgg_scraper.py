@@ -64,6 +64,81 @@ class JavaGGScraper:
             )
             print("  ✅ Browser ready")
     
+    def _extract_m3u8_from_embed_fast(self, embed_url: str) -> Optional[str]:
+        """Fast M3U8 extraction with minimal waits"""
+        print(f"  🔍 Quick M3U8 extraction...")
+        
+        driver = None
+        try:
+            options = Options()
+            options.add_argument('--disable-blink-features=AutomationControlled')
+            options.add_argument('--disable-gpu')
+            options.add_argument('--no-sandbox')
+            options.add_argument('--disable-dev-shm-usage')
+            options.add_argument('--headless')
+            options.page_load_strategy = 'none'  # Don't wait for page load
+            options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
+            
+            # Find Chrome binary
+            import shutil
+            chrome_paths = [
+                '/usr/bin/chromium-browser',
+                '/usr/bin/chromium',
+                '/usr/bin/google-chrome',
+                shutil.which('chromium-browser'),
+                shutil.which('google-chrome'),
+            ]
+            
+            chrome_binary = None
+            for path in chrome_paths:
+                if path and os.path.exists(path):
+                    chrome_binary = path
+                    break
+            
+            if chrome_binary:
+                options.binary_location = chrome_binary
+            
+            driver = webdriver.Chrome(options=options)
+            driver.set_page_load_timeout(10)
+            
+            # Load page
+            driver.get(embed_url)
+            time.sleep(2)  # Minimal wait
+            
+            # Try to play video
+            try:
+                driver.execute_script("var v=document.querySelector('video');if(v){v.muted=true;v.play();}")
+                time.sleep(1)  # Quick wait
+            except:
+                pass
+            
+            # Check logs once
+            try:
+                logs = driver.get_log('performance')
+                for log in logs:
+                    try:
+                        message = json.loads(log['message'])
+                        if message.get('message', {}).get('method') == 'Network.responseReceived':
+                            url = message.get('message', {}).get('params', {}).get('response', {}).get('url', '')
+                            if '.m3u8' in url:
+                                driver.quit()
+                                return url
+                    except:
+                        continue
+            except:
+                pass
+            
+            driver.quit()
+            return None
+            
+        except Exception as e:
+            if driver:
+                try:
+                    driver.quit()
+                except:
+                    pass
+            return None
+    
     def _extract_m3u8_from_embed(self, embed_url: str) -> Optional[str]:
         """Extract M3U8 URL from embed using network monitoring"""
         print(f"  🔍 Extracting M3U8 from embed...")
@@ -232,14 +307,13 @@ class JavaGGScraper:
             # Load page with timeout
             print(f"  🌐 Loading page...")
             try:
-                self.driver.set_page_load_timeout(30)  # 30 second timeout
+                self.driver.set_page_load_timeout(20)  # Reduced from 30 to 20
                 self.driver.get(video_url)
-                time.sleep(3)
+                time.sleep(2)  # Reduced from 3 to 2
                 print(f"  ✅ Page loaded")
             except Exception as e:
                 print(f"  ⚠️ Page load timeout or error: {str(e)[:100]}")
-                # Try to continue anyway if page partially loaded
-                time.sleep(2)
+                time.sleep(1)  # Reduced from 2 to 1
             
             soup = BeautifulSoup(self.driver.page_source, 'html.parser')
             
@@ -294,7 +368,9 @@ class JavaGGScraper:
             
             # Try to extract M3U8 URL from embed (needed for download)
             print(f"  🔍 Extracting stream URL from embed...")
-            m3u8_url = self._extract_m3u8_from_embed(embed_url)
+            
+            # Quick extraction with reduced timeouts
+            m3u8_url = self._extract_m3u8_from_embed_fast(embed_url)
             
             if m3u8_url:
                 print(f"  ✅ Found stream URL")
