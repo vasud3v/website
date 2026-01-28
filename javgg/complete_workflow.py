@@ -292,7 +292,7 @@ class WorkflowManager:
                 download_url
             ]
             
-            # Run with minimal output
+            # Run with progress bar
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -301,20 +301,30 @@ class WorkflowManager:
                 bufsize=1
             )
             
-            # Show progress at intervals (every 10%)
+            # Show visual progress bar
+            print(f"     ", end='', flush=True)
             last_percent = 0
+            bar_width = 50
+            
             for line in process.stdout:
                 line = line.strip()
                 if '/' in line:
                     try:
                         downloaded, total = line.split('/')
                         percent = int((int(downloaded) / int(total)) * 100)
-                        # Show progress every 10%
-                        if percent >= last_percent + 10:
-                            print(f"     Progress: {percent}%")
+                        
+                        # Update progress bar every 2%
+                        if percent >= last_percent + 2:
+                            filled = int(bar_width * percent / 100)
+                            bar = '█' * filled + '░' * (bar_width - filled)
+                            print(f"\r     [{bar}] {percent}%", end='', flush=True)
                             last_percent = percent
                     except:
                         pass
+            
+            # Complete the progress bar
+            bar = '█' * bar_width
+            print(f"\r     [{bar}] 100%")
             
             process.wait()
             result_code = process.returncode
