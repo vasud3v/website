@@ -31,7 +31,7 @@ class AdultSceneDetector:
         self.has_audio = False
         
     def get_video_info(self) -> dict:
-        """Get video metadata"""
+        """Get video metadata with fallback methods"""
         try:
             cmd = [
                 'ffprobe', '-v', 'error',
@@ -70,15 +70,59 @@ class AdultSceneDetector:
                 None
             )
             
-            # Get duration from format or stream
+            # Get duration from multiple sources with fallbacks
             duration = None
+            
+            # Method 1: From format
             if 'format' in data and 'duration' in data['format']:
-                duration = float(data['format']['duration'])
-            elif 'duration' in video_stream:
-                duration = float(video_stream['duration'])
+                try:
+                    duration = float(data['format']['duration'])
+                    print(f"[AdultDetector] Duration from format: {duration}s")
+                except (ValueError, TypeError):
+                    pass
+            
+            # Method 2: From video stream
+            if not duration and 'duration' in video_stream:
+                try:
+                    duration = float(video_stream['duration'])
+                    print(f"[AdultDetector] Duration from video stream: {duration}s")
+                except (ValueError, TypeError):
+                    pass
+            
+            # Method 3: Calculate from nb_frames and fps
+            if not duration and 'nb_frames' in video_stream and 'r_frame_rate' in video_stream:
+                try:
+                    nb_frames = int(video_stream['nb_frames'])
+                    fps_str = video_stream['r_frame_rate']
+                    num, den = map(int, fps_str.split('/'))
+                    fps = num / den if den != 0 else 30.0
+                    duration = nb_frames / fps
+                    print(f"[AdultDetector] Duration calculated from frames: {duration}s")
+                except (ValueError, TypeError, ZeroDivisionError):
+                    pass
+            
+            # Method 4: Use ffmpeg to get duration directly
+            if not duration:
+                print(f"[AdultDetector] Trying alternative method with ffmpeg...")
+                try:
+                    cmd_alt = [
+                        'ffmpeg', '-i', self.video_path,
+                        '-f', 'null', '-'
+                    ]
+                    result_alt = subprocess.run(cmd_alt, capture_output=True, text=True, timeout=60)
+                    # Parse duration from ffmpeg output
+                    duration_match = re.search(r'Duration: (\d+):(\d+):(\d+\.\d+)', result_alt.stderr)
+                    if duration_match:
+                        hours, minutes, seconds = duration_match.groups()
+                        duration = int(hours) * 3600 + int(minutes) * 60 + float(seconds)
+                        print(f"[AdultDetector] Duration from ffmpeg: {duration}s")
+                except Exception as e:
+                    print(f"[AdultDetector] ffmpeg fallback failed: {e}")
             
             if not duration:
                 print(f"[AdultDetector] Could not determine video duration")
+                print(f"[AdultDetector] Format data: {data.get('format', {})}")
+                print(f"[AdultDetector] Video stream data: {video_stream}")
                 return None
             
             self.duration = duration

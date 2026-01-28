@@ -379,14 +379,35 @@ class WorkflowManager:
     
     def generate_preview_video(self, video_file: str, video_code: str) -> Optional[str]:
         """
-        Generate preview video
+        Generate preview video - REQUIRED step
         """
         print(f"\n🎬 Generating preview: {video_code}")
         
         try:
             preview_file = self.download_dir / f"{video_code}_preview.mp4"
             
+            # Check if video file exists and is valid
+            if not os.path.exists(video_file):
+                print(f"  ❌ Video file not found: {video_file}")
+                return None
+            
+            file_size = os.path.getsize(video_file)
+            if file_size < 1024 * 1024:  # Less than 1MB
+                print(f"  ❌ Video file too small ({file_size} bytes)")
+                return None
+            
+            print(f"  📹 Video file: {file_size / 1024 / 1024:.1f} MB")
+            
+            # Check if ffprobe is available
+            try:
+                subprocess.run(['ffprobe', '-version'], capture_output=True, check=True, timeout=5)
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                print(f"  ❌ ffprobe not found - cannot generate preview")
+                print(f"  ℹ️ Install ffmpeg to enable preview generation")
+                return None
+            
             # Generate 2-minute preview using PreviewGenerator
+            print(f"  🎬 Starting preview generation...")
             generator = PreviewGenerator(video_file)
             result = generator.generate_preview(
                 output_path=str(preview_file),
@@ -400,15 +421,18 @@ class WorkflowManager:
                 max_workers=32
             )
             
-            if result['success'] and preview_file.exists():
-                print(f"  ✅ Preview generated: {preview_file.name}")
+            if result.get('success') and preview_file.exists():
+                print(f"  ✅ Preview generated: {preview_file.name} ({preview_file.stat().st_size / 1024 / 1024:.1f} MB)")
                 return str(preview_file)
             else:
-                print(f"  ❌ Preview generation failed")
+                error_msg = result.get('error', 'Unknown error')
+                print(f"  ❌ Preview generation failed: {error_msg}")
                 return None
                 
         except Exception as e:
             print(f"  ❌ Error generating preview: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def upload_videos(self, video_file: str, preview_file: str, video_code: str) -> Dict:
