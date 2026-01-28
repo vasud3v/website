@@ -565,8 +565,9 @@ class WorkflowManager:
                 '--no-warnings',
                 '--no-check-certificate',
                 '--concurrent-fragments', '16',
-                '--retries', '5',
-                '--fragment-retries', '5',
+                '--retries', '3',  # Reduced from 5
+                '--fragment-retries', '3',  # Reduced from 5
+                '--socket-timeout', '30',  # Add socket timeout
                 '--quiet',  # Suppress progress output
                 '--progress-template', '%(progress.downloaded_bytes)s/%(progress.total_bytes)s',
                 download_url
@@ -587,16 +588,34 @@ class WorkflowManager:
                 last_percent = 0
                 bar_width = 50
                 
-                # Set timeout for the entire download (10 minutes)
+                # Set timeout for the entire download (2 minutes for initial response)
                 import time
                 start_time = time.time()
-                timeout_seconds = 600
+                initial_timeout = 120  # 2 minutes to start
+                download_timeout = 600  # 10 minutes total
+                
+                line_count = 0
+                has_progress = False
                 
                 for line in process.stdout:
-                    # Check timeout
-                    if time.time() - start_time > timeout_seconds:
+                    line_count += 1
+                    elapsed = time.time() - start_time
+                    
+                    # Check if we got any progress
+                    if '/' in line:
+                        has_progress = True
+                    
+                    # If no progress after initial timeout, kill it
+                    if not has_progress and elapsed > initial_timeout:
                         process.kill()
-                        print(f"\n  ❌ Download timeout (10 minutes)")
+                        print(f"\n  ❌ No download started after {initial_timeout} seconds")
+                        print(f"  ⚠️ This embed URL may not be supported by yt-dlp")
+                        return None
+                    
+                    # Check total timeout
+                    if elapsed > download_timeout:
+                        process.kill()
+                        print(f"\n  ❌ Download timeout ({download_timeout//60} minutes)")
                         return None
                     
                     line = line.strip()
