@@ -2,7 +2,6 @@ name: JavaGG Complete Workflow
 
 on:
   schedule:
-    # Run every 6 hours as backup
     - cron: '0 */6 * * *'
   workflow_dispatch:
     inputs:
@@ -10,132 +9,154 @@ on:
         description: 'Maximum videos to process (0 = unlimited)'
         required: false
         default: '0'
+      force_run:
+        description: 'Force run even if no changes'
+        required: false
+        default: 'false'
+      skip_trigger:
+        description: 'Skip auto-retrigger (one-shot mode)'
+        required: false
+        default: 'false'
+
+# Prevent concurrent runs - critical for data integrity
+concurrency:
+  group: javgg-workflow
+  cancel-in-progress: false
+
+env:
+  PYTHONUNBUFFERED: '1'
+  GIO_MODULE_DIR: '/dev/null'
 
 jobs:
   process-videos:
     runs-on: ubuntu-latest
-    timeout-minutes: 330  # 5.5 hours (safe margin before 6h limit)
+    timeout-minutes: 330
     permissions:
-      contents: write  # Allow pushing to repository
-      actions: write   # Allow triggering workflows
+      contents: write
+      actions: write
+    
+    outputs:
+      videos_processed: ${{ steps.workflow.outputs.videos_processed }}
+      should_retrigger: ${{ steps.decide.outputs.should_retrigger }}
+      exit_status: ${{ steps.workflow.outputs.exit_status }}
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
       
-      - name: Pull latest changes
+      - name: Pull latest changes with retry
+        id: git_pull
         run: |
-          git pull origin main
+          for i in 1 2 3; do
+            if git pull origin main; then
+              echo "pulled=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            echo "Pull failed, retrying in 5s..."
+            sleep 5
+          done
+          echo "pulled=false" >> $GITHUB_OUTPUT
+          exit 1
+      
+      - name: Pre-flight checks
+        run: |
+          # Check disk space (need at least 5GB)
+          AVAILABLE=$(df / | tail -1 | awk '{print $4}')
+          if [ "$AVAILABLE" -lt 5242880 ]; then
+            echo "❌ Insufficient disk space: ${AVAILABLE}KB available"
+            exit 1
+          fi
+          echo "✅ Disk space OK: ${AVAILABLE}KB available"
+          
+          # Ensure required directories exist
+          mkdir -p database javgg logs
+      
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            /usr/local/bin/chromedriver
+          key: deps-${{ runner.os }}-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            deps-${{ runner.os }}-
       
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       
-      - name: Install system dependencies
+      - name: Install Chrome (latest stable)
         run: |
-          echo "Installing system dependencies..."
           sudo apt-get update -qq
           
-          # Install Chrome
-          echo "Installing Chrome..."
-          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-          echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq google-chrome-stable
+          # Use Google's official repo with signed-by (apt-key is deprecated)
+          wget -qO- https://dl-ssl.google.com/linux/linux_signing_key.pub | \
+            sudo gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] \
+            http://dl.google.com/linux/chrome/deb/ stable main" | \
+            sudo tee /etc/apt/sources.list.d/google-chrome.list
           
-          # Install ChromeDriver (new method for Chrome 115+)
-          echo "Installing ChromeDriver..."
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq google-chrome-stable ffmpeg
+          
+          echo "Chrome version: $(google-chrome --version)"
+      
+      - name: Install matching ChromeDriver
+        run: |
           CHROME_VERSION=$(google-chrome --version | grep -oP '\d+' | head -1)
-          echo "Chrome version: $CHROME_VERSION"
+          echo "Chrome major version: $CHROME_VERSION"
           
-          # For Chrome 115+, use Chrome for Testing endpoints
-          if [ "$CHROME_VERSION" -ge 115 ]; then
-            echo "Using Chrome for Testing endpoints..."
-            CHROMEDRIVER_URL=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/latest-versions-per-milestone-with-downloads.json" | \
-              python3 -c "import sys, json; data=json.load(sys.stdin); print(data['milestones']['$CHROME_VERSION']['downloads']['chromedriver'][0]['url'])" 2>/dev/null || echo "")
-            
-            if [ -z "$CHROMEDRIVER_URL" ]; then
-              echo "Failed to get ChromeDriver URL, trying alternative..."
-              CHROMEDRIVER_URL="https://storage.googleapis.com/chrome-for-testing-public/$(curl -s https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_$CHROME_VERSION)/linux64/chromedriver-linux64.zip"
-            fi
-          else
-            # Old method for Chrome < 115
-            CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION")
-            CHROMEDRIVER_URL="https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
+          # Fetch matching ChromeDriver
+          DRIVER_VERSION=$(curl -fsSL \
+            "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_${CHROME_VERSION}")
+          
+          if [ -z "$DRIVER_VERSION" ]; then
+            echo "❌ Failed to get ChromeDriver version for Chrome $CHROME_VERSION"
+            exit 1
           fi
           
-          echo "Downloading from: $CHROMEDRIVER_URL"
-          wget -q "$CHROMEDRIVER_URL" -O chromedriver.zip
+          echo "ChromeDriver version: $DRIVER_VERSION"
+          
+          # Download and install
+          curl -fsSL \
+            "https://storage.googleapis.com/chrome-for-testing-public/${DRIVER_VERSION}/linux64/chromedriver-linux64.zip" \
+            -o chromedriver.zip
+          
           unzip -q chromedriver.zip
-          
-          # Handle different archive structures
-          if [ -f "chromedriver-linux64/chromedriver" ]; then
-            sudo mv chromedriver-linux64/chromedriver /usr/local/bin/
-            rm -rf chromedriver-linux64
-          elif [ -f "chromedriver" ]; then
-            sudo mv chromedriver /usr/local/bin/
-          fi
-          
+          sudo mv chromedriver-linux64/chromedriver /usr/local/bin/
           sudo chmod +x /usr/local/bin/chromedriver
-          rm -f chromedriver.zip
+          rm -rf chromedriver-linux64 chromedriver.zip
           
-          # Install ffmpeg
-          echo "Installing ffmpeg..."
-          sudo apt-get install -y -qq ffmpeg
-          
-          echo "System dependencies installed"
+          chromedriver --version
       
       - name: Install Python dependencies
         run: |
-          echo "Installing Python dependencies..."
           python -m pip install --upgrade pip
+          
+          # Install with proper error handling
           pip install -r javgg/requirements.txt
-          pip install -r tools/preview_generator/requirements.txt || true
-          pip install -r upload_pipeline/requirements.txt || true
+          pip install -r tools/preview_generator/requirements.txt || echo "Optional requirements failed"
+          pip install -r upload_pipeline/requirements.txt || echo "Optional requirements failed"
           pip install yt-dlp
-          echo "Python dependencies installed"
       
       - name: Verify browser setup
         run: |
-          echo "=== Browser Setup Verification ==="
-          echo "Chrome version:"
-          google-chrome --version
-          echo ""
-          echo "ChromeDriver version:"
-          chromedriver --version
-          echo ""
-          echo "ChromeDriver location:"
-          which chromedriver
-          echo "==================================="
-      
-      - name: Test browser initialization
-        run: |
-          echo "Testing browser initialization..."
           python3 -c "
           from selenium import webdriver
           from selenium.webdriver.chrome.options import Options
-          import sys
           
-          print('Creating Chrome options...')
           options = Options()
           options.add_argument('--headless=new')
           options.add_argument('--no-sandbox')
           options.add_argument('--disable-dev-shm-usage')
-          options.add_argument('--disable-gpu')
           
-          print('Initializing Chrome driver...')
-          try:
-              driver = webdriver.Chrome(options=options)
-              print('✅ Browser initialized successfully')
-              print(f'Browser version: {driver.capabilities[\"browserVersion\"]}')
-              driver.quit()
-              print('✅ Browser closed successfully')
-          except Exception as e:
-              print(f'❌ Browser initialization failed: {e}')
-              sys.exit(1)
+          driver = webdriver.Chrome(options=options)
+          print(f'✅ Browser: {driver.capabilities[\"browserVersion\"]}')
+          driver.quit()
           "
       
       - name: Configure Git
@@ -144,56 +165,185 @@ jobs:
           git config --global user.email "actions@github.com"
       
       - name: Run workflow
+        id: workflow
         env:
           MAX_VIDEOS: ${{ github.event.inputs.max_videos || '0' }}
-          PYTHONUNBUFFERED: '1'
-          GIO_MODULE_DIR: '/dev/null'
         run: |
-          echo "Starting workflow..."
-          cd javgg || exit 1
-          echo "Changed to javgg directory"
-          echo "Running: python complete_workflow.py --max-videos $MAX_VIDEOS"
-          timeout 5h python -u complete_workflow.py --max-videos $MAX_VIDEOS 2>&1 || true
-          echo "Workflow completed or timed out"
-      
-      - name: Commit and push changes
-        run: |
-          git add database/combined_videos.json
-          git add database/workflow_progress.json
-          git add database/progress_tracking.json || true
-          git add database/stats.json || true
+          cd javgg
           
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
+          # Run with timeout, capture exit code properly
+          timeout 5h python -u complete_workflow.py --max-videos "$MAX_VIDEOS" 2>&1 | tee ../logs/workflow.log
+          EXIT_CODE=${PIPESTATUS[0]}
+          
+          # Parse results if available
+          VIDEOS_PROCESSED=0
+          if [ -f ../database/stats.json ]; then
+            VIDEOS_PROCESSED=$(python3 -c "import json; d=json.load(open('../database/stats.json')); print(d.get('videos_processed_today', 0))" 2>/dev/null || echo 0)
+          fi
+          
+          echo "videos_processed=$VIDEOS_PROCESSED" >> $GITHUB_OUTPUT
+          echo "exit_status=$EXIT_CODE" >> $GITHUB_OUTPUT
+          
+          if [ $EXIT_CODE -eq 124 ]; then
+            echo "status=timeout" >> $GITHUB_OUTPUT
+            echo "⏱️ Timed out after 5 hours"
+          elif [ $EXIT_CODE -eq 0 ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "✅ Completed successfully"
           else
-            git commit -m "Update database: $(date '+%Y-%m-%d %H:%M:%S')"
-            git push
+            echo "status=error" >> $GITHUB_OUTPUT
+            echo "❌ Failed with exit code $EXIT_CODE"
+            exit 1
           fi
       
-      - name: Upload logs as artifact
+      - name: Validate database files
+        run: |
+          # Check JSON files are valid before committing
+          for file in database/*.json; do
+            if [ -f "$file" ]; then
+              if ! python3 -c "import json; json.load(open('$file'))" 2>/dev/null; then
+                echo "❌ Invalid JSON: $file"
+                exit 1
+              fi
+            fi
+          done
+          echo "✅ All database files are valid JSON"
+      
+      - name: Check for meaningful changes
+        id: check_changes
+        run: |
+          git add database/ logs/ 2>/dev/null || true
+          
+          # Check if there are actual content changes (not just timestamps)
+          if git diff --staged --quiet; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "📭 No changes"
+          else
+            # Show what changed
+            echo "📦 Changes detected:"
+            git diff --staged --stat
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Commit and push with retry
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          git commit -m "Update: $(date '+%Y-%m-%d %H:%M:%S') [processed: ${{ steps.workflow.outputs.videos_processed }} videos]"
+          
+          # Retry push up to 3 times
+          for i in 1 2 3; do
+            if git push; then
+              echo "✅ Pushed successfully"
+              exit 0
+            fi
+            echo "Push failed, pulling and retrying..."
+            git pull --rebase origin main || true
+            sleep 5
+          done
+          echo "❌ Failed to push after 3 attempts"
+          exit 1
+      
+      - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: workflow-logs-${{ github.run_number }}
+          name: logs-${{ github.run_number }}-${{ github.run_attempt }}
           path: |
-            javgg/*.log
+            logs/
             database/*.json
+            javgg/*.log
           retention-days: 7
+          if-no-files-found: ignore
       
-      - name: Trigger next run for 24/7 operation
-        if: success()
+      - name: Cleanup old artifacts
+        if: always()
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Delete artifacts older than 7 days to save space
+            const artifacts = await github.rest.actions.listArtifactsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100
+            });
+            
+            const oldArtifacts = artifacts.data.artifacts.filter(a => {
+              const age = Date.now() - new Date(a.created_at).getTime();
+              return age > 7 * 24 * 60 * 60 * 1000 && !a.expired;
+            });
+            
+            for (const artifact of oldArtifacts.slice(0, 10)) {
+              await github.rest.actions.deleteArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: artifact.id
+              });
+              console.log(`Deleted old artifact: ${artifact.name}`);
+            }
+      
+      - name: Decide on retrigger
+        id: decide
+        run: |
+          # Don't retrigger if:
+          # 1. Explicitly skipped
+          # 2. No videos processed AND no changes AND not forced
+          # 3. Exit status was error
+          
+          if [ "${{ github.event.inputs.skip_trigger }}" = "true" ]; then
+            echo "should_retrigger=false" >> $GITHUB_OUTPUT
+            echo "🚫 Retrigger skipped (manual)"
+          elif [ "${{ steps.workflow.outputs.exit_status }}" != "0" ]; then
+            echo "should_retrigger=false" >> $GITHUB_OUTPUT
+            echo "🚫 Not retriggering due to error"
+          elif [ "${{ github.event.inputs.force_run }}" = "true" ]; then
+            echo "should_retrigger=true" >> $GITHUB_OUTPUT
+            echo "🔄 Retriggering (forced)"
+          elif [ "${{ steps.workflow.outputs.videos_processed }}" -gt 0 ]; then
+            echo "should_retrigger=true" >> $GITHUB_OUTPUT
+            echo "🔄 Retriggering (processed ${{ steps.workflow.outputs.videos_processed }} videos)"
+          elif [ "${{ steps.check_changes.outputs.has_changes }}" = "true" ]; then
+            echo "should_retrigger=true" >> $GITHUB_OUTPUT
+            echo "🔄 Retriggering (has changes)"
+          else
+            echo "should_retrigger=false" >> $GITHUB_OUTPUT
+            echo "🛑 Not retriggering (no work done)"
+          fi
+      
+      - name: Trigger next run
+        if: steps.decide.outputs.should_retrigger == 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            // Trigger the workflow again to continue 24/7
+            // Rate limit protection: max 10 triggers per hour
+            const runs = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: context.workflow,
+              created: '>=' + new Date(Date.now() - 60*60*1000).toISOString(),
+              per_page: 20
+            });
+            
+            const recentTriggers = runs.data.workflow_runs.filter(r => 
+              r.event === 'workflow_dispatch' && 
+              new Date(r.created_at) > new Date(Date.now() - 60*60*1000)
+            ).length;
+            
+            if (recentTriggers >= 10) {
+              console.log('⚠️ Rate limit protection: too many recent triggers');
+              return;
+            }
+            
             await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              workflow_id: 'javgg-workflow.yml',
-              ref: 'main',
+              workflow_id: context.workflow,
+              ref: context.ref,
               inputs: {
-                max_videos: '0'
+                max_videos: '0',
+                force_run: 'false',
+                skip_trigger: 'false'
               }
             });
-            console.log('✅ Triggered next workflow run for continuous operation');
+            console.log('✅ Triggered next run');
