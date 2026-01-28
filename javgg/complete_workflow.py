@@ -44,7 +44,10 @@ class WorkflowManager:
         self.base_dir = Path(base_dir) if base_dir else Path(__file__).parent.parent
         self.download_dir = self.base_dir / 'downloaded_files'
         self.database_dir = self.base_dir / 'database'
-        self.db_manager = DatabaseManager()  # DatabaseManager doesn't take arguments
+        self.db_manager = DatabaseManager()
+        
+        # Reusable browser instance (OPTIMIZATION)
+        self.scraper = None
         
         # Create directories
         self.download_dir.mkdir(exist_ok=True)
@@ -57,6 +60,22 @@ class WorkflowManager:
         # Ensure progress file exists immediately
         if not self.progress_file.exists():
             self.save_progress()
+    
+    def get_scraper(self):
+        """Get or create reusable scraper instance"""
+        if self.scraper is None:
+            self.scraper = JavaGGScraper(headless=True)
+            self.scraper._init_driver()
+        return self.scraper
+    
+    def cleanup_scraper(self):
+        """Cleanup scraper at end of workflow"""
+        if self.scraper:
+            try:
+                self.scraper.close()
+            except:
+                pass
+            self.scraper = None
     
     def load_progress(self):
         """Load workflow progress"""
@@ -93,11 +112,10 @@ class WorkflowManager:
         print("="*70)
         
         print("\nInitializing scraper...")
-        scraper = JavaGGScraper(headless=True)
+        scraper = self.get_scraper()  # Reuse browser instance
         new_urls = []
         
         try:
-            print("Initializing browser driver...")
             # Initialize driver
             scraper._init_driver()
             print("Browser driver ready!")
@@ -246,9 +264,11 @@ class WorkflowManager:
             print(f"\n✅ Total found: {len(new_urls)} new videos to process")
             print(f"   Scraped {pages_scraped} pages")
             
-        finally:
-            scraper.close()
+        except Exception as e:
+            print(f"❌ Error scraping: {str(e)}")
+            return []
         
+        # Don't close scraper - reuse it
         return new_urls
     
     def download_video(self, video_url: str, video_code: str) -> Optional[str]:
@@ -258,7 +278,7 @@ class WorkflowManager:
         """
         print(f"\n📥 Downloading video: {video_code}")
         
-        scraper = JavaGGScraper(headless=True)
+        scraper = self.get_scraper()  # Reuse browser instance
         
         try:
             # Scrape to get embed URLs
@@ -390,8 +410,8 @@ class WorkflowManager:
         except Exception as e:
             print(f"  ❌ Error downloading: {str(e)}")
             return None
-        finally:
-            scraper.close()
+        
+        # Don't close scraper - reuse it
     
     def enrich_and_save(self, video_url: str, video_code: str) -> Dict:
         """
@@ -399,7 +419,7 @@ class WorkflowManager:
         """
         print(f"\n📊 Enriching metadata: {video_code}")
         
-        scraper = JavaGGScraper(headless=True)
+        scraper = self.get_scraper()  # Reuse browser instance
         
         try:
             # Scrape JavaGG
@@ -430,15 +450,23 @@ class WorkflowManager:
             print(f"  ✅ Metadata saved to database")
             
             return enriched_data
-            
-        finally:
-            scraper.close()
+        
+        except Exception as e:
+            print(f"  ❌ Error enriching: {str(e)}")
+            return None
+        
+        # Don't close scraper - reuse it
     
-    def generate_preview_video(self, video_file: str, video_code: str) -> Optional[str]:
+    def generate_preview_video(self, video_file: str, video_code: str, file_size_mb: float) -> Optional[str]:
         """
-        Generate preview video - REQUIRED step
+        Generate preview video - OPTIONAL (skip for large files)
         """
         print(f"\n🎬 Generating preview: {video_code}")
+        
+        # Skip preview for very large files (> 2GB) to save time
+        if file_size_mb > 2048:
+            print(f"  ⏭️ Skipping preview for large file ({file_size_mb:.1f} MB)")
+            return None
         
         try:
             preview_file = self.download_dir / f"{video_code}_preview.mp4"
@@ -490,19 +518,19 @@ class WorkflowManager:
                 print(f"  ⚠️ Validation error: {str(e)} - skipping preview")
                 return None
             
-            # Generate 2-minute preview using PreviewGenerator
+            # Generate preview with optimized settings
             print(f"  🎬 Starting preview generation...")
             generator = PreviewGenerator(video_file)
             result = generator.generate_preview(
                 output_path=str(preview_file),
-                target_duration=120,  # 2 minutes
-                clip_duration=2.5,
-                resolution="720",
-                crf=23,
-                fps=30,
+                target_duration=90,  # Reduced from 120 to 90 seconds
+                clip_duration=2.0,  # Reduced from 2.5 to 2.0
+                resolution="480",  # Reduced from 720 to 480 for speed
+                crf=28,  # Increased from 23 to 28 (faster encoding)
+                fps=24,  # Reduced from 30 to 24
                 cleanup=True,
                 parallel=True,
-                max_workers=32
+                max_workers=16  # Reduced from 32 to 16
             )
             
             if result.get('success') and preview_file.exists():
@@ -694,8 +722,9 @@ class WorkflowManager:
                 self.save_progress()
                 return False
             
-            # Step 3: Generate preview
-            preview_file = self.generate_preview_video(video_file, video_code)
+            # Step 3: Generate preview (with file size for optimization)
+            file_size_mb = os.path.getsize(video_file) / 1024 / 1024
+            preview_file = self.generate_preview_video(video_file, video_code, file_size_mb)
             
             # Step 4: Upload videos
             urls = self.upload_videos(video_file, preview_file, video_code)
@@ -710,8 +739,9 @@ class WorkflowManager:
             self.progress['processed_videos'].append(video_code)
             self.save_progress()
             
-            # Commit and push changes after each video (important for GitHub Actions)
-            self.commit_and_push_changes(video_code)
+            # Commit and push changes (batched every 5 videos for speed)
+            if len(self.progress['processed_videos']) % 5 == 0:
+                self.commit_and_push_changes(f"Batch update: {len(self.progress['processed_videos'])} videos")
             
             print(f"\n✅ Successfully processed: {video_code}")
             return True
@@ -816,6 +846,13 @@ class WorkflowManager:
         print(f"❌ Failed: {total_processed - success_count}")
         print(f"⏳ Pending enrichment: {len(self.progress['pending_enrichment'])}")
         print(f"End time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        # Final commit for remaining videos
+        if success_count > 0:
+            self.commit_and_push_changes(f"Final update: {success_count} videos")
+        
+        # Cleanup browser
+        self.cleanup_scraper()
 
 
 if __name__ == '__main__':
