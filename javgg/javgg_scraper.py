@@ -212,11 +212,29 @@ class JavaGGScraper:
             # Method 1: Check page source for M3U8 URLs
             print(f"  🔍 Checking page source...")
             page_source = self.driver.page_source
-            m3u8_matches = re.findall(r'(https?://[^\s"\'<>]+\.m3u8[^\s"\'<>]*)', page_source)
-            if m3u8_matches:
-                m3u8_url = m3u8_matches[0]
-                print(f"  ✅ Found M3U8 in page source: {m3u8_url[:80]}...")
-                return m3u8_url
+            
+            # Look for M3U8 URLs with various patterns
+            m3u8_patterns = [
+                r'(https?://[^\s"\'<>]+\.m3u8[^\s"\'<>]*)',  # Standard M3U8
+                r'"(https?://[^"]+\.m3u8[^"]*)"',  # In quotes
+                r"'(https?://[^']+\.m3u8[^']*)'",  # In single quotes
+                r'src["\s:=]+(["\'])(https?://[^"\']+\.m3u8[^"\']*)\1',  # src attribute
+                r'file["\s:=]+(["\'])(https?://[^"\']+\.m3u8[^"\']*)\1',  # file attribute
+            ]
+            
+            for pattern in m3u8_patterns:
+                matches = re.findall(pattern, page_source, re.IGNORECASE)
+                if matches:
+                    # Handle tuple results from patterns with groups
+                    for match in matches:
+                        if isinstance(match, tuple):
+                            m3u8_url = match[-1]  # Get last group
+                        else:
+                            m3u8_url = match
+                        
+                        if m3u8_url and '.m3u8' in m3u8_url:
+                            print(f"  ✅ Found M3U8 in page source: {m3u8_url[:80]}...")
+                            return m3u8_url
             
             # Method 2: Check JavaScript variables
             print(f"  🔍 Checking JavaScript variables...")
@@ -269,91 +287,6 @@ class JavaGGScraper:
             
         except Exception as e:
             print(f"  ❌ M3U8 extraction error: {str(e)[:100]}")
-            return None
-    
-    def scrape_video(self, video_url: str) -> Optional[VideoData]:
-            try:
-                driver.execute_script("""
-                    var playBtn = document.querySelector('.vjs-big-play-button, .play-button, button[aria-label*="Play"]');
-                    if (playBtn) playBtn.click();
-                """)
-                time.sleep(1)  # Reduced from 2 to 1
-            except:
-                pass
-            
-            # Method 2: Play video element directly
-            try:
-                driver.execute_script("""
-                    var video = document.querySelector('video');
-                    if (video) {
-                        video.muted = true;
-                        video.play();
-                    }
-                """)
-                time.sleep(2)  # Reduced from 3 to 2
-            except:
-                pass
-            
-            # Method 3: Check for jwplayer
-            try:
-                driver.execute_script("""
-                    if (typeof jwplayer !== 'undefined') {
-                        var player = jwplayer();
-                        if (player) player.play();
-                    }
-                """)
-                time.sleep(1)  # Reduced from 2 to 1
-            except:
-                pass
-            
-            print(f"  🔍 Checking network logs for M3U8...")
-            
-            # Wait and check logs - reduced iterations
-            m3u8_url = None
-            for attempt in range(2):  # Reduced from 3 to 2 attempts
-                try:
-                    logs = driver.get_log('performance')
-                    
-                    for log in logs:
-                        try:
-                            message = json.loads(log['message'])
-                            method = message.get('message', {}).get('method', '')
-                            
-                            if method == 'Network.responseReceived':
-                                response = message.get('message', {}).get('params', {}).get('response', {})
-                                url = response.get('url', '')
-                                
-                                # Look for M3U8 URLs
-                                if '.m3u8' in url:
-                                    print(f"  ✅ Found M3U8: {url[:80]}...")
-                                    m3u8_url = url
-                                    break
-                        except:
-                            continue
-                    
-                    if m3u8_url:
-                        break
-                    
-                    time.sleep(1)  # Reduced from 2 to 1
-                except:
-                    pass
-            
-            driver.quit()
-            
-            if m3u8_url:
-                return m3u8_url
-            else:
-                print(f"  ⚠️ No M3U8 found in network logs")
-                return None
-            
-        except Exception as e:
-            error_msg = str(e)[:100]
-            print(f"  ⚠️ M3U8 extraction error: {error_msg}")
-            if driver:
-                try:
-                    driver.quit()
-                except:
-                    pass
             return None
     
     def scrape_video(self, video_url: str) -> Optional[VideoData]:
