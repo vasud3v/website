@@ -450,14 +450,14 @@ class JavaGGScraper:
             print(f"    📏 Content length: {len(response.text)} bytes")
             print(f"    🔗 Final URL: {response.url[:60]}...")
             
-            # Check response
-            if response.status_code != 200:
-                print(f"    ⚠️ Non-200 status code")
-                # Save response for debugging
-                debug_file = f"downloaded_files/{code}_debug_response.html"
-                with open(debug_file, 'w', encoding='utf-8') as f:
-                    f.write(response.text)
-                print(f"    💾 Saved response to {debug_file}")
+            # Check response - accept both 200 and 403 (some sites return 403 but still work)
+            if response.status_code not in [200, 403]:
+                print(f"    ⚠️ Unexpected status code: {response.status_code}")
+                return None
+            
+            # If we got content, try to parse it regardless of status code
+            if len(response.text) < 1000:
+                print(f"    ⚠️ Response too small, likely blocked")
                 return None
             
             # Parse HTML
