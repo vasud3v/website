@@ -56,13 +56,25 @@ class JavaGGScraper:
         if self.driver is None:
             print("🌐 Initializing browser...")
             # Use undetected-chromedriver with additional stealth options
-            self.driver = Driver(
-                uc=True, 
-                headless=self.headless, 
-                incognito=True,
-                agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            )
-            print("  ✅ Browser ready")
+            try:
+                self.driver = Driver(
+                    uc=True, 
+                    headless=self.headless, 
+                    incognito=True,
+                    agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    # Additional options for better Cloudflare bypass
+                    disable_csp=True,
+                    no_sandbox=True
+                )
+                
+                # Set additional timeouts
+                self.driver.set_page_load_timeout(60)
+                self.driver.set_script_timeout(30)
+                
+                print("  ✅ Browser ready")
+            except Exception as e:
+                print(f"  ⚠️ Browser initialization error: {str(e)[:100]}")
+                raise
     
     def _extract_m3u8_from_embed_fast(self, embed_url: str) -> Optional[str]:
         """Fast M3U8 extraction with minimal waits"""

@@ -141,30 +141,79 @@ class WorkflowManager:
                     base_url = f"https://javgg.net/new-post/page/{page}/"
                 
                 print(f"  Loading: {base_url}")
-                scraper.driver.get(base_url)
                 
-                # Wait for Cloudflare check to complete
-                print(f"  Waiting for Cloudflare check...")
-                max_wait = 15  # Reduced from 30 to 15 seconds
-                waited = 0
-                while waited < max_wait:
-                    time.sleep(1)  # Check every second
-                    waited += 1
+                # Try loading the page with retry on Cloudflare block
+                max_retries = 3
+                page_loaded = False
+                
+                for retry in range(max_retries):
+                    if retry > 0:
+                        print(f"  🔄 Retry {retry}/{max_retries-1}...")
+                        time.sleep(5)  # Wait before retry
                     
-                    # Check if Cloudflare challenge is still showing
-                    if "Just a moment" not in scraper.driver.title:
-                        print(f"  ✅ Cloudflare check passed after {waited}s")
+                    try:
+                        scraper.driver.get(base_url)
+                    except Exception as e:
+                        print(f"  ⚠️ Page load error: {str(e)[:100]}")
+                    
+                    # Wait for Cloudflare check to complete
+                    print(f"  Waiting for Cloudflare check...")
+                    max_wait = 30  # Increased back to 30 seconds for GitHub Actions
+                    waited = 0
+                    cloudflare_passed = False
+                    
+                    while waited < max_wait:
+                        time.sleep(2)  # Check every 2 seconds instead of 1
+                        waited += 2
+                        
+                        # Check multiple indicators that Cloudflare is done
+                        try:
+                            title = scraper.driver.title
+                            url = scraper.driver.current_url
+                            
+                            # Check if Cloudflare challenge is gone
+                            if "Just a moment" not in title and "Cloudflare" not in title:
+                                # Also check if we're on the actual page
+                                if "javgg.net" in url and "/new-post" in url:
+                                    print(f"  ✅ Cloudflare check passed after {waited}s")
+                                    cloudflare_passed = True
+                                    page_loaded = True
+                                    break
+                        except:
+                            pass
+                        
+                        if waited % 10 == 0:  # Print every 10 seconds
+                            print(f"  ⏳ Still waiting for Cloudflare... ({waited}s)")
+                    
+                    if cloudflare_passed:
                         break
                     
-                    if waited % 5 == 0:  # Print every 5 seconds
-                        print(f"  ⏳ Still waiting for Cloudflare... ({waited}s)")
+                    if retry < max_retries - 1:
+                        print(f"  ⚠️ Cloudflare check failed, will retry...")
+                
+                if not page_loaded:
+                    print(f"  ❌ Failed to bypass Cloudflare after {max_retries} attempts")
+                    break
                 
                 # Additional wait for page to fully load
-                time.sleep(2)  # Reduced from 3 to 2
+                time.sleep(3)
                 
                 # Check if page loaded
                 print(f"  Current URL: {scraper.driver.current_url}")
                 print(f"  Page title: {scraper.driver.title}")
+                
+                # Check if still blocked by Cloudflare
+                if "Just a moment" in scraper.driver.title or "Cloudflare" in scraper.driver.page_source:
+                    print(f"  ❌ Still blocked by Cloudflare after all retries")
+                    
+                    # Save page source for debugging
+                    debug_file = self.download_dir / f"cloudflare_blocked_page_{page}.html"
+                    with open(debug_file, 'w', encoding='utf-8') as f:
+                        f.write(scraper.driver.page_source)
+                    print(f"  ⚠️ Saved blocked page to {debug_file} for debugging")
+                    
+                    # Cannot proceed
+                    break
                 
                 # Scroll down to trigger lazy loading
                 scraper.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
