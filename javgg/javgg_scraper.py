@@ -163,135 +163,115 @@ class JavaGGScraper:
         else:
             self.driver = webdriver.Chrome(options=options)
     
-    def _extract_m3u8_from_embed_fast(self, embed_url: str) -> Optional[str]:
-        """Fast M3U8 extraction with minimal waits"""
-        print(f"  🔍 Quick M3U8 extraction...")
+    def _extract_m3u8_from_embed(self, embed_url: str) -> Optional[str]:
+        """Extract M3U8 URL from embed page - IMPROVED VERSION"""
+        print(f"  🔍 Extracting M3U8 from embed...")
         
-        driver = None
+        # Use the main driver instead of creating a new one
         try:
-            options = Options()
-            options.add_argument('--disable-blink-features=AutomationControlled')
-            options.add_argument('--disable-gpu')
-            options.add_argument('--no-sandbox')
-            options.add_argument('--disable-dev-shm-usage')
-            options.add_argument('--headless')
-            options.page_load_strategy = 'none'  # Don't wait for page load
-            options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
+            print(f"  📄 Loading embed page...")
+            self.driver.get(embed_url)
             
-            # Find Chrome binary
-            import shutil
-            chrome_paths = [
-                '/usr/bin/chromium-browser',
-                '/usr/bin/chromium',
-                '/usr/bin/google-chrome',
-                shutil.which('chromium-browser'),
-                shutil.which('google-chrome'),
-            ]
+            # Wait for video player to initialize
+            time.sleep(5)
             
-            chrome_binary = None
-            for path in chrome_paths:
-                if path and os.path.exists(path):
-                    chrome_binary = path
-                    break
-            
-            if chrome_binary:
-                options.binary_location = chrome_binary
-            
-            driver = webdriver.Chrome(options=options)
-            driver.set_page_load_timeout(10)
-            
-            # Load page
-            driver.get(embed_url)
-            time.sleep(2)  # Minimal wait
-            
-            # Try to play video
+            # Try to play the video to trigger M3U8 loading
+            print(f"  ▶️ Triggering video play...")
             try:
-                driver.execute_script("var v=document.querySelector('video');if(v){v.muted=true;v.play();}")
-                time.sleep(1)  # Quick wait
-            except:
-                pass
+                self.driver.execute_script("""
+                    // Try multiple methods to play video
+                    var video = document.querySelector('video');
+                    if (video) {
+                        video.muted = true;
+                        video.play();
+                    }
+                    
+                    // Try jwplayer
+                    if (typeof jwplayer !== 'undefined') {
+                        try {
+                            jwplayer().play();
+                        } catch(e) {}
+                    }
+                    
+                    // Try videojs
+                    if (typeof videojs !== 'undefined') {
+                        try {
+                            var player = videojs('video');
+                            player.play();
+                        } catch(e) {}
+                    }
+                    
+                    // Click play button
+                    var playBtn = document.querySelector('.vjs-big-play-button, .play-button, button[aria-label*="Play"]');
+                    if (playBtn) playBtn.click();
+                """)
+                time.sleep(3)
+            except Exception as e:
+                print(f"  ⚠️ Could not trigger play: {str(e)[:50]}")
             
-            # Check logs once
+            # Method 1: Check page source for M3U8 URLs
+            print(f"  🔍 Checking page source...")
+            page_source = self.driver.page_source
+            m3u8_matches = re.findall(r'(https?://[^\s"\'<>]+\.m3u8[^\s"\'<>]*)', page_source)
+            if m3u8_matches:
+                m3u8_url = m3u8_matches[0]
+                print(f"  ✅ Found M3U8 in page source: {m3u8_url[:80]}...")
+                return m3u8_url
+            
+            # Method 2: Check JavaScript variables
+            print(f"  🔍 Checking JavaScript variables...")
             try:
-                logs = driver.get_log('performance')
+                m3u8_url = self.driver.execute_script("""
+                    // Check common variable names
+                    if (typeof videoUrl !== 'undefined') return videoUrl;
+                    if (typeof video_url !== 'undefined') return video_url;
+                    if (typeof streamUrl !== 'undefined') return streamUrl;
+                    if (typeof stream_url !== 'undefined') return stream_url;
+                    if (typeof sources !== 'undefined' && sources.length > 0) return sources[0].src || sources[0].file;
+                    
+                    // Check video element src
+                    var video = document.querySelector('video');
+                    if (video && video.src) return video.src;
+                    if (video && video.currentSrc) return video.currentSrc;
+                    
+                    // Check source elements
+                    var source = document.querySelector('video source');
+                    if (source && source.src) return source.src;
+                    
+                    return null;
+                """)
+                
+                if m3u8_url and '.m3u8' in m3u8_url:
+                    print(f"  ✅ Found M3U8 in JavaScript: {m3u8_url[:80]}...")
+                    return m3u8_url
+            except Exception as e:
+                print(f"  ⚠️ JavaScript check failed: {str(e)[:50]}")
+            
+            # Method 3: Check network requests (if available)
+            print(f"  🔍 Checking network logs...")
+            try:
+                logs = self.driver.get_log('performance')
                 for log in logs:
                     try:
                         message = json.loads(log['message'])
                         if message.get('message', {}).get('method') == 'Network.responseReceived':
                             url = message.get('message', {}).get('params', {}).get('response', {}).get('url', '')
                             if '.m3u8' in url:
-                                driver.quit()
+                                print(f"  ✅ Found M3U8 in network logs: {url[:80]}...")
                                 return url
                     except:
                         continue
-            except:
-                pass
+            except Exception as e:
+                print(f"  ⚠️ Network log check failed: {str(e)[:50]}")
             
-            driver.quit()
+            print(f"  ⚠️ No M3U8 URL found")
             return None
             
         except Exception as e:
-            if driver:
-                try:
-                    driver.quit()
-                except:
-                    pass
+            print(f"  ❌ M3U8 extraction error: {str(e)[:100]}")
             return None
     
-    def _extract_m3u8_from_embed(self, embed_url: str) -> Optional[str]:
-        """Extract M3U8 URL from embed using network monitoring"""
-        print(f"  🔍 Extracting M3U8 from embed...")
-        
-        driver = None
-        try:
-            options = Options()
-            options.add_argument('--disable-blink-features=AutomationControlled')
-            options.add_argument('--disable-gpu')
-            options.add_argument('--no-sandbox')
-            options.add_argument('--disable-dev-shm-usage')
-            options.add_argument('--disable-software-rasterizer')
-            options.add_argument('--headless')
-            options.page_load_strategy = 'eager'
-            options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
-            
-            # Try to find Chrome binary (GitHub Actions uses chromium-browser)
-            import shutil
-            chrome_paths = [
-                '/usr/bin/chromium-browser',  # GitHub Actions
-                '/usr/bin/chromium',
-                '/usr/bin/google-chrome',
-                '/usr/bin/chrome',
-                shutil.which('chromium-browser'),
-                shutil.which('chromium'),
-                shutil.which('google-chrome'),
-            ]
-            
-            chrome_binary = None
-            for path in chrome_paths:
-                if path and os.path.exists(path):
-                    chrome_binary = path
-                    break
-            
-            if chrome_binary:
-                options.binary_location = chrome_binary
-            
-            driver = webdriver.Chrome(options=options)
-            driver.set_page_load_timeout(30)
-            driver.set_script_timeout(30)
-            
-            print(f"  ⏳ Loading embed page...")
-            try:
-                driver.get(embed_url)
-            except Exception as e:
-                if 'timeout' not in str(e).lower():
-                    raise
-            
-            time.sleep(3)  # Reduced from 5 to 3 seconds
-            
-            # Try multiple methods to trigger video and find M3U8
-            print(f"  ▶️ Triggering video play...")
-            
-            # Method 1: Click play button
+    def scrape_video(self, video_url: str) -> Optional[VideoData]:
             try:
                 driver.execute_script("""
                     var playBtn = document.querySelector('.vjs-big-play-button, .play-button, button[aria-label*="Play"]');
@@ -677,8 +657,8 @@ class JavaGGScraper:
             # Try to extract M3U8 URL from embed (needed for download)
             print(f"  🔍 Extracting stream URL from embed...")
             
-            # Quick extraction with reduced timeouts
-            m3u8_url = self._extract_m3u8_from_embed_fast(embed_url)
+            # Extract M3U8 URL from embed
+            m3u8_url = self._extract_m3u8_from_embed(embed_url)
             
             if m3u8_url:
                 print(f"  ✅ Found stream URL")
