@@ -288,11 +288,10 @@ class WorkflowManager:
                 '--retries', '5',
                 '--fragment-retries', '5',
                 '--progress',  # Show progress
-                '--newline',   # Each progress on new line
                 download_url
             ]
             
-            # Run with real-time output
+            # Run with real-time output on same line
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -301,11 +300,20 @@ class WorkflowManager:
                 bufsize=1
             )
             
-            # Print progress in real-time
+            # Print progress on same line
+            last_line = ""
             for line in process.stdout:
                 line = line.strip()
                 if line and ('[download]' in line or '%' in line or 'ETA' in line):
-                    print(f"     {line}")
+                    # Clear previous line and print new one
+                    if last_line:
+                        print('\r' + ' ' * len(last_line), end='', flush=True)
+                    print(f"\r     {line}", end='', flush=True)
+                    last_line = line
+            
+            # Move to next line after download completes
+            if last_line:
+                print()
             
             process.wait()
             result_code = process.returncode
