@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 import time
 import urllib3
-from tqdm import tqdm
 
 # Disable SSL warnings for expired certificates
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)

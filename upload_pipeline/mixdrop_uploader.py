@@ -7,7 +7,6 @@ import requests
 import os
 from pathlib import Path
 import time
-from tqdm import tqdm
 
 
 class MixDropUploader:
@@ -97,14 +96,20 @@ class MixDropUploader:
                     print(f"[MixDrop] Response: {result}")
                     
                     if result.get('success'):
-                        file_code = result['result']['fileref']
+                        # Safely extract file code
+                        result_data = result.get('result', {})
+                        file_code = result_data.get('fileref')
+                        
+                        if not file_code:
+                            return {"success": False, "error": f"No file code in response: {result}"}
+                        
                         print(f"[MixDrop] ✓ Upload successful: {file_code}")
                         return {
                             "success": True,
                             "host": "mixdrop",
                             "file_code": file_code,
-                            "url": result['result']['url'],
-                            "embed_url": result['result']['embedurl']
+                            "url": result_data.get('url', f"https://mixdrop.ag/f/{file_code}"),
+                            "embed_url": result_data.get('embedurl', f"https://mixdrop.ag/e/{file_code}")
                         }
                     else:
                         return {"success": False, "error": result.get('msg', 'Upload failed')}

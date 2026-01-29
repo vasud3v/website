@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 import time
 import urllib3
-from tqdm import tqdm
 
 # Disable SSL warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -109,13 +108,19 @@ class StreamtapeUploader:
                 print(f"[Streamtape] Response: {result}")
                 
                 if result.get('status') == 200:
-                    file_id = result['result']['id']
+                    # Safely extract file ID
+                    result_data = result.get('result', {})
+                    file_id = result_data.get('id')
+                    
+                    if not file_id:
+                        return {"success": False, "error": f"No file ID in response: {result}"}
+                    
                     print(f"[Streamtape] ✓ Upload successful: {file_id}")
                     return {
                         "success": True,
                         "host": "streamtape",
                         "file_id": file_id,
-                        "url": result['result']['url'],
+                        "url": result_data.get('url', f"https://streamtape.com/v/{file_id}"),
                         "embed_url": f"https://streamtape.com/e/{file_id}"
                     }
                 else:

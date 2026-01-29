@@ -296,21 +296,32 @@ class WorkingHostsUploader:
             # Update hosting URLs
             for host, result in results.items():
                 if result.get('success'):
+                    # Extract file code from various possible field names
+                    file_code = (
+                        result.get('file_code') or 
+                        result.get('vid') or 
+                        result.get('video_id') or 
+                        result.get('file_id') or 
+                        ''
+                    )
+                    
                     video['hosting_urls'][host] = {
                         'embed_url': result.get('embed_url', ''),
                         'download_url': result.get('url', result.get('download_url', '')),
-                        'file_code': result.get('file_code', result.get('vid', ''))
+                        'file_code': file_code
                     }
+                    
+                    print(f"  ✓ Saved {host}: {file_code}")
             
             video['uploaded_at'] = datetime.now().isoformat()
             
             if db_manager.add_or_update_video(video):
-                print(f"✓ Updated database for '{video_code}'")
+                print(f"\n✓ Updated database for '{video_code}'")
             else:
-                print(f"✗ Failed to update database")
+                print(f"\n✗ Failed to update database")
                 
         except Exception as e:
-            print(f"✗ Database update error: {str(e)}")
+            print(f"\n✗ Database update error: {str(e)}")
 
 
 def main():

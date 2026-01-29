@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 import time
 import urllib3
-from tqdm import tqdm
 
 # Disable SSL warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -33,6 +32,10 @@ class UploadyUploader:
         try:
             if not os.path.exists(video_path):
                 return {"success": False, "error": "Video file not found"}
+            
+            file_size = os.path.getsize(video_path)
+            if file_size == 0:
+                return {"success": False, "error": "File is empty (0 bytes)"}
             
             file_name = Path(video_path).name
             title = title or Path(video_path).stem
@@ -74,6 +77,10 @@ class UploadyUploader:
             
             upload_url = server_data.get('result')
             sess_id = server_data.get('sess_id')
+            
+            if not upload_url or not sess_id:
+                return {"success": False, "error": f"Missing upload URL or session ID in response: {server_data}"}
+            
             print(f"[Uploady] Upload server: {upload_url}")
             print(f"[Uploady] Session ID: {sess_id}")
             
