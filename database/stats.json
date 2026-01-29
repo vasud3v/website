@@ -1,15 +1,16 @@
 {
-  "total_videos": 3,
+  "total_videos": 4,
   "total_size_bytes": 0,
   "by_hosting": {},
   "by_category": {},
   "by_model": {},
   "by_studio": {
+    "Amateur 39": 1,
     "Prestige": 2,
     "Momotaro Eizo": 1
   },
-  "with_javdb": 3,
+  "with_javdb": 4,
   "with_cast": 0,
   "with_screenshots": 2,
-  "last_updated": "2026-01-29T12:06:48.115137"
+  "last_updated": "2026-01-29T12:15:27.378092"
 }
