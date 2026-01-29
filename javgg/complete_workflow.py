@@ -1223,12 +1223,12 @@ class WorkflowManager:
                     self.progress['processed_videos'].append(video_code)
                 self.save_progress()
                 
-                # Commit changes
-                if len(self.progress['processed_videos']) % 5 == 0:
-                    try:
-                        self.commit_and_push_changes(f"Batch update: {len(self.progress['processed_videos'])} videos")
-                    except Exception as e:
-                        print(f"  ⚠️ Git commit error: {str(e)[:100]}")
+                # Commit changes after each video
+                try:
+                    self.commit_and_push_changes(f"Add metadata: {video_code}")
+                    print(f"  ✅ Changes committed and pushed to GitHub")
+                except Exception as e:
+                    print(f"  ⚠️ Git commit error: {str(e)[:100]}")
                 
                 print(f"\n✅ Metadata saved for: {video_code} (no video file)")
                 return True
@@ -1270,12 +1270,12 @@ class WorkflowManager:
                 self.progress['processed_videos'].append(video_code)
             self.save_progress()
             
-            # Commit and push changes (batched every 5 videos for speed)
-            if len(self.progress['processed_videos']) % 5 == 0:
-                try:
-                    self.commit_and_push_changes(f"Batch update: {len(self.progress['processed_videos'])} videos")
-                except Exception as e:
-                    print(f"  ⚠️ Git commit error: {str(e)[:100]}")
+            # Commit and push changes after EACH video
+            try:
+                self.commit_and_push_changes(f"Add video: {video_code}")
+                print(f"  ✅ Changes committed and pushed to GitHub")
+            except Exception as e:
+                print(f"  ⚠️ Git commit error: {str(e)[:100]}")
             
             print(f"\n✅ Successfully processed: {video_code}")
             return True
