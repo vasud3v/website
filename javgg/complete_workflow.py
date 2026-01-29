@@ -974,14 +974,17 @@ class WorkflowManager:
     
     def upload_videos(self, video_file: str, preview_file: str, video_code: str) -> Dict:
         """
-        Upload full video to all hosts and preview to Internet Archive
+        Upload full video to all hosts and preview to Internet Archive (in parallel)
         Returns dict with all URLs
         """
         print(f"\n☁️ Uploading videos: {video_code}")
+        print(f"   Preview file: {preview_file}")
         
         urls = {}
         
         try:
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            
             # Upload full video to all hosting sites
             print(f"\n  📤 Uploading full video to hosting sites...")
             print(f"     File: {os.path.basename(video_file)}")
@@ -995,58 +998,93 @@ class WorkflowManager:
             else:
                 print(f"     ⚠️ No upload hosts configured (check .env file)")
             
-            results = uploader.upload_to_all(video_file, title=video_code)
-            
-            # Extract URLs from results
-            hosting_urls = {}
-            for host, result in results.items():
-                if result.get('success'):
-                    print(f"     ✅ {host}: Success")
-                    hosting_urls[host] = {
-                        'embed_url': result.get('embed_url', '') or result.get('video_player', ''),
-                        'download_url': result.get('download_url', '') or result.get('url', '') or result.get('video_downloader', ''),
-                        'file_code': result.get('file_code', '') or result.get('file_id', '') or result.get('video_id', '')
-                    }
+            # Use ThreadPoolExecutor to upload to hosting sites and Internet Archive in parallel
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                # Submit hosting upload task
+                hosting_future = executor.submit(uploader.upload_to_all, video_file, video_code, max_workers=6)
+                
+                # Submit Internet Archive upload task (if preview exists)
+                ia_future = None
+                # Check if preview_file is valid (not None, not empty string, and file exists)
+                if preview_file and preview_file != 'None' and os.path.exists(preview_file):
+                    print(f"\n  📤 Uploading preview to Internet Archive (in parallel)...")
+                    print(f"     Preview: {os.path.basename(preview_file)} ({os.path.getsize(preview_file) / 1024 / 1024:.1f} MB)")
+                    ia_future = executor.submit(self._upload_to_internet_archive, preview_file, video_code)
                 else:
-                    print(f"     ❌ {host}: Failed")
-            
-            urls['hosting'] = hosting_urls
-            print(f"  ✅ Uploaded to {len(hosting_urls)} hosting sites")
-            
-            # Upload preview to Internet Archive
-            if preview_file:
-                print(f"\n  📤 Uploading preview to Internet Archive...")
-                try:
-                    ia_uploader = InternetArchiveUploader()
-                    ia_result = ia_uploader.upload_preview(preview_file, video_code, metadata={'title': video_code})
-                    
+                    print(f"\n  ⏭️ Skipping Internet Archive upload (no preview file)")
+                    if preview_file:
+                        print(f"     Reason: preview_file={preview_file}, exists={os.path.exists(preview_file) if preview_file != 'None' else False}")
+                
+                # Wait for hosting uploads to complete
+                results = hosting_future.result()
+                
+                # Extract URLs from results
+                hosting_urls = {}
+                for host, result in results.items():
+                    if result.get('success'):
+                        print(f"     ✅ {host}: Success")
+                        hosting_urls[host] = {
+                            'embed_url': result.get('embed_url', '') or result.get('video_player', ''),
+                            'download_url': result.get('download_url', '') or result.get('url', '') or result.get('video_downloader', ''),
+                            'file_code': result.get('file_code', '') or result.get('file_id', '') or result.get('video_id', '')
+                        }
+                    else:
+                        print(f"     ❌ {host}: Failed")
+                
+                urls['hosting'] = hosting_urls
+                print(f"  ✅ Uploaded to {len(hosting_urls)} hosting sites")
+                
+                # Wait for Internet Archive upload to complete
+                if ia_future:
+                    ia_result = ia_future.result()
+                    print(f"\n  📊 Internet Archive result: success={ia_result.get('success')}")
                     if ia_result.get('success'):
+                        direct_link = ia_result.get('direct_mp4_link')
                         print(f"     ✅ Internet Archive: Success")
-                        print(f"     🔗 URL: {ia_result.get('direct_mp4_link')}")
-                        urls['internet_archive'] = ia_result.get('direct_mp4_link')
+                        print(f"     🔗 Direct link: {direct_link}")
+                        if direct_link:
+                            urls['internet_archive'] = direct_link
+                            print(f"     ✅ Saved to urls dict: {direct_link[:80]}...")
+                        else:
+                            print(f"     ⚠️ No direct_mp4_link in result!")
                         urls['preview_file'] = preview_file
                     else:
                         print(f"     ❌ Internet Archive: Failed ({ia_result.get('error')})")
-                except Exception as e:
-                    print(f"     ❌ Internet Archive error: {e}")
-                    # Keep local file if upload fails
-                    urls['preview_file'] = preview_file
-
+                        urls['preview_file'] = preview_file
+                else:
+                    print(f"\n  ℹ️ Internet Archive upload was not started")
             
             print(f"\n  ✅ Uploads complete")
             print(f"     - Hosting sites: {len(hosting_urls)} URLs")
+            if urls.get('internet_archive'):
+                print(f"     - Internet Archive: {urls['internet_archive'][:80]}...")
+            else:
+                print(f"     - Internet Archive: Not uploaded (no URL in dict)")
             
             return urls
             
         except Exception as e:
             print(f"  ❌ Error uploading: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return urls
+    
+    def _upload_to_internet_archive(self, preview_file: str, video_code: str) -> Dict:
+        """Helper method to upload preview to Internet Archive"""
+        try:
+            ia_uploader = InternetArchiveUploader()
+            return ia_uploader.upload_preview(preview_file, video_code, metadata={'title': video_code})
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
     
     def update_metadata_with_urls(self, video_code: str, urls: Dict):
         """
         Update video metadata in database with hosting URLs
         """
         print(f"\n💾 Updating metadata with URLs: {video_code}")
+        print(f"   URLs received: {list(urls.keys())}")
+        if urls.get('internet_archive'):
+            print(f"   Internet Archive URL: {urls['internet_archive'][:100]}...")
         
         try:
             # Load current database
@@ -1077,7 +1115,9 @@ class WorkflowManager:
                     video_found = True
                     print(f"  ✅ Updated video: {video_code}")
                     if urls.get('internet_archive'):
-                        print(f"     Preview URL: {urls['internet_archive'][:80]}...")
+                        print(f"     ✅ Preview URL saved: {urls['internet_archive'][:80]}...")
+                    else:
+                        print(f"     ⚠️ No Internet Archive URL to save")
                     print(f"     Hosting sites: {len(urls.get('hosting', {}))}")
                     break
             
