@@ -1,0 +1,25 @@
+{
+  "total_videos": 1,
+  "total_size_bytes": 0,
+  "by_hosting": {
+    "mixdrop": 1,
+    "uploady": 1,
+    "turboviplay": 1,
+    "seekstreaming": 1
+  },
+  "by_category": {
+    "Genres": 1,
+    "VR": 1,
+    "Featured Actress": 1
+  },
+  "by_model": {
+    "Airi Suzumura": 1
+  },
+  "by_studio": {
+    "Prestige": 1
+  },
+  "with_javdb": 1,
+  "with_cast": 0,
+  "with_screenshots": 1,
+  "last_updated": "2026-01-29T18:10:27.219450"
+}
