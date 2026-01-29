@@ -23,7 +23,8 @@
     "FNEW-021-REDUCE-MOSAIC",
     "GQN-008-REDUCE-MOSAIC",
     "FLAV-413-REDUCE-MOSAIC",
-    "DOA-135-REDUCE-MOSAIC"
+    "DOA-135-REDUCE-MOSAIC",
+    "CEMD-799-REDUCE-MOSAIC"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -121,7 +122,12 @@
       "code": "DOA-135-REDUCE-MOSAIC",
       "url": "https://javgg.net/jav/doa-135-reduce-mosaic/",
       "retry_after": 1769868930.560186
+    },
+    {
+      "code": "CEMD-799-REDUCE-MOSAIC",
+      "url": "https://javgg.net/jav/cemd-799-reduce-mosaic/",
+      "retry_after": 1769869295.996914
     }
   ],
-  "last_run": "2026-01-29T14:15:30.564147"
+  "last_run": "2026-01-29T14:27:32.799097"
 }
