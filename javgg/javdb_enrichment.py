@@ -164,9 +164,16 @@ def merge_javgg_and_javdb(javgg_data: dict, javdb_metadata) -> dict:
         print(f"     - Merged actresses: {len(javdb_metadata.actresses)}")
     
     # Add actress details (images, profile URLs, bio)
-    if javdb_metadata.actress_details:
+    # Handle different scraper versions (actress_details vs actress_images)
+    if hasattr(javdb_metadata, 'actress_details') and javdb_metadata.actress_details:
         merged['actress_details'] = javdb_metadata.actress_details
         print(f"     - Actress details: {len(javdb_metadata.actress_details)}")
+    elif hasattr(javdb_metadata, 'actress_images') and javdb_metadata.actress_images:
+        # Convert simple image dict to details format
+        merged['actress_details'] = {}
+        for name, img in javdb_metadata.actress_images.items():
+            merged['actress_details'][name] = {'image': img}
+        print(f"     - Actress images: {len(javdb_metadata.actress_images)}")
     
     # Add screenshots from JAVDatabase (high quality)
     if javdb_metadata.screenshots:
@@ -176,14 +183,14 @@ def merge_javgg_and_javdb(javgg_data: dict, javdb_metadata) -> dict:
     # Merge director with URL
     if javdb_metadata.director:
         merged['director'] = javdb_metadata.director
-        if javdb_metadata.director_url:
+        if hasattr(javdb_metadata, 'director_url') and javdb_metadata.director_url:
             merged['director_url'] = javdb_metadata.director_url
         print(f"     - Director: {javdb_metadata.director}")
     
     # Merge studio with URL
     if javdb_metadata.studio:
         merged['studio'] = javdb_metadata.studio
-        if javdb_metadata.studio_url:
+        if hasattr(javdb_metadata, 'studio_url') and javdb_metadata.studio_url:
             merged['studio_url'] = javdb_metadata.studio_url
         # Keep studio_japanese from JavaGG if available
         if not merged.get('studio_japanese'):
@@ -193,49 +200,55 @@ def merge_javgg_and_javdb(javgg_data: dict, javdb_metadata) -> dict:
     # Merge label with URL
     if javdb_metadata.label:
         merged['label'] = javdb_metadata.label
-        if javdb_metadata.label_url:
+        if hasattr(javdb_metadata, 'label_url') and javdb_metadata.label_url:
             merged['label_url'] = javdb_metadata.label_url
         print(f"     - Label: {javdb_metadata.label}")
     
     # Merge series with URL
     if javdb_metadata.series:
         merged['series'] = javdb_metadata.series
-        if javdb_metadata.series_url:
+        if hasattr(javdb_metadata, 'series_url') and javdb_metadata.series_url:
             merged['series_url'] = javdb_metadata.series_url
         print(f"     - Series: {javdb_metadata.series}")
     
     # Add Content ID and DVD ID
-    if javdb_metadata.content_id:
+    if hasattr(javdb_metadata, 'content_id') and javdb_metadata.content_id:
         merged['content_id'] = javdb_metadata.content_id
         print(f"     - Content ID: {javdb_metadata.content_id}")
     
-    if javdb_metadata.dvd_id:
+    if hasattr(javdb_metadata, 'dvd_id') and javdb_metadata.dvd_id:
         merged['dvd_id'] = javdb_metadata.dvd_id
     
     # Add release year
-    if javdb_metadata.release_year:
+    if hasattr(javdb_metadata, 'release_year') and javdb_metadata.release_year:
         merged['release_year'] = javdb_metadata.release_year
+    elif hasattr(javdb_metadata, 'release_date') and javdb_metadata.release_date:
+        merged['release_date'] = javdb_metadata.release_date
+        merged['release_year'] = javdb_metadata.release_date[:4]
     
     # Add runtime minutes
-    if javdb_metadata.runtime_minutes:
+    if hasattr(javdb_metadata, 'runtime_minutes') and javdb_metadata.runtime_minutes:
         merged['runtime_minutes'] = javdb_metadata.runtime_minutes
+    elif hasattr(javdb_metadata, 'runtime') and javdb_metadata.runtime:
+         merged['runtime'] = javdb_metadata.runtime
     
-    # Add rating and engagement metrics
-    if javdb_metadata.rating > 0:
+    # Add rating and engagement metrics (check attributes exist)
+    if hasattr(javdb_metadata, 'rating') and javdb_metadata.rating > 0:
         merged['rating'] = javdb_metadata.rating
-        merged['rating_text'] = javdb_metadata.rating_text
-        print(f"     - Rating: {javdb_metadata.rating_text}")
+        if hasattr(javdb_metadata, 'rating_text'):
+             merged['rating_text'] = javdb_metadata.rating_text
+        print(f"     - Rating: {javdb_metadata.rating}")
     
-    if javdb_metadata.votes > 0:
+    if hasattr(javdb_metadata, 'votes') and javdb_metadata.votes > 0:
         merged['votes'] = javdb_metadata.votes
     
-    if javdb_metadata.views > 0:
+    if hasattr(javdb_metadata, 'views') and javdb_metadata.views > 0:
         merged['views'] = javdb_metadata.views
     
-    if javdb_metadata.favorites > 0:
+    if hasattr(javdb_metadata, 'favorites') and javdb_metadata.favorites > 0:
         merged['favorites'] = javdb_metadata.favorites
     
-    if javdb_metadata.popularity_rank > 0:
+    if hasattr(javdb_metadata, 'popularity_rank') and javdb_metadata.popularity_rank > 0:
         merged['popularity_rank'] = javdb_metadata.popularity_rank
     
     # Merge categories/tags
@@ -250,7 +263,7 @@ def merge_javgg_and_javdb(javgg_data: dict, javdb_metadata) -> dict:
         merged['cover_url_javdb'] = javdb_metadata.cover_url
         print(f"     - Cover URL: Yes")
     
-    if javdb_metadata.cover_url_large:
+    if hasattr(javdb_metadata, 'cover_url_large') and javdb_metadata.cover_url_large:
         merged['cover_url_large'] = javdb_metadata.cover_url_large
     
     # Add description if available
@@ -258,7 +271,7 @@ def merge_javgg_and_javdb(javgg_data: dict, javdb_metadata) -> dict:
         merged['description'] = javdb_metadata.description
     
     # Prefer JAVDatabase title_jp if available and JavaGG doesn't have it
-    if javdb_metadata.title_jp and not merged.get('title_japanese'):
+    if hasattr(javdb_metadata, 'title_jp') and javdb_metadata.title_jp and not merged.get('title_japanese'):
         merged['title_japanese'] = javdb_metadata.title_jp
     
     return merged
