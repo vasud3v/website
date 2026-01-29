@@ -21,7 +21,7 @@ import random
 # Optimal default based on CDN analysis
 # Note: CDN throttles heavily (~0.1-0.2 MB/s) regardless of worker count
 # 18 workers provides best balance between speed and avoiding detection
-DEFAULT_WORKERS = 18
+DEFAULT_WORKERS = 32
 
 class AdvancedHLSDownloader:
     def __init__(self, max_workers=DEFAULT_WORKERS):
@@ -37,9 +37,10 @@ class AdvancedHLSDownloader:
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15',
         ]
         
-        # Create multiple sessions for connection pooling
+        # Create multiple sessions for connection pooling - optimized for 32 workers
         self.sessions = []
-        for i in range(4):  # 4 different sessions
+        # Create 8 sessions (4 workers per session)
+        for i in range(8):
             session = requests.Session()
             adapter = requests.adapters.HTTPAdapter(
                 pool_connections=max_workers,
@@ -275,6 +276,12 @@ class AdvancedHLSDownloader:
                             progress = (downloaded / total) * 100
                             elapsed = current_time - start_time
                             speed = (total_bytes / (1024*1024)) / elapsed if elapsed > 0 else 0
+                            
+                            # THROTTLING CHECK: If speed is too low after 30 seconds
+                            if elapsed > 30 and speed < 0.5:
+                                print(f"\n  ⚠️ Throttling detected! Speed: {speed:.2f} MB/s (Threshold: 0.5 MB/s)")
+                                print(f"  🛑 Aborting download to trigger restart...")
+                                return False
                             
                             filled = int(bar_width * progress / 100)
                             bar = '█' * filled + '░' * (bar_width - filled)

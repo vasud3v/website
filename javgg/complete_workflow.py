@@ -370,7 +370,24 @@ class WorkflowManager:
                 # Look for links with /jav/ in them
                 video_links = soup.find_all('a', href=lambda x: x and '/jav/' in x)
                 
-                print(f"  Found {len(video_links)} video links")
+                # Target main content area to avoid sidebar/footer links
+                main_content = soup.find('main') or soup.find('div', id='primary') or soup.find('div', class_='site-main') or soup
+                
+                # Try specific selector first (links inside entry-title)
+                video_links = []
+                for title in main_content.find_all(['h1', 'h2', 'h3', 'h4'], class_='entry-title'):
+                    link = title.find('a', href=True)
+                    if link and '/jav/' in link['href']:
+                        video_links.append(link)
+                
+                print(f"  Found {len(video_links)} video links in entry titles")
+                
+                # Fallback to broader search if strict search fails
+                if not video_links:
+                    print(f"  ⚠️ No links found in titles, trying broader search in main content...")
+                    video_links = main_content.find_all('a', href=lambda x: x and '/jav/' in x)
+                
+                print(f"  Found {len(video_links)} total video links")
                 
                 # If no links found, save page source for debugging
                 if len(video_links) == 0:
@@ -531,220 +548,239 @@ class WorkflowManager:
         Download video trying multiple methods
         Returns path to downloaded video file
         """
-        print(f"\n📥 Downloading video: {video_code}")
+        max_retries = 3
         
-        scraper = self.get_scraper()  # Reuse browser instance
-        
-        try:
-            # Scrape to get embed URLs
-            video_data = scraper.scrape_video(video_url)
+        for attempt in range(max_retries):
+            print(f"\n📥 Downloading video: {video_code} (Attempt {attempt+1}/{max_retries})")
             
-            if not video_data:
-                print(f"❌ Failed to scrape video metadata")
-                return None
+            scraper = self.get_scraper()  # Reuse browser instance
             
-            video_file = self.download_dir / f"{video_code}.mp4"
-            
-            # Skip download if file already exists and is large enough
-            if video_file.exists() and video_file.stat().st_size > 10 * 1024 * 1024:  # > 10MB
-                print(f"  ✅ Already downloaded: {video_file.name} ({video_file.stat().st_size / 1024 / 1024:.1f} MB)")
-                return str(video_file)
-            
-            download_url = video_data.m3u8_url or video_data.embed_url
-            print(f"  🔗 Download URL: {download_url[:60]}...")
-            
-            # Try HLS downloader first if we have M3U8 URL
-            if video_data.m3u8_url and '.m3u8' in video_data.m3u8_url:
-                print(f"  📥 Using advanced HLS downloader (18 workers + anti-throttling)...")
-                try:
-                    from hls_downloader_advanced import AdvancedHLSDownloader
-                    hls_dl = AdvancedHLSDownloader(max_workers=18)
-                    
-                    # Download with timeout
-                    import signal
-                    
-                    def timeout_handler(signum, frame):
-                        raise TimeoutError("HLS download timeout")
-                    
-                    # Set 15 minute timeout (only on Unix)
-                    if hasattr(signal, 'SIGALRM'):
-                        signal.signal(signal.SIGALRM, timeout_handler)
-                        signal.alarm(900)  # 15 minutes
-                    
+            try:
+                # Scrape to get embed URLs
+                video_data = scraper.scrape_video(video_url)
+                
+                if not video_data:
+                    print(f"❌ Failed to scrape video metadata")
+                    if attempt < max_retries - 1:
+                        print("  🔄 Retrying...")
+                        self.cleanup_scraper()
+                        continue
+                    return None
+                
+                video_file = self.download_dir / f"{video_code}.mp4"
+                
+                # Skip download if file already exists and is large enough
+                if video_file.exists() and video_file.stat().st_size > 10 * 1024 * 1024:  # > 10MB
+                    print(f"  ✅ Already downloaded: {video_file.name} ({video_file.stat().st_size / 1024 / 1024:.1f} MB)")
+                    return str(video_file)
+                
+                download_url = video_data.m3u8_url or video_data.embed_url
+                print(f"  🔗 Download URL: {download_url[:60]}...")
+                
+                # Try HLS downloader first if we have M3U8 URL
+                if video_data.m3u8_url and '.m3u8' in video_data.m3u8_url:
+                    print(f"  📥 Using advanced HLS downloader (32 workers + anti-throttling)...")
                     try:
-                        download_success = hls_dl.download(video_data.m3u8_url, str(video_file), code=video_code)
-                    finally:
-                        if hasattr(signal, 'SIGALRM'):
-                            signal.alarm(0)  # Cancel alarm
-                    
-                    if download_success:
-                        # Validate the downloaded file
-                        if video_file.exists() and video_file.stat().st_size > 1024 * 1024:
-                            print(f"  ✅ Downloaded: {video_file.name} ({video_file.stat().st_size / 1024 / 1024:.1f} MB)")
-                            
-                            # Validate format
-                            if self.validate_video_file(video_file):
-                                return str(video_file)
-                            else:
-                                print(f"  ⚠️ Video validation failed, will try yt-dlp...")
-                                if video_file.exists():
-                                    video_file.unlink()
-                        else:
-                            print(f"  ⚠️ Downloaded file too small or missing")
-                    else:
-                        print(f"  ⚠️ HLS download failed")
+                        from hls_downloader_advanced import AdvancedHLSDownloader
+                        hls_dl = AdvancedHLSDownloader() # Uses default 32 workers
                         
-                except TimeoutError:
-                    print(f"  ⚠️ HLS download timeout (15 minutes)")
-                    if video_file.exists():
-                        video_file.unlink()
-                except Exception as e:
-                    print(f"  ⚠️ HLS downloader failed: {str(e)[:100]}")
-                
-                print(f"  ⏭️ Falling back to yt-dlp...")
-            
-            # Fallback to yt-dlp
-            print(f"  📥 Attempting download with yt-dlp...")
-            
-            # Check if yt-dlp is available
-            try:
-                subprocess.run(['yt-dlp', '--version'], capture_output=True, timeout=5, check=True)
-            except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
-                print(f"  ⚠️ yt-dlp not available")
-                print(f"  ⚠️ Cannot download video without yt-dlp")
-                return None
-            
-            cmd = [
-                'yt-dlp',
-                '-o', str(video_file),
-                '--no-warnings',
-                '--no-check-certificate',
-                '--concurrent-fragments', '16',
-                '--retries', '3',  # Reduced from 5
-                '--fragment-retries', '3',  # Reduced from 5
-                '--socket-timeout', '30',  # Add socket timeout
-                '--quiet',  # Suppress progress output
-                '--progress-template', '%(progress.downloaded_bytes)s/%(progress.total_bytes)s',
-                download_url
-            ]
-            
-            # Run with progress bar and timeout
-            try:
-                process = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    bufsize=1
-                )
-                
-                # Show visual progress bar
-                print(f"  ", end='', flush=True)
-                last_percent = 0
-                bar_width = 50
-                
-                # Set timeout for the entire download (2 minutes for initial response)
-                import time
-                start_time = time.time()
-                initial_timeout = 120  # 2 minutes to start
-                download_timeout = 600  # 10 minutes total
-                
-                line_count = 0
-                has_progress = False
-                
-                for line in process.stdout:
-                    line_count += 1
-                    elapsed = time.time() - start_time
-                    
-                    # Check if we got any progress
-                    if '/' in line:
-                        has_progress = True
-                    
-                    # If no progress after initial timeout, kill it
-                    if not has_progress and elapsed > initial_timeout:
-                        process.kill()
-                        print(f"\r  ❌ No download started after {initial_timeout} seconds{' ' * 30}")
-                        print(f"  ⚠️ This embed URL may not be supported by yt-dlp")
-                        return None
-                    
-                    # Check total timeout
-                    if elapsed > download_timeout:
-                        process.kill()
-                        print(f"\r  ❌ Download timeout ({download_timeout//60} minutes){' ' * 30}")
-                        return None
-                    
-                    line = line.strip()
-                    if '/' in line:
+                        # Download with timeout
+                        import signal
+                        
+                        def timeout_handler(signum, frame):
+                            raise TimeoutError("HLS download timeout")
+                        
+                        # Set 15 minute timeout (only on Unix)
+                        if hasattr(signal, 'SIGALRM'):
+                            signal.signal(signal.SIGALRM, timeout_handler)
+                            signal.alarm(900)  # 15 minutes
+                        
                         try:
-                            downloaded, total = line.split('/')
-                            percent = int((int(downloaded) / int(total)) * 100)
-                            
-                            # Update progress bar every 1%
-                            if percent > last_percent:
-                                filled = int(bar_width * percent / 100)
-                                bar = '█' * filled + '░' * (bar_width - filled)
+                            download_success = hls_dl.download(video_data.m3u8_url, str(video_file), code=video_code)
+                        finally:
+                            if hasattr(signal, 'SIGALRM'):
+                                signal.alarm(0)  # Cancel alarm
+                        
+                        if download_success:
+                            # Validate the downloaded file
+                            if video_file.exists() and video_file.stat().st_size > 1024 * 1024:
+                                print(f"  ✅ Downloaded: {video_file.name} ({video_file.stat().st_size / 1024 / 1024:.1f} MB)")
                                 
-                                # Calculate speed and ETA
-                                if elapsed > 0:
-                                    speed_bps = int(downloaded) / elapsed
-                                    speed_mbps = speed_bps / (1024 * 1024)
-                                    remaining_bytes = int(total) - int(downloaded)
-                                    eta_seconds = remaining_bytes / speed_bps if speed_bps > 0 else 0
-                                    eta_min = int(eta_seconds // 60)
-                                    eta_sec = int(eta_seconds % 60)
-                                    
-                                    status = f"\r  [{bar}] {percent}% | {speed_mbps:.1f} MB/s | ETA {eta_min}:{eta_sec:02d}"
+                                # Validate format
+                                if self.validate_video_file(video_file):
+                                    return str(video_file)
                                 else:
-                                    status = f"\r  [{bar}] {percent}%"
+                                    print(f"  ⚠️ Video validation failed, will try yt-dlp...")
+                                    if video_file.exists():
+                                        video_file.unlink()
+                            else:
+                                print(f"  ⚠️ Downloaded file too small or missing")
+                        else:
+                            print(f"  ⚠️ HLS download failed (likely throttled)")
+                            if attempt < max_retries - 1:
+                                print("  🔄 Detecting potential throttling... RESTARTING BROWSER and retrying...")
+                                self.cleanup_scraper() # Force browser restart
+                                if video_file.exists():
+                                    try:
+                                        video_file.unlink() # Clean up partial
+                                    except:
+                                        pass
+                                continue # Retry loop
+                            
+                    except TimeoutError:
+                        print(f"  ⚠️ HLS download timeout (15 minutes)")
+                        if video_file.exists():
+                            video_file.unlink()
+                    except Exception as e:
+                        print(f"  ⚠️ HLS downloader failed: {str(e)[:100]}")
+                    
+                    print(f"  ⏭️ Falling back to yt-dlp...")
+                
+                # Fallback to yt-dlp
+                print(f"  📥 Attempting download with yt-dlp...")
+                
+                # Check if yt-dlp is available
+                try:
+                    subprocess.run(['yt-dlp', '--version'], capture_output=True, timeout=5, check=True)
+                except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                    print(f"  ⚠️ yt-dlp not available")
+                    print(f"  ⚠️ Cannot download video without yt-dlp")
+                    return None
+                
+                cmd = [
+                    'yt-dlp',
+                    '-o', str(video_file),
+                    '--no-warnings',
+                    '--no-check-certificate',
+                    '--concurrent-fragments', '16',
+                    '--retries', '3',  # Reduced from 5
+                    '--fragment-retries', '3',  # Reduced from 5
+                    '--socket-timeout', '30',  # Add socket timeout
+                    '--quiet',  # Suppress progress output
+                    '--progress-template', '%(progress.downloaded_bytes)s/%(progress.total_bytes)s',
+                    download_url
+                ]
+                
+                # Run with progress bar and timeout
+                try:
+                    process = subprocess.Popen(
+                        cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        bufsize=1
+                    )
+                    
+                    # Show visual progress bar
+                    print(f"  ", end='', flush=True)
+                    last_percent = 0
+                    bar_width = 50
+                    
+                    # Set timeout for the entire download (2 minutes for initial response)
+                    import time
+                    start_time = time.time()
+                    initial_timeout = 120  # 2 minutes to start
+                    download_timeout = 600  # 10 minutes total
+                    
+                    line_count = 0
+                    has_progress = False
+                    
+                    for line in process.stdout:
+                        line_count += 1
+                        elapsed = time.time() - start_time
+                        
+                        # Check if we got any progress
+                        if '/' in line:
+                            has_progress = True
+                        
+                        # If no progress after initial timeout, kill it
+                        if not has_progress and elapsed > initial_timeout:
+                            process.kill()
+                            print(f"\r  ❌ No download started after {initial_timeout} seconds{' ' * 30}")
+                            print(f"  ⚠️ This embed URL may not be supported by yt-dlp")
+                            return None
+                        
+                        # Check total timeout
+                        if elapsed > download_timeout:
+                            process.kill()
+                            print(f"\r  ❌ Download timeout ({download_timeout//60} minutes){' ' * 30}")
+                            return None
+                        
+                        line = line.strip()
+                        if '/' in line:
+                            try:
+                                downloaded, total = line.split('/')
+                                percent = int((int(downloaded) / int(total)) * 100)
                                 
-                                print(status, end='', flush=True)
-                                last_percent = percent
-                        except:
-                            pass
+                                # Update progress bar every 1%
+                                if percent > last_percent:
+                                    filled = int(bar_width * percent / 100)
+                                    bar = '█' * filled + '░' * (bar_width - filled)
+                                    
+                                    # Calculate speed and ETA
+                                    if elapsed > 0:
+                                        speed_bps = int(downloaded) / elapsed
+                                        speed_mbps = speed_bps / (1024 * 1024)
+                                        remaining_bytes = int(total) - int(downloaded)
+                                        eta_seconds = remaining_bytes / speed_bps if speed_bps > 0 else 0
+                                        eta_min = int(eta_seconds // 60)
+                                        eta_sec = int(eta_seconds % 60)
+                                        
+                                        status = f"\r  [{bar}] {percent}% | {speed_mbps:.1f} MB/s | ETA {eta_min}:{eta_sec:02d}"
+                                    else:
+                                        status = f"\r  [{bar}] {percent}%"
+                                    
+                                    print(status, end='', flush=True)
+                                    last_percent = percent
+                            except:
+                                pass
+                    
+                    # Complete the progress bar
+                    bar = '█' * bar_width
+                    print(f"\r  [{bar}] 100% | Complete{' ' * 30}")
+                    
+                    process.wait(timeout=10)  # Wait up to 10 more seconds for process to finish
+                    result_code = process.returncode
+                    
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    print(f"\n  ❌ Download process timeout")
+                    return None
+                except Exception as e:
+                    print(f"\n  ❌ Download error: {str(e)[:100]}")
+                    return None
                 
-                # Complete the progress bar
-                bar = '█' * bar_width
-                print(f"\r  [{bar}] 100% | Complete{' ' * 30}")
+                if result_code == 0 and video_file.exists() and video_file.stat().st_size > 1024 * 1024:
+                    print(f"  ✅ Downloaded: {video_file.name} ({video_file.stat().st_size / 1024 / 1024:.1f} MB)")
+                    
+                    # Validate the video file
+                    print(f"  🔍 Validating video file...")
+                    if self.validate_video_file(video_file):
+                        return str(video_file)
+                    else:
+                        print(f"  ⚠️ Downloaded file is corrupted or not a video")
+                        print(f"  ⚠️ This usually means the stream is encrypted or protected")
+                        print(f"  ⚠️ Deleting corrupted file...")
+                        if video_file.exists():
+                            video_file.unlink()
+                        return None
                 
-                process.wait(timeout=10)  # Wait up to 10 more seconds for process to finish
-                result_code = process.returncode
+                # If we're here, it failed but not captured above
+                if attempt < max_retries - 1:
+                    print("  ❌ Download failed, retrying...")
+                    continue
+                else:
+                    print(f"  ❌ yt-dlp failed after all attempts")
+                    return None
                 
             except subprocess.TimeoutExpired:
-                process.kill()
-                print(f"\n  ❌ Download process timeout")
+                print(f"  ❌ Download timeout (10 minutes)")
                 return None
             except Exception as e:
-                print(f"\n  ❌ Download error: {str(e)[:100]}")
+                print(f"  ❌ Error downloading: {str(e)}")
                 return None
-            
-            if result_code == 0 and video_file.exists() and video_file.stat().st_size > 1024 * 1024:
-                print(f"  ✅ Downloaded: {video_file.name} ({video_file.stat().st_size / 1024 / 1024:.1f} MB)")
-                
-                # Validate the video file
-                print(f"  🔍 Validating video file...")
-                if self.validate_video_file(video_file):
-                    return str(video_file)
-                else:
-                    print(f"  ⚠️ Downloaded file is corrupted or not a video")
-                    print(f"  ⚠️ This usually means the stream is encrypted or protected")
-                    print(f"  ⚠️ Deleting corrupted file...")
-                    if video_file.exists():
-                        video_file.unlink()
-                    return None
-            
-            # If yt-dlp failed, log the error
-            print(f"  ❌ yt-dlp failed")
-            print(f"  ⚠️ Download not supported for this embed type")
-            return None
-                
-        except subprocess.TimeoutExpired:
-            print(f"  ❌ Download timeout (10 minutes)")
-            return None
-        except Exception as e:
-            print(f"  ❌ Error downloading: {str(e)}")
-            return None
         
-        # Don't close scraper - reuse it
+        return None
     
     def enrich_and_save(self, video_url: str, video_code: str) -> Dict:
         """
