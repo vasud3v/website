@@ -17,8 +17,8 @@ from database_manager import db_manager
 from seekstreaming_uploader import SeekstreamingUploader
 from streamtape_uploader import StreamtapeUploader
 from turboviplay_uploader import TurboviplayUploader
-from vidoza_uploader import VidozaUploader
 from uploady_uploader import UploadyUploader
+from mixdrop_uploader import MixDropUploader
 
 load_dotenv()
 
@@ -55,14 +55,13 @@ class MultiHostUploader:
             )
             self.databases['turboviplay'] = "../database/turboviplay_host.json"
         
-        # Initialize Vidoza
-        if os.getenv('VIDOZA_API_KEY'):
-            self.uploaders['vidoza'] = VidozaUploader(
-                email=os.getenv('VIDOZA_EMAIL'),
-                password=os.getenv('VIDOZA_PASSWORD'),
-                api_key=os.getenv('VIDOZA_API_KEY')
+        # Initialize MixDrop
+        if os.getenv('MIXDROP_API_KEY'):
+            self.uploaders['mixdrop'] = MixDropUploader(
+                email=os.getenv('MIXDROP_EMAIL'),
+                api_key=os.getenv('MIXDROP_API_KEY')
             )
-            self.databases['vidoza'] = "../database/vidoza_host.json"
+            self.databases['mixdrop'] = "../database/mixdrop_host.json"
         
         # Initialize Uploady
         if os.getenv('UPLOADY_API_KEY'):
@@ -124,9 +123,9 @@ class MultiHostUploader:
                 "video_downloader": result['url'],
                 "embed_code": f'<iframe src="{result["embed_url"]}" width="100%" height="100%" frameborder="0" allowfullscreen></iframe>'
             })
-        elif host == 'vidoza':
+        elif host == 'mixdrop':
             new_video.update({
-                "video_id": result['video_id'],
+                "file_code": result['file_code'],
                 "video_player": result['embed_url'],
                 "video_downloader": result['url'],
                 "embed_code": f'<iframe src="{result["embed_url"]}" width="100%" height="100%" frameborder="0" allowfullscreen></iframe>'
@@ -317,11 +316,11 @@ class MultiHostUploader:
                             'download_url': host_result.get('url', ''),
                             'file_code': host_result.get('video_id', '')
                         }
-                    elif host == 'vidoza':
+                    elif host == 'mixdrop':
                         video['hosting_urls'][host] = {
                             'embed_url': host_result.get('embed_url', ''),
                             'download_url': host_result.get('url', ''),
-                            'file_code': host_result.get('video_id', '')
+                            'file_code': host_result.get('file_code', '')
                         }
                     elif host == 'uploady':
                         video['hosting_urls'][host] = {

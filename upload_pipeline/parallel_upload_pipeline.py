@@ -14,9 +14,8 @@ from database_manager import db_manager
 from seekstreaming_uploader import SeekstreamingUploader
 from streamtape_uploader import StreamtapeUploader
 from turboviplay_uploader import TurboviplayUploader
-from vidoza_uploader import VidozaUploader
 from uploady_uploader import UploadyUploader
-from upload18_uploader import Upload18Uploader
+from mixdrop_uploader import MixDropUploader
 
 class ParallelUploadPipeline:
     def __init__(self, env_path=".env"):
@@ -31,8 +30,8 @@ class ParallelUploadPipeline:
                 password=os.getenv("SEEKSTREAMING_PASSWORD")
             ),
             "streamtape": StreamtapeUploader(
-                username=os.getenv("STREAMTAPE_USERNAME"),
-                password=os.getenv("STREAMTAPE_PASSWORD")
+                login=os.getenv("STREAMTAPE_LOGIN"),
+                api_key=os.getenv("STREAMTAPE_API_KEY")
             ),
             "turboviplay": TurboviplayUploader(
                 email=os.getenv("TURBOVIPLAY_EMAIL"),
@@ -40,21 +39,14 @@ class ParallelUploadPipeline:
                 password=os.getenv("TURBOVIPLAY_PASSWORD"),
                 api_key=os.getenv("TURBOVIPLAY_API_KEY")
             ),
-            "vidoza": VidozaUploader(
-                email=os.getenv("VIDOZA_EMAIL"),
-                password=os.getenv("VIDOZA_PASSWORD"),
-                api_key=os.getenv("VIDOZA_API_KEY")
-            ),
             "uploady": UploadyUploader(
                 email=os.getenv("UPLOADY_EMAIL"),
                 username=os.getenv("UPLOADY_USERNAME"),
                 api_key=os.getenv("UPLOADY_API_KEY")
             ),
-            "upload18": Upload18Uploader(
-                email=os.getenv("UPLOAD18_EMAIL"),
-                username=os.getenv("UPLOAD18_USERNAME"),
-                password=os.getenv("UPLOAD18_PASSWORD"),
-                api_key=os.getenv("UPLOAD18_API_KEY")
+            "mixdrop": MixDropUploader(
+                email=os.getenv("MIXDROP_EMAIL"),
+                api_key=os.getenv("MIXDROP_API_KEY")
             )
         }
         
