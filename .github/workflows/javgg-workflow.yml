@@ -101,7 +101,7 @@ jobs:
             sudo tee /etc/apt/sources.list.d/google-chrome.list
           
           sudo apt-get update -qq
-          sudo apt-get install -y -qq google-chrome-stable ffmpeg
+          sudo apt-get install -y -qq google-chrome-stable ffmpeg xvfb
           
           echo "Chrome version: $(google-chrome --version)"
       
@@ -172,7 +172,8 @@ jobs:
           cd javgg
           
           # Run with timeout, capture exit code properly
-          timeout 5h python -u complete_workflow.py --max-videos "$MAX_VIDEOS" 2>&1 | tee ../logs/workflow.log
+          # Use specific screen size for xvfb to prevent browser crashes
+          timeout 5h xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24" python -u complete_workflow.py --max-videos "$MAX_VIDEOS" 2>&1 | tee ../logs/workflow.log
           EXIT_CODE=${PIPESTATUS[0]}
           
           # Parse results if available
@@ -320,7 +321,7 @@ jobs:
             const runs = await github.rest.actions.listWorkflowRuns({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              workflow_id: context.workflow,
+              workflow_id: 'javgg-workflow.yml',
               created: '>=' + new Date(Date.now() - 60*60*1000).toISOString(),
               per_page: 20
             });
@@ -338,7 +339,7 @@ jobs:
             await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              workflow_id: context.workflow,
+              workflow_id: 'javgg-workflow.yml',
               ref: context.ref,
               inputs: {
                 max_videos: '0',

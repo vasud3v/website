@@ -146,7 +146,9 @@ class JavaGGScraper:
                 # agent=None, # Let UC driver choose appropriate agent
                 disable_csp=True,
                 no_sandbox=True,
-                page_load_strategy='none'  # Don't wait for full page load
+                page_load_strategy='none',  # Don't wait for full page load
+                disable_gpu=True,  # Stability
+                uc_subprocess=True,  # Better process management for UC
             )
             
             # Test if driver works
