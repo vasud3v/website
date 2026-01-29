@@ -20,9 +20,10 @@
     "CAWD-938",
     "MIDA-511",
     "MIDA-529",
-    "MIDA-506"
+    "MIDA-506",
+    "MIDA-498"
   ],
   "failed_videos": [],
   "pending_enrichment": [],
-  "last_run": "2026-01-29T23:15:39.335422"
+  "last_run": "2026-01-29T23:23:59.614426"
 }
