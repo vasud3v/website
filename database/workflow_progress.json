@@ -28,7 +28,8 @@
     "CEMD-798-REDUCE-MOSAIC",
     "CEMD-796-REDUCE-MOSAIC",
     "BLOR-288-REDUCE-MOSAIC",
-    "APNS-398-REDUCE-MOSAIC"
+    "APNS-398-REDUCE-MOSAIC",
+    "APAK-323-REDUCE-MOSAIC"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -151,7 +152,12 @@
       "code": "APNS-398-REDUCE-MOSAIC",
       "url": "https://javgg.net/jav/apns-398-reduce-mosaic/",
       "retry_after": 1769871235.24524
+    },
+    {
+      "code": "APAK-323-REDUCE-MOSAIC",
+      "url": "https://javgg.net/jav/apak-323-reduce-mosaic/",
+      "retry_after": 1769871791.496521
     }
   ],
-  "last_run": "2026-01-29T14:58:33.784466"
+  "last_run": "2026-01-29T15:07:10.762815"
 }

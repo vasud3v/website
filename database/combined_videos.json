@@ -1,6 +1,53 @@
 {
   "videos": [
     {
+      "code": "APAK-323-REDUCE-MOSAIC",
+      "title": "APAK-323 Reduce Mosaic",
+      "title_japanese": "",
+      "embed_url": "https://jav-vids.xyz/embed/21nuaje01utm",
+      "m3u8_url": "https://ESrZaEKj9iFIuE8.dramiyos-cdn.com/hls2/01/07304/21nuaje01utm_,l,n,h,.urlset/master.m3u8?t=Z_Pj12U0PBNjnaaqBU545aODiO7wtN2PnL7kD1Yar1E&s=1769698981&e=129600&f=36522840&srv=mnTs8JVdEBe4&i=0.4&sp=500&p1=mnTs8JVdEBe4&p2=mnTs8JVdEBe4&asn=8075",
+      "thumbnail_url": "https://javgg.net/wp-content/uploads/2026/01/apak-323.jpg",
+      "release_date": "",
+      "release_date_formatted": "",
+      "duration": "",
+      "duration_minutes": 0,
+      "studio": "",
+      "studio_japanese": "",
+      "director": "",
+      "series": "",
+      "models": [],
+      "tags": [],
+      "scraped_at": "2026-01-29T15:03:01.781852",
+      "javdb_available": false,
+      "javdb_not_found": true,
+      "processed_at": "2026-01-29T15:03:11.497058",
+      "source": "javgg",
+      "hosting_urls": {
+        "mixdrop": {
+          "embed_url": "",
+          "download_url": "",
+          "file_code": ""
+        },
+        "turboviplay": {
+          "embed_url": "",
+          "download_url": "",
+          "file_code": ""
+        },
+        "uploady": {
+          "embed_url": "",
+          "download_url": "",
+          "file_code": ""
+        },
+        "seekstreaming": {
+          "embed_url": "",
+          "download_url": "",
+          "file_code": ""
+        }
+      },
+      "uploaded_at": "2026-01-29T15:07:10.305179",
+      "preview_url": "https://archive.org/download/javmix-preview-apak-323-reduce-mosaic-20260129/APAK-323-REDUCE-MOSAIC_preview.mp4"
+    },
+    {
       "code": "APNS-398-REDUCE-MOSAIC",
       "title": "APNS-398 Reduce Mosaic",
       "title_japanese": "",
@@ -1278,7 +1325,7 @@
     }
   ],
   "stats": {
-    "total_videos": 28,
-    "last_updated": "2026-01-29T14:58:33.315340"
+    "total_videos": 29,
+    "last_updated": "2026-01-29T15:07:10.294645"
   }
 }
