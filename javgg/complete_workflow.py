@@ -1022,14 +1022,26 @@ class WorkflowManager:
                 hosting_urls = {}
                 for host, result in results.items():
                     if result.get('success'):
-                        print(f"     ✅ {host}: Success")
-                        hosting_urls[host] = {
-                            'embed_url': result.get('embed_url', '') or result.get('video_player', ''),
-                            'download_url': result.get('download_url', '') or result.get('url', '') or result.get('video_downloader', ''),
-                            'file_code': result.get('file_code', '') or result.get('file_id', '') or result.get('video_id', '')
-                        }
+                        # Extract URLs
+                        embed_url = result.get('embed_url', '') or result.get('video_player', '')
+                        download_url = result.get('download_url', '') or result.get('url', '') or result.get('video_downloader', '')
+                        file_code = result.get('file_code', '') or result.get('file_id', '') or result.get('video_id', '')
+                        
+                        # CRITICAL: Only save if we have actual URLs (not empty strings)
+                        if embed_url or download_url:
+                            hosting_urls[host] = {
+                                'embed_url': embed_url,
+                                'download_url': download_url,
+                                'file_code': file_code
+                            }
+                            print(f"     ✅ {host}: Success - {embed_url[:50] if embed_url else download_url[:50]}")
+                        else:
+                            print(f"     ⚠️  {host}: Success but NO URLs returned!")
+                            print(f"        Result keys: {list(result.keys())}")
+                            print(f"        This indicates uploader returned success=True but no URLs")
                     else:
-                        print(f"     ❌ {host}: Failed")
+                        error_msg = result.get('error', 'Unknown error')
+                        print(f"     ❌ {host}: Failed - {error_msg[:60]}")
                 
                 urls['hosting'] = hosting_urls
                 print(f"  ✅ Uploaded to {len(hosting_urls)} hosting sites")
@@ -1047,6 +1059,23 @@ class WorkflowManager:
                             print(f"     ✅ Saved to urls dict: {direct_link[:80]}...")
                         else:
                             print(f"     ⚠️ No direct_mp4_link in result!")
+                        
+                        # Save all Internet Archive data (embed URLs, iframe codes, etc.)
+                        urls['internet_archive_data'] = {
+                            'identifier': ia_result.get('identifier', ''),
+                            'direct_mp4_link': direct_link,
+                            'player_link': ia_result.get('player_link', ''),
+                            'embed_url': ia_result.get('embed_url', ''),
+                            'embed_code': ia_result.get('embed_code', ''),
+                            'embed_code_small': ia_result.get('embed_code_small', ''),
+                            'embed_code_large': ia_result.get('embed_code_large', ''),
+                            'filename': ia_result.get('filename', ''),
+                            'file_size_mb': ia_result.get('file_size_mb', 0),
+                            'uploaded_at': ia_result.get('uploaded_at', '')
+                        }
+                        print(f"     ✅ Saved embed URL: {ia_result.get('embed_url', '')[:80]}...")
+                        print(f"     ✅ Saved player link: {ia_result.get('player_link', '')[:80]}...")
+                        
                         urls['preview_file'] = preview_file
                     else:
                         print(f"     ❌ Internet Archive: Failed ({ia_result.get('error')})")
@@ -1109,16 +1138,42 @@ class WorkflowManager:
             video_found = False
             for video in videos:
                 if video.get('code') == video_code:
-                    video['hosting_urls'] = urls.get('hosting', {})
-                    video['preview_url'] = urls.get('internet_archive', '')
-                    video['uploaded_at'] = datetime.now().isoformat()
-                    video_found = True
-                    print(f"  ✅ Updated video: {video_code}")
-                    if urls.get('internet_archive'):
-                        print(f"     ✅ Preview URL saved: {urls['internet_archive'][:80]}...")
+                    # CRITICAL: Only update if we have actual hosting URLs
+                    hosting_data = urls.get('hosting', {})
+                    
+                    if hosting_data:
+                        video['hosting_urls'] = hosting_data
+                        print(f"  ✅ Updated video: {video_code}")
+                        print(f"     Hosting sites: {len(hosting_data)}")
+                        for host, host_urls in hosting_data.items():
+                            embed = host_urls.get('embed_url', '')
+                            download = host_urls.get('download_url', '')
+                            print(f"     - {host}: {embed[:50] if embed else download[:50]}")
                     else:
-                        print(f"     ⚠️ No Internet Archive URL to save")
-                    print(f"     Hosting sites: {len(urls.get('hosting', {}))}")
+                        print(f"  ⚠️  No hosting URLs to save for {video_code}")
+                        print(f"     Keeping existing hosting_urls")
+                    
+                    # Update preview URL if available
+                    if urls.get('internet_archive'):
+                        video['preview_url'] = urls.get('internet_archive', '')
+                        print(f"     ✅ Preview URL saved: {urls['internet_archive'][:80]}...")
+                    
+                    # Update Internet Archive embed URLs and iframe codes
+                    if urls.get('internet_archive_data'):
+                        ia_data = urls['internet_archive_data']
+                        video['preview_embed_url'] = ia_data.get('embed_url', '')
+                        video['preview_embed_code'] = ia_data.get('embed_code', '')
+                        video['preview_embed_code_small'] = ia_data.get('embed_code_small', '')
+                        video['preview_embed_code_large'] = ia_data.get('embed_code_large', '')
+                        video['preview_player_link'] = ia_data.get('player_link', '')
+                        video['preview_identifier'] = ia_data.get('identifier', '')
+                        print(f"     ✅ Preview embed URL: {ia_data.get('embed_url', '')[:80]}...")
+                        print(f"     ✅ Preview player link: {ia_data.get('player_link', '')[:80]}...")
+                    
+                    # Update timestamp
+                    video['uploaded_at'] = datetime.now().isoformat()
+                    
+                    video_found = True
                     break
             
             if not video_found:

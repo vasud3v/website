@@ -43,25 +43,46 @@ def enrich_with_javdb(javgg_data: dict, headless: bool = True, skip_actress_imag
         print("❌ No video code provided")
         return javgg_data
     
+    # CRITICAL FIX: Extract actual video code from suffixes like "-REDUCE-MOSAIC"
+    # Examples:
+    #   "APAK-323-REDUCE-MOSAIC" -> "APAK-323"
+    #   "FC2-PPV-4838212" -> "FC2-PPV-4838212" (keep as is)
+    #   "012926-001-CARIB" -> "012926-001-CARIB" (keep as is)
+    
+    actual_code = video_code
+    
+    # Remove common suffixes that are not part of the actual video code
+    suffixes_to_remove = [
+        '-REDUCE-MOSAIC',
+        '-REDUCED-MOSAIC',
+        '-UNCENSORED',
+        '-LEAKED',
+        '-UNCEN',
+        ' REDUCE MOSAIC',
+        ' REDUCED MOSAIC',
+        ' UNCENSORED'
+    ]
+    
+    for suffix in suffixes_to_remove:
+        if actual_code.endswith(suffix):
+            actual_code = actual_code[:-len(suffix)]
+            print(f"  📝 Cleaned code: {video_code} -> {actual_code}")
+            break
+    
     print(f"\n{'='*70}")
-    print(f"🔍 JAVDatabase Enrichment: {video_code}")
+    print(f"🔍 JAVDatabase Enrichment: {actual_code}")
     print(f"{'='*70}")
     
-    # Check if this video type should skip JAVDatabase enrichment
-    should_skip, skip_reason = should_skip_javdb_enrichment(video_code)
-    if should_skip:
-        print(f"⏭️  Skipping JAVDatabase enrichment: {skip_reason}")
-        javgg_data['javdb_available'] = False
-        javgg_data['javdb_skip_reason'] = skip_reason
-        return javgg_data
+    # Try JAVDatabase first for all videos
+    # If not found, will fall back to enhanced JavaGG scraping
     
     try:
         print(f"  📊 Fetching metadata from JAVDatabase...")
         
-        # Use JAVDatabase scraper
+        # Use JAVDatabase scraper with the cleaned code
         temp_scraper = JAVDatabaseScraper(headless=headless)
         try:
-            javdb_metadata = temp_scraper.scrape_video_metadata(video_code)
+            javdb_metadata = temp_scraper.scrape_video_metadata(actual_code)
         finally:
             try:
                 temp_scraper.close()
@@ -82,13 +103,14 @@ def enrich_with_javdb(javgg_data: dict, headless: bool = True, skip_actress_imag
             return enriched_data
         else:
             print(f"  ⚠️  Video not found on JAVDatabase")
-            print(f"     This is normal for new releases (usually indexed within 2-7 days)")
-            print(f"     Using JavaGG data only")
+            print(f"     Falling back to enhanced JavaGG scraping...")
+            
+            # Fallback: Scrape enhanced metadata from JavaGG
+            enhanced_data = scrape_enhanced_from_javgg(javgg_data)
+            
             print(f"{'='*70}\n")
             
-            javgg_data['javdb_available'] = False
-            javgg_data['javdb_not_found'] = True
-            return javgg_data
+            return enhanced_data
             
     except Exception as e:
         print(f"  ❌ JAVDatabase enrichment failed: {str(e)[:100]}")
@@ -100,26 +122,93 @@ def enrich_with_javdb(javgg_data: dict, headless: bool = True, skip_actress_imag
         return javgg_data
 
 
-def should_skip_javdb_enrichment(video_code: str) -> tuple:
+def scrape_enhanced_from_javgg(javgg_data: dict) -> dict:
     """
-    Check if video should skip JAVDatabase enrichment
+    Scrape enhanced metadata from JavaGG when JAVDatabase doesn't have the video.
+    This extracts categories, tags, and post_date from the JavaGG page.
+    
+    Args:
+        javgg_data: Basic video data from JavaGG scraper
     
     Returns:
-        tuple: (should_skip, reason)
+        dict: Enhanced video data with additional metadata from JavaGG
     """
-    video_code_upper = video_code.upper()
+    video_code = javgg_data.get("code", "")
+    source_url = javgg_data.get("source_url", "")
     
-    # FC2PPV videos are not on JAVDatabase (amateur/independent content)
-    if video_code_upper.startswith('FC2') or 'FC2PPV' in video_code_upper or 'FC2-PPV' in video_code_upper:
-        return (True, "FC2PPV videos are not indexed on JAVDatabase (amateur content)")
+    if not source_url:
+        print(f"  ⚠️  No source URL available for enhanced scraping")
+        javgg_data['javdb_available'] = False
+        javgg_data['javdb_not_found'] = True
+        return javgg_data
     
-    # Amateur patterns
-    amateur_patterns = ['AMATEUR', 'PERSONAL', 'PRIVATE']
-    for pattern in amateur_patterns:
-        if pattern in video_code_upper:
-            return (True, f"Amateur/personal content not on JAVDatabase")
-    
-    return (False, "")
+    try:
+        print(f"  🔍 Scraping enhanced metadata from JavaGG...")
+        
+        # Import scraper
+        from javgg_scraper import JavaGGScraper
+        
+        # Create temporary scraper instance
+        temp_scraper = JavaGGScraper(headless=True)
+        
+        try:
+            # Re-scrape the video to get enhanced metadata
+            enhanced_video_data = temp_scraper.scrape_video(source_url)
+            
+            if enhanced_video_data:
+                # Merge enhanced data
+                if enhanced_video_data.categories:
+                    javgg_data['categories'] = enhanced_video_data.categories
+                    print(f"     - Categories: {len(enhanced_video_data.categories)}")
+                
+                if enhanced_video_data.tags:
+                    javgg_data['tags'] = enhanced_video_data.tags
+                    print(f"     - Tags: {len(enhanced_video_data.tags)}")
+                
+                if enhanced_video_data.release_date:
+                    javgg_data['release_date'] = enhanced_video_data.release_date
+                    javgg_data['release_date_formatted'] = enhanced_video_data.release_date_formatted
+                    print(f"     - Release Date: {enhanced_video_data.release_date}")
+                
+                # Update other fields if they're better in the new scrape
+                if enhanced_video_data.duration and not javgg_data.get('duration'):
+                    javgg_data['duration'] = enhanced_video_data.duration
+                    javgg_data['duration_minutes'] = enhanced_video_data.duration_minutes
+                
+                if enhanced_video_data.models and not javgg_data.get('models'):
+                    javgg_data['models'] = enhanced_video_data.models
+                
+                if enhanced_video_data.studio and not javgg_data.get('studio'):
+                    javgg_data['studio'] = enhanced_video_data.studio
+                    javgg_data['studio_japanese'] = enhanced_video_data.studio_japanese
+                
+                if enhanced_video_data.director and not javgg_data.get('director'):
+                    javgg_data['director'] = enhanced_video_data.director
+                
+                if enhanced_video_data.series and not javgg_data.get('series'):
+                    javgg_data['series'] = enhanced_video_data.series
+                
+                print(f"  ✅ Enhanced metadata scraped from JavaGG")
+            else:
+                print(f"  ⚠️  Could not re-scrape video from JavaGG")
+        
+        finally:
+            try:
+                temp_scraper.close()
+            except:
+                pass
+        
+        javgg_data['javdb_available'] = False
+        javgg_data['javdb_not_found'] = True
+        javgg_data['enhanced_from_javgg'] = True
+        
+        return javgg_data
+        
+    except Exception as e:
+        print(f"  ⚠️  Enhanced JavaGG scraping failed: {str(e)[:100]}")
+        javgg_data['javdb_available'] = False
+        javgg_data['javdb_not_found'] = True
+        return javgg_data
 
 
 def merge_javgg_and_javdb(javgg_data: dict, javdb_metadata) -> dict:

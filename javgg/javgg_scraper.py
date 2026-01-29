@@ -43,6 +43,7 @@ class VideoData:
     series: str
     models: List[str]
     tags: List[str]
+    categories: List[str]  # Added for FC2 videos
     scraped_at: str
 
 
@@ -470,7 +471,16 @@ class JavaGGScraper:
                 return None
             
             code = code_match.group(1).upper()
-            print(f"  📝 Code: {code}")
+            
+            # CRITICAL FIX: Clean the code by removing common suffixes
+            # This ensures JAVDatabase enrichment works correctly
+            original_code = code
+            code = self._clean_video_code(code)
+            
+            if code != original_code:
+                print(f"  📝 Code (cleaned): {original_code} -> {code}")
+            else:
+                print(f"  📝 Code: {code}")
             
             # Method 1: Requests-based scraping removed as requested
             # Directly use Selenium
@@ -493,6 +503,33 @@ class JavaGGScraper:
             # Cancel alarm
             if hasattr(signal, 'SIGALRM'):
                 signal.alarm(0)
+    
+    def _clean_video_code(self, code: str) -> str:
+        """
+        Clean video code by removing common suffixes that are not part of the actual code
+        
+        Examples:
+            "APAK-323-REDUCE-MOSAIC" -> "APAK-323"
+            "FC2-PPV-4838212" -> "FC2-PPV-4838212" (keep as is)
+            "012926-001-CARIB" -> "012926-001-CARIB" (keep as is)
+        """
+        suffixes_to_remove = [
+            '-REDUCE-MOSAIC',
+            '-REDUCED-MOSAIC',
+            '-UNCENSORED',
+            '-LEAKED',
+            '-UNCEN',
+            '-MOSAIC',
+            '-HD',
+            '-FHD',
+            '-4K'
+        ]
+        
+        for suffix in suffixes_to_remove:
+            if code.endswith(suffix):
+                return code[:-len(suffix)]
+        
+        return code
     
     def _scrape_with_requests(self, video_url: str, code: str) -> Optional[VideoData]:
         """Try to scrape using requests library (faster, better Cloudflare bypass)"""
@@ -615,6 +652,7 @@ class JavaGGScraper:
                 series="",
                 models=[],
                 tags=[],
+                categories=[],
                 scraped_at=datetime.now().isoformat()
             )
             
@@ -805,6 +843,52 @@ class JavaGGScraper:
             # Try to extract M3U8 from embed
             m3u8_url = self._extract_m3u8_from_embed(embed_url)
             
+            # ENHANCED METADATA FOR FC2 VIDEOS
+            categories = []
+            tags = []
+            post_date = ""
+            
+            # Check if this is an FC2 video
+            is_fc2 = 'FC2' in code.upper() or 'FC2-PPV' in code.upper()
+            
+            if is_fc2:
+                print(f"  🔍 Extracting enhanced metadata for FC2 video...")
+                
+                # Extract categories
+                category_links = soup.find_all('a', rel='category tag')
+                for cat_link in category_links:
+                    cat_text = cat_link.text.strip()
+                    if cat_text and cat_text not in categories:
+                        categories.append(cat_text)
+                
+                if categories:
+                    print(f"  ✅ Found {len(categories)} categories: {', '.join(categories[:3])}")
+                
+                # Extract tags
+                tag_links = soup.find_all('a', rel='tag')
+                for tag_link in tag_links:
+                    tag_text = tag_link.text.strip()
+                    if tag_text and tag_text not in tags:
+                        tags.append(tag_text)
+                
+                if tags:
+                    print(f"  ✅ Found {len(tags)} tags: {', '.join(tags[:3])}")
+                
+                # Extract post date
+                time_elem = soup.find('time', class_='entry-date')
+                if time_elem:
+                    post_date = time_elem.get('datetime', '')
+                    if post_date:
+                        print(f"  ✅ Found post date: {post_date}")
+                
+                # If no time element, try meta tag
+                if not post_date:
+                    meta_date = soup.find('meta', property='article:published_time')
+                    if meta_date:
+                        post_date = meta_date.get('content', '')
+                        if post_date:
+                            print(f"  ✅ Found post date (meta): {post_date}")
+            
             print(f"  ✅ Selenium scraping successful")
             
             return VideoData(
@@ -814,7 +898,7 @@ class JavaGGScraper:
                 embed_url=embed_url,
                 m3u8_url=m3u8_url or "",
                 thumbnail_url=thumbnail_url,
-                release_date="",
+                release_date=post_date if is_fc2 else "",
                 release_date_formatted="",
                 duration="",
                 duration_minutes=0,
@@ -823,7 +907,8 @@ class JavaGGScraper:
                 director="",
                 series="",
                 models=[],
-                tags=[],
+                tags=tags if is_fc2 else [],
+                categories=categories if is_fc2 else [],
                 scraped_at=datetime.now().isoformat()
             )
             
@@ -1133,6 +1218,7 @@ class JavaGGScraper:
                 series=series,
                 models=models,
                 tags=tags,
+                categories=[],
                 scraped_at=datetime.now().isoformat()
             )
             

@@ -156,6 +156,7 @@ class MultiHostUploader:
             if result.get('success'):
                 with print_lock:
                     print(f"[{host.upper()}] ✓ Upload successful!")
+                    print(f"[{host.upper()}] URLs: embed={result.get('embed_url', 'N/A')[:50]}")
                 
                 # Save to host-specific database
                 self.save_to_database(host, video_info, result)
@@ -163,10 +164,18 @@ class MultiHostUploader:
                 with print_lock:
                     print(f"[{host.upper()}] ✓ Saved to host database")
                 
+                # CRITICAL FIX: Return flat result, not nested
+                # This ensures complete_workflow.py can access URLs directly
                 return {
-                    'host': host,
                     'success': True,
-                    'result': result
+                    'host': host,
+                    'embed_url': result.get('embed_url', ''),
+                    'download_url': result.get('url', result.get('download_url', '')),
+                    'file_code': result.get('file_code', result.get('file_id', result.get('video_id', ''))),
+                    # Keep all_urls for seekstreaming compatibility
+                    'all_urls': result.get('all_urls', {}),
+                    # Keep original result for debugging
+                    '_original': result
                 }
             else:
                 with print_lock:
@@ -289,57 +298,60 @@ class MultiHostUploader:
             if 'hosting_urls' not in video:
                 video['hosting_urls'] = {}
             
+            successful_hosts = 0
+            
             for host, result in results.items():
                 if result.get('success'):
-                    host_result = result.get('result', {})
+                    # CRITICAL FIX: Results are now flat (not nested)
+                    # Access URLs directly from result
                     
                     # Initialize host entry if not exists
                     if host not in video['hosting_urls']:
                         video['hosting_urls'][host] = {}
                     
-                    # Map different host response formats
-                    if host == 'seekstreaming':
+                    # Extract URLs - handle both new flat format and old nested format for compatibility
+                    embed_url = result.get('embed_url', '')
+                    download_url = result.get('download_url', result.get('url', ''))
+                    file_code = result.get('file_code', '')
+                    
+                    # Special handling for seekstreaming (has all_urls dict)
+                    if host == 'seekstreaming' and result.get('all_urls'):
+                        all_urls = result.get('all_urls', {})
+                        embed_url = all_urls.get('video_player', embed_url)
+                        download_url = all_urls.get('video_downloader', download_url)
+                        if embed_url and '#' in embed_url:
+                            file_code = embed_url.split('#')[-1]
+                    
+                    # Validate we have actual URLs (not empty strings)
+                    if embed_url or download_url:
                         video['hosting_urls'][host] = {
-                            'embed_url': host_result.get('all_urls', {}).get('video_player', ''),
-                            'download_url': host_result.get('all_urls', {}).get('video_downloader', ''),
-                            'file_code': host_result.get('all_urls', {}).get('video_player', '').split('#')[-1] if host_result.get('all_urls', {}).get('video_player') else ''
+                            'embed_url': embed_url,
+                            'download_url': download_url,
+                            'file_code': file_code
                         }
-                    elif host == 'streamtape':
-                        video['hosting_urls'][host] = {
-                            'embed_url': host_result.get('embed_url', ''),
-                            'download_url': host_result.get('url', ''),
-                            'file_code': host_result.get('file_id', '')
-                        }
-                    elif host == 'turboviplay':
-                        video['hosting_urls'][host] = {
-                            'embed_url': host_result.get('embed_url', ''),
-                            'download_url': host_result.get('url', ''),
-                            'file_code': host_result.get('video_id', '')
-                        }
-                    elif host == 'mixdrop':
-                        video['hosting_urls'][host] = {
-                            'embed_url': host_result.get('embed_url', ''),
-                            'download_url': host_result.get('url', ''),
-                            'file_code': host_result.get('file_code', '')
-                        }
-                    elif host == 'uploady':
-                        video['hosting_urls'][host] = {
-                            'embed_url': host_result.get('embed_url', ''),
-                            'download_url': host_result.get('url', ''),
-                            'file_code': host_result.get('file_code', '')
-                        }
+                        successful_hosts += 1
+                        print(f"  ✓ {host}: {embed_url[:60] if embed_url else download_url[:60]}")
+                    else:
+                        print(f"  ⚠️ {host}: No URLs found in result")
+                        print(f"     Result keys: {list(result.keys())}")
             
-            # Update uploaded_at timestamp
-            video['uploaded_at'] = datetime.now().isoformat()
-            
-            # Save back to main database
-            if db_manager.add_or_update_video(video):
-                print(f"✓ Synced hosting URLs to main database for '{video_title}'")
+            # Only update if we actually got some URLs
+            if successful_hosts > 0:
+                # Update uploaded_at timestamp
+                video['uploaded_at'] = datetime.now().isoformat()
+                
+                # Save back to main database
+                if db_manager.add_or_update_video(video):
+                    print(f"\n✓ Synced {successful_hosts} hosting URLs to main database for '{video_title}'")
+                else:
+                    print(f"\n✗ Failed to sync to main database")
             else:
-                print(f"✗ Failed to sync to main database")
+                print(f"\n⚠️ No valid URLs to sync for '{video_title}'")
                 
         except Exception as e:
-            print(f"✗ Error syncing to main database: {e}")
+            print(f"\n✗ Error syncing to main database: {e}")
+            import traceback
+            traceback.print_exc()
 
 
 def main():

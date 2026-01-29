@@ -145,13 +145,21 @@ class InternetArchiveUploader:
                 # Generate player link
                 player_link = f"https://archive.org/details/{identifier}"
                 
-                # Generate embed code
-                embed_code = f'<iframe src="https://archive.org/embed/{identifier}" width="640" height="480" frameborder="0" webkitallowfullscreen="true" mozallowfullscreen="true" allowfullscreen></iframe>'
+                # Generate embed URL (for iframe src)
+                embed_url = f"https://archive.org/embed/{identifier}"
+                
+                # Generate full embed/iframe code
+                embed_code = f'<iframe src="{embed_url}" width="640" height="480" frameborder="0" webkitallowfullscreen="true" mozallowfullscreen="true" allowfullscreen></iframe>'
+                
+                # Alternative embed sizes
+                embed_code_small = f'<iframe src="{embed_url}" width="480" height="360" frameborder="0" allowfullscreen></iframe>'
+                embed_code_large = f'<iframe src="{embed_url}" width="854" height="480" frameborder="0" allowfullscreen></iframe>'
                 
                 print(f"\n✅ UPLOAD SUCCESSFUL")
                 print(f"{'='*70}")
                 print(f"Direct MP4 Link: {direct_link}")
                 print(f"Player Link: {player_link}")
+                print(f"Embed URL: {embed_url}")
                 print(f"{'='*70}")
                 
                 return {
@@ -159,7 +167,10 @@ class InternetArchiveUploader:
                     'identifier': identifier,
                     'direct_mp4_link': direct_link,
                     'player_link': player_link,
+                    'embed_url': embed_url,
                     'embed_code': embed_code,
+                    'embed_code_small': embed_code_small,
+                    'embed_code_large': embed_code_large,
                     'filename': filename,
                     'file_size_mb': round(file_size_mb, 2),
                     'uploaded_at': datetime.now().isoformat()
