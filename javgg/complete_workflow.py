@@ -1052,11 +1052,19 @@ class WorkflowManager:
             # Load current database
             db_file = self.database_dir / 'combined_videos.json'
             with open(db_file, 'r', encoding='utf-8') as f:
-                videos = json.load(f)
+                db = json.load(f)
             
-            # Database is a list of videos, not a dict
-            if not isinstance(videos, list):
-                print(f"  ⚠️ Database format error: expected list, got {type(videos)}")
+            # Handle both list and dict formats
+            if isinstance(db, list):
+                # Database is a list of videos
+                videos = db
+                is_dict_format = False
+            elif isinstance(db, dict) and 'videos' in db:
+                # Database is a dict with 'videos' key
+                videos = db['videos']
+                is_dict_format = True
+            else:
+                print(f"  ⚠️ Database format error: expected list or dict with 'videos' key, got {type(db)}")
                 return
             
             # Find and update video
@@ -1077,9 +1085,12 @@ class WorkflowManager:
                 print(f"  ⚠️ Video {video_code} not found in database")
                 return
             
-            # Save database
+            # Save database in the same format it was loaded
             with open(db_file, 'w', encoding='utf-8') as f:
-                json.dump(videos, f, indent=2, ensure_ascii=False)
+                if is_dict_format:
+                    json.dump(db, f, indent=2, ensure_ascii=False)
+                else:
+                    json.dump(videos, f, indent=2, ensure_ascii=False)
             
             print(f"  ✅ Metadata updated in database")
             
