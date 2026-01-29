@@ -32,10 +32,12 @@ class AdvancedHLSDownloader:
     def __init__(self, max_workers=32):
         self.max_workers = max_workers
         self.session = requests.Session()
+        # Increase pool size significantly to prevent connection exhaustion
         adapter = requests.adapters.HTTPAdapter(
-            pool_connections=max_workers * 2,  # Increased pool for high concurrency
-            pool_maxsize=max_workers * 2,
-            max_retries=3
+            pool_connections=max_workers * 3,  # Increased pool for high concurrency
+            pool_maxsize=max_workers * 3,
+            max_retries=2,
+            pool_block=False  # Don't block when pool is full, create new connection
         )
         self.session.mount('http://', adapter)
         self.session.mount('https://', adapter)
@@ -53,28 +55,48 @@ class AdvancedHLSDownloader:
         self.consecutive_403s = 0
     
     def get_key(self, key_uri, base_url):
-        """Fetch decryption key"""
+        """Fetch decryption key with retry"""
         if not key_uri.startswith('http'):
             key_uri = base_url + key_uri
-        try:
-            response = self.session.get(key_uri, timeout=30)
-            response.raise_for_status()
-            return response.content
-        except Exception as e:
-            print(f"  ❌ Key fetch failed: {e}")
-            return None
+        
+        # Retry key fetch up to 3 times
+        for attempt in range(3):
+            try:
+                response = self.session.get(key_uri, timeout=15)
+                response.raise_for_status()
+                if len(response.content) == 16:  # AES-128 key is 16 bytes
+                    return response.content
+                else:
+                    print(f"  ⚠️ Invalid key size: {len(response.content)} bytes")
+            except Exception as e:
+                if attempt < 2:
+                    time.sleep(0.5 * (attempt + 1))
+                else:
+                    print(f"  ❌ Key fetch failed after 3 attempts: {e}")
+        return None
 
     def decrypt_segment(self, data, key, iv):
         """Decrypt AES-128 segment"""
+        if not AES:
+            return data
+        
         try:
+            if len(key) != 16:
+                return data
+            if len(iv) != 16:
+                return data
+            
             cipher = AES.new(key, AES.MODE_CBC, iv)
             decrypted = cipher.decrypt(data)
-            # Remove PKCS7 padding
-            pad_len = decrypted[-1]
-            if isinstance(pad_len, int) and 1 <= pad_len <= 16:
-                 return decrypted[:-pad_len]
+            
+            # Remove PKCS7 padding safely
+            if len(decrypted) > 0:
+                pad_len = decrypted[-1]
+                if isinstance(pad_len, int) and 1 <= pad_len <= 16:
+                    return decrypted[:-pad_len]
             return decrypted
-        except:
+        except Exception as e:
+            # If decryption fails, return original data
             return data
 
     def download_segment(self, args):
@@ -97,7 +119,8 @@ class AdvancedHLSDownloader:
                 if attempt > 0:
                     time.sleep(0.2 * attempt)
                 
-                response = self.session.get(url, timeout=30)
+                # Reduced timeout to prevent hanging
+                response = self.session.get(url, timeout=15, stream=False)
                 response.raise_for_status()
                 data = response.content
                 
@@ -110,24 +133,46 @@ class AdvancedHLSDownloader:
                     if key:
                          data = self.decrypt_segment(data, key, iv)
 
-                # Atomic write
+                # Atomic write with error handling
                 temp_path = output_path + '.tmp'
-                with open(temp_path, 'wb') as f:
-                    f.write(data)
-                os.replace(temp_path, output_path)
+                try:
+                    with open(temp_path, 'wb') as f:
+                        f.write(data)
+                    # Verify temp file was written correctly
+                    if os.path.getsize(temp_path) == len(data):
+                        os.replace(temp_path, output_path)
+                    else:
+                        raise IOError("Temp file size mismatch")
+                except Exception as write_error:
+                    # Clean up temp file on error
+                    if os.path.exists(temp_path):
+                        try:
+                            os.remove(temp_path)
+                        except:
+                            pass
+                    raise write_error
                 
                 return index, True, len(data), False
                 
             except requests.exceptions.HTTPError as e:
-                if e.response.status_code == 403:
-                    if attempt < 2:
-                        time.sleep(0.2)
-                        continue
-                    return index, False, 0, True  # 403 error
-                elif attempt < 2:
+                if hasattr(e, 'response') and e.response is not None:
+                    if e.response.status_code == 403:
+                        if attempt < 2:
+                            time.sleep(0.2)
+                            continue
+                        return index, False, 0, True  # 403 error
+                if attempt < 2:
                     time.sleep(0.1)
+            except requests.exceptions.Timeout:
+                # Timeout - retry with exponential backoff
+                if attempt < 2:
+                    time.sleep(0.3 * (attempt + 1))
+            except requests.exceptions.ConnectionError:
+                # Connection error - retry
+                if attempt < 2:
+                    time.sleep(0.2 * (attempt + 1))
             except Exception as e:
-                # Connection errors etc
+                # Other errors
                 if attempt < 2:
                     time.sleep(0.1)
         
@@ -272,11 +317,24 @@ class AdvancedHLSDownloader:
             error_403_count = 0
             bar_width = 50
             
-            # ThreadPool execution
+            # ThreadPool execution with timeout protection
             with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 futures = {executor.submit(self.download_segment, t): t for t in tasks}
-                for future in as_completed(futures):
-                    idx, success, size, got_403 = future.result()
+                
+                # Add timeout to prevent indefinite hangs
+                timeout_per_segment = 60  # 60 seconds per segment max
+                
+                for future in as_completed(futures, timeout=timeout_per_segment * total):
+                    try:
+                        idx, success, size, got_403 = future.result(timeout=timeout_per_segment)
+                    except Exception as e:
+                        # Handle timeout or other exceptions
+                        task_info = futures.get(future)
+                        if task_info:
+                            idx = task_info[0]
+                            failed.append(idx)
+                            print(f"\n  ⚠️ Segment {idx} timed out or failed: {str(e)[:50]}")
+                        continue
                     
                     if success:
                         downloaded += 1
@@ -328,17 +386,35 @@ class AdvancedHLSDownloader:
                      print(f"  ❌ High failure rate. Aborting.")
                      return False
                 
-                # Simple retry loop for remaining items
+                # Retry with reduced workers and timeout protection
                 retry_tasks = [tasks[i] for i in failed]
                 still_failed = []
-                with ThreadPoolExecutor(max_workers=16) as executor:
+                retry_workers = min(16, len(retry_tasks))
+                
+                with ThreadPoolExecutor(max_workers=retry_workers) as executor:
                     futures = {executor.submit(self.download_segment, t): t for t in retry_tasks}
-                    for future in as_completed(futures):
-                        idx, success, size, _ = future.result()
-                        if success:
-                            downloaded += 1
-                        else:
-                            still_failed.append(idx)
+                    
+                    # Add timeout for retry phase
+                    retry_timeout = 120  # 2 minutes per segment on retry
+                    try:
+                        for future in as_completed(futures, timeout=retry_timeout * len(retry_tasks)):
+                            try:
+                                idx, success, size, _ = future.result(timeout=retry_timeout)
+                                if success:
+                                    downloaded += 1
+                                    total_bytes += size
+                                else:
+                                    still_failed.append(idx)
+                            except Exception as e:
+                                task_info = futures.get(future)
+                                if task_info:
+                                    still_failed.append(task_info[0])
+                    except Exception as timeout_error:
+                        print(f"\n  ⚠️ Retry phase timeout: {timeout_error}")
+                        # Mark remaining futures as failed
+                        for future, task_info in futures.items():
+                            if not future.done():
+                                still_failed.append(task_info[0])
                 
                 if still_failed:
                     print(f"  ❌ {len(still_failed)} segments failed after retry.")
@@ -357,25 +433,54 @@ class AdvancedHLSDownloader:
                 return False
             print(f"  ✅ Validation passed: {msg}")
             
-            # Convert
+            # Convert with better error handling
             if temp_output != output_path:
                 print(f"  🎬 Converting to MP4...")
                 try:
                     import subprocess
                     cmd = ['ffmpeg', '-i', str(temp_output), '-c', 'copy', '-y', str(output_path)]
-                    subprocess.run(cmd, capture_output=True, timeout=300)
-                    temp_output.unlink()
-                except:
+                    result = subprocess.run(cmd, capture_output=True, timeout=600, text=True)
+                    
+                    if result.returncode == 0 and os.path.exists(output_path):
+                        # Verify converted file
+                        if os.path.getsize(output_path) > 0:
+                            temp_output.unlink()
+                        else:
+                            print(f"  ⚠️ Converted file is empty, keeping .ts")
+                            output_path = temp_output
+                    else:
+                        print(f"  ⚠️ FFmpeg conversion failed, keeping .ts file")
+                        print(f"  Error: {result.stderr[:200]}")
+                        output_path = temp_output
+                except subprocess.TimeoutExpired:
+                    print(f"  ⚠️ FFmpeg timeout, keeping .ts file")
+                    output_path = temp_output
+                except Exception as e:
+                    print(f"  ⚠️ Conversion error: {e}, keeping .ts file")
                     output_path = temp_output
             
             self.cleanup_temp_dir(temp_dir)
             total_time = time.time() - start_time
-            size_gb = os.path.getsize(output_path) / (1024**3)
-            print(f"  ✅ Complete! {size_gb:.2f} GB in {int(total_time)}s")
-            return True
+            
+            # Final verification
+            if os.path.exists(output_path):
+                size_gb = os.path.getsize(output_path) / (1024**3)
+                avg_speed = (size_gb * 1024) / (total_time / 60) if total_time > 0 else 0
+                print(f"  ✅ Complete! {size_gb:.2f} GB in {int(total_time)}s ({avg_speed:.1f} MB/min)")
+                return True
+            else:
+                print(f"  ❌ Output file not found: {output_path}")
+                return False
 
+        except KeyboardInterrupt:
+            print(f"\n  ⚠️ Download interrupted by user")
+            print(f"  📂 Temp files preserved in: {temp_dir}")
+            print(f"  💡 Resume by running the same command again")
+            return False
         except Exception as e:
             print(f"  ❌ Download Error: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def merge(self, temp_dir, output, total):
@@ -385,21 +490,75 @@ class AdvancedHLSDownloader:
             segments = glob.glob(os.path.join(temp_dir, "seg_*.ts"))
             
             if not segments: 
+                print(f"  ❌ No segments found in {temp_dir}")
                 return False
             
-            # Robust numeric sort
-            segments.sort(key=lambda x: int(os.path.basename(x).split('_')[1].split('.')[0]))
+            # Robust numeric sort with error handling
+            try:
+                segments.sort(key=lambda x: int(os.path.basename(x).split('_')[1].split('.')[0]))
+            except (ValueError, IndexError) as e:
+                print(f"  ❌ Failed to sort segments: {e}")
+                return False
             
-            if len(segments) < total * 0.95:  # Allow some leniency, but warn
-                print(f"  ⚠️ Warning: Merging {len(segments)}/{total} segments")
-
-            with open(output, 'wb') as outfile:
-                for seg in segments:
-                    with open(seg, 'rb') as infile:
-                        outfile.write(infile.read())
-            return True
+            # Check for missing segments
+            segment_indices = [int(os.path.basename(s).split('_')[1].split('.')[0]) for s in segments]
+            expected_indices = set(range(total))
+            missing_indices = expected_indices - set(segment_indices)
+            
+            if missing_indices:
+                print(f"  ⚠️ Missing {len(missing_indices)} segments: {sorted(list(missing_indices))[:10]}...")
+            
+            if len(segments) < total * 0.95:  # Allow 5% loss max
+                print(f"  ❌ Too many missing segments: {len(segments)}/{total}")
+                return False
+            
+            # Merge with progress for large files
+            merged_size = 0
+            temp_output = output + '.merging'
+            
+            with open(temp_output, 'wb') as outfile:
+                for i, seg in enumerate(segments):
+                    try:
+                        seg_size = os.path.getsize(seg)
+                        if seg_size == 0:
+                            print(f"  ⚠️ Skipping empty segment: {seg}")
+                            continue
+                        
+                        with open(seg, 'rb') as infile:
+                            chunk_size = 1024 * 1024  # 1MB chunks
+                            while True:
+                                chunk = infile.read(chunk_size)
+                                if not chunk:
+                                    break
+                                outfile.write(chunk)
+                        
+                        merged_size += seg_size
+                        
+                        # Progress for large merges
+                        if i % 100 == 0 and i > 0:
+                            progress = (i / len(segments)) * 100
+                            print(f"  🔗 Merging: {progress:.1f}% ({merged_size / (1024**2):.1f} MB)")
+                    
+                    except Exception as seg_error:
+                        print(f"  ⚠️ Error reading segment {seg}: {seg_error}")
+                        continue
+            
+            # Atomic rename
+            if os.path.exists(temp_output):
+                if os.path.getsize(temp_output) > 0:
+                    os.replace(temp_output, output)
+                    return True
+                else:
+                    print(f"  ❌ Merged file is empty")
+                    os.remove(temp_output)
+                    return False
+            
+            return False
+            
         except Exception as e:
             print(f"  ❌ Merge error: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     
