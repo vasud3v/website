@@ -25,7 +25,8 @@
     "FLAV-413-REDUCE-MOSAIC",
     "DOA-135-REDUCE-MOSAIC",
     "CEMD-799-REDUCE-MOSAIC",
-    "CEMD-798-REDUCE-MOSAIC"
+    "CEMD-798-REDUCE-MOSAIC",
+    "CEMD-796-REDUCE-MOSAIC"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -133,7 +134,12 @@
       "code": "CEMD-798-REDUCE-MOSAIC",
       "url": "https://javgg.net/jav/cemd-798-reduce-mosaic/",
       "retry_after": 1769869955.320245
+    },
+    {
+      "code": "CEMD-796-REDUCE-MOSAIC",
+      "url": "https://javgg.net/jav/cemd-796-reduce-mosaic/",
+      "retry_after": 1769870384.326658
     }
   ],
-  "last_run": "2026-01-29T14:36:56.128377"
+  "last_run": "2026-01-29T14:39:44.331303"
 }
