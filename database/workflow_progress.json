@@ -4,9 +4,16 @@
     "ABF-315",
     "MOGH-001",
     "ABF-316",
-    "STSK-209"
+    "STSK-209",
+    "012926_001-1PON"
   ],
   "failed_videos": [],
-  "pending_enrichment": [],
-  "last_run": "2026-01-29T12:15:27.801183"
+  "pending_enrichment": [
+    {
+      "code": "012926_001-1PON",
+      "url": "https://javgg.net/jav/012926_001-1pon/",
+      "retry_after": 1769861925.608464
+    }
+  ],
+  "last_run": "2026-01-29T12:22:04.459476"
 }
