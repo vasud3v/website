@@ -405,14 +405,17 @@ class JAVDatabaseScraper:
             
             # Look for actress links in the page
             actress_links = soup.find_all('a', href=re.compile(r'/idols/[a-z0-9-]+/$'))
-            # Filter out navigation links
+            # Filter out navigation links and deduplicate by href
+            seen_hrefs = set()
             valid_actress_links = []
             for link in actress_links:
                 href = link.get('href', '')
                 if href not in ['/idols/', '/idols/?_sort_=most_favorited'] and '/idols/?_' not in href:
-                    valid_actress_links.append(link)
+                    if href not in seen_hrefs:
+                        seen_hrefs.add(href)
+                        valid_actress_links.append(link)
             
-            print(f"  Found {len(valid_actress_links)} actress links")
+            print(f"  Found {len(valid_actress_links)} unique actress links")
             
             actress_details = {}  # Store full actress data
             
