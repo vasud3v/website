@@ -34,13 +34,24 @@ class UploadyUploader:
                 return {"success": False, "error": "Video file not found"}
             
             file_size = os.path.getsize(video_path)
+            file_size_gb = file_size / (1024 * 1024 * 1024)
+            
             if file_size == 0:
                 return {"success": False, "error": "File is empty (0 bytes)"}
+            
+            # Uploady has a file size limit (typically 5GB for free accounts)
+            MAX_FILE_SIZE_GB = 5.0
+            if file_size_gb > MAX_FILE_SIZE_GB:
+                return {
+                    "success": False, 
+                    "error": f"File too large ({file_size_gb:.2f} GB). Uploady limit: {MAX_FILE_SIZE_GB} GB",
+                    "skipped": True  # Mark as skipped, not failed
+                }
             
             file_name = Path(video_path).name
             title = title or Path(video_path).stem
             
-            print(f"[Uploady] Starting upload: {file_name}")
+            print(f"[Uploady] Starting upload: {file_name} ({file_size_gb:.2f} GB)")
             
             # Get upload server with retry
             print(f"[Uploady] Getting upload server...")

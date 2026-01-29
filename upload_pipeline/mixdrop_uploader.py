@@ -52,10 +52,22 @@ class MixDropUploader:
             if not os.path.exists(video_path):
                 return {"success": False, "error": "Video file not found"}
             
+            file_size = os.path.getsize(video_path)
+            file_size_gb = file_size / (1024 * 1024 * 1024)
+            
+            # MixDrop has a 5GB file size limit for free accounts
+            MAX_FILE_SIZE_GB = 5.0
+            if file_size_gb > MAX_FILE_SIZE_GB:
+                return {
+                    "success": False,
+                    "error": f"File too large ({file_size_gb:.2f} GB). MixDrop limit: {MAX_FILE_SIZE_GB} GB",
+                    "skipped": True
+                }
+            
             file_name = Path(video_path).name
             title = title or Path(video_path).stem
             
-            print(f"[MixDrop] Starting upload: {file_name}")
+            print(f"[MixDrop] Starting upload: {file_name} ({file_size_gb:.2f} GB)")
             
             # MixDrop uses direct upload URL (no need to get upload server)
             upload_url = "https://ul.mixdrop.ag/api"
@@ -63,7 +75,6 @@ class MixDropUploader:
             
             # Upload file
             print(f"[MixDrop] Uploading file...")
-            file_size = os.path.getsize(video_path)
             size_mb = file_size / (1024 * 1024)
             
             with open(video_path, 'rb') as f:
