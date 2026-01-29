@@ -26,6 +26,15 @@ class ActressData:
     birthdate: Optional[str] = None
     measurements: Optional[str] = None
     height: Optional[str] = None
+    debut_date: Optional[str] = None
+    debut_age: Optional[str] = None
+    birthplace: Optional[str] = None
+    zodiac_sign: Optional[str] = None
+    blood_type: Optional[str] = None
+    cup_size: Optional[str] = None
+    shoe_size: Optional[str] = None
+    hair_length: Optional[str] = None
+    hair_color: Optional[str] = None
 
 
 @dataclass
