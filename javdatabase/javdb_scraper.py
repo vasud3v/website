@@ -45,6 +45,7 @@ class VideoMetadata:
     screenshots: List[str]
     actresses: List[str]  # Actress names
     actress_images: Dict[str, str]  # name -> image_url
+    actress_details: Dict[str, Dict] = None  # name -> full ActressData dict
     categories: List[str]
     description: str
     rating: float
@@ -279,16 +280,33 @@ class JAVDatabaseScraper:
             
             print(f"  Found {len(valid_actress_links)} actress links")
             
+            actress_details = {}  # Store full actress data
+            
             for link in valid_actress_links:
                 actress_name = link.get_text(strip=True)
                 if actress_name and actress_name not in ['All Idols', 'Most Favorited', 'Teen', 'Twenties', 'MILF']:
                     actresses.append(actress_name)
                     
-                    # Get actress image
-                    print(f"    Getting image for: {actress_name}")
+                    # Get full actress profile data
+                    print(f"    Getting profile for: {actress_name}")
                     actress_data = self.scrape_actress_profile(actress_name)
-                    if actress_data and actress_data.image_url:
-                        actress_images[actress_name] = actress_data.image_url
+                    if actress_data:
+                        # Store image URL for backward compatibility
+                        if actress_data.image_url:
+                            actress_images[actress_name] = actress_data.image_url
+                        
+                        # Store full actress details
+                        actress_details[actress_name] = {
+                            'name': actress_data.name,
+                            'name_jp': actress_data.name_jp,
+                            'image': actress_data.image_url,
+                            'profile_url': actress_data.profile_url,
+                            'age': actress_data.age,
+                            'birthdate': actress_data.birthdate,
+                            'measurements': actress_data.measurements,
+                            'height': actress_data.height
+                        }
+                        print(f"      ✓ Profile saved: {actress_data.name}")
             
             # Get other metadata from page
             release_date = ""
@@ -441,6 +459,7 @@ class JAVDatabaseScraper:
                 screenshots=screenshots,
                 actresses=actresses,
                 actress_images=actress_images,
+                actress_details=actress_details,  # Add full actress details
                 categories=categories,
                 description=description,
                 rating=rating,
