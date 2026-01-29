@@ -1,6 +1,53 @@
 {
   "videos": [
     {
+      "code": "APNS-398-REDUCE-MOSAIC",
+      "title": "APNS-398 Reduce Mosaic",
+      "title_japanese": "",
+      "embed_url": "https://jav-vids.xyz/embed/seo64611zuiv",
+      "m3u8_url": "https://RNzT2t4XVKU08.acek-cdn.com/hls2/01/07304/seo64611zuiv_,l,n,h,.urlset/master.m3u8?t=UicouVSvTpCWAH354bYXDsSQ7YgQojG-DTAsSGbiJX4&s=1769698426&e=129600&f=36522791&srv=pmjx9cjae94d&i=0.4&sp=500&p1=pmjx9cjae94d&p2=pmjx9cjae94d&asn=8075",
+      "thumbnail_url": "https://javgg.net/wp-content/uploads/2026/01/apns-398.jpg",
+      "release_date": "",
+      "release_date_formatted": "",
+      "duration": "",
+      "duration_minutes": 0,
+      "studio": "",
+      "studio_japanese": "",
+      "director": "",
+      "series": "",
+      "models": [],
+      "tags": [],
+      "scraped_at": "2026-01-29T14:53:46.901435",
+      "javdb_available": false,
+      "javdb_not_found": true,
+      "processed_at": "2026-01-29T14:53:55.245865",
+      "source": "javgg",
+      "hosting_urls": {
+        "mixdrop": {
+          "embed_url": "",
+          "download_url": "",
+          "file_code": ""
+        },
+        "turboviplay": {
+          "embed_url": "",
+          "download_url": "",
+          "file_code": ""
+        },
+        "seekstreaming": {
+          "embed_url": "",
+          "download_url": "",
+          "file_code": ""
+        },
+        "uploady": {
+          "embed_url": "",
+          "download_url": "",
+          "file_code": ""
+        }
+      },
+      "uploaded_at": "2026-01-29T14:58:33.326422",
+      "preview_url": "https://archive.org/download/javmix-preview-apns-398-reduce-mosaic-20260129/APNS-398-REDUCE-MOSAIC_preview.mp4"
+    },
+    {
       "code": "BLOR-288-REDUCE-MOSAIC",
       "title": "BLOR-288 Reduce Mosaic",
       "title_japanese": "",
@@ -1231,7 +1278,7 @@
     }
   ],
   "stats": {
-    "total_videos": 27,
-    "last_updated": "2026-01-29T14:49:10.085870"
+    "total_videos": 28,
+    "last_updated": "2026-01-29T14:58:33.315340"
   }
 }
