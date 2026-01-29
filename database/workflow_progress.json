@@ -9,7 +9,8 @@
     "TENH-21",
     "HEYZO-3797",
     "FC2-PPV-4838889",
-    "FC2-PPV-4838912"
+    "FC2-PPV-4838912",
+    "FC2-PPV-4838936"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -37,7 +38,12 @@
       "code": "FC2-PPV-4838912",
       "url": "https://javgg.net/jav/fc2-ppv-4838912/",
       "retry_after": 1769863188.564075
+    },
+    {
+      "code": "FC2-PPV-4838936",
+      "url": "https://javgg.net/jav/fc2-ppv-4838936/",
+      "retry_after": 1769863476.383146
     }
   ],
-  "last_run": "2026-01-29T12:42:06.551211"
+  "last_run": "2026-01-29T12:47:06.140525"
 }
