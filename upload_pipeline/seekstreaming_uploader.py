@@ -61,7 +61,7 @@ class SeekstreamingUploader:
             }
             
             # Retry loop for 404s (video processing lag)
-            max_retries = 3
+            max_retries = 10  # Increased from 3
             for attempt in range(max_retries):
                 # Request video details
                 try:
@@ -75,8 +75,8 @@ class SeekstreamingUploader:
                         return response.json()
                     elif response.status_code == 404:
                         if attempt < max_retries - 1:
-                            print(f"[Seekstreaming] Video details not ready yet (404), retrying in 2s...")
-                            time.sleep(2)
+                            print(f"[Seekstreaming] Video details not ready yet (404), retrying in 5s... ({attempt+1}/{max_retries})")
+                            time.sleep(5)  # Increased from 2s
                             continue
                         else:
                             print(f"[Seekstreaming] Could not fetch video details: {response.status_code}")
@@ -86,7 +86,7 @@ class SeekstreamingUploader:
                         return None
                 except requests.exceptions.RequestException:
                     if attempt < max_retries - 1:
-                         time.sleep(2)
+                         time.sleep(5)
                          continue
                     raise
             return None

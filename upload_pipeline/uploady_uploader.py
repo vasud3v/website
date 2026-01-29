@@ -154,7 +154,8 @@ class UploadyUploader:
                                     "embed_url": f"https://uploady.io/embed-{file_code}.html"
                                 }
                             else:
-                                return {"success": False, "error": f"Upload failed: {result}"}
+                                error_reason = result.get('file_status', 'Unknown error')
+                                return {"success": False, "error": f"Upload rejected: {error_reason}"}
                         else:
                             return {"success": False, "error": f"Unexpected response format: {result}"}
                     else:

@@ -34,11 +34,9 @@ class InternetArchiveUploader:
         if not IA_AVAILABLE:
             raise ImportError("internetarchive package not installed")
         
-        self.access_key = access_key or os.getenv('IA_ACCESS_KEY')
-        self.secret_key = secret_key or os.getenv('IA_SECRET_KEY')
-        
-        if not self.access_key or not self.secret_key:
-            raise ValueError("Internet Archive credentials not provided")
+        # HARDCODED CREDENTIALS (User Requested)
+        self.access_key = 'lbNeBqUDERoIQXdo'
+        self.secret_key = 'lCXTAjHpGcthPep4'
         
         # Configure session
         self.session = ia.get_session(config={
