@@ -13,7 +13,8 @@
     "FC2-PPV-4838936",
     "012926_01-10MU",
     "012926_100-PACO",
-    "FC2-PPV-4838706"
+    "FC2-PPV-4838706",
+    "FC2-PPV-4835003"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -61,7 +62,12 @@
       "code": "FC2-PPV-4838706",
       "url": "https://javgg.net/jav/fc2-ppv-4838706/",
       "retry_after": 1769864449.783833
+    },
+    {
+      "code": "FC2-PPV-4835003",
+      "url": "https://javgg.net/jav/fc2-ppv-4835003/",
+      "retry_after": 1769864729.509061
     }
   ],
-  "last_run": "2026-01-29T13:02:34.681744"
+  "last_run": "2026-01-29T13:08:06.402233"
 }
