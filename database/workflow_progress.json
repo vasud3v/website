@@ -20,7 +20,8 @@
     "012926-001-CARIB",
     "SCPX-545-REDUCE-MOSAIC",
     "MADV-619-REDUCE-MOSAIC",
-    "FNEW-021-REDUCE-MOSAIC"
+    "FNEW-021-REDUCE-MOSAIC",
+    "GQN-008-REDUCE-MOSAIC"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -103,7 +104,12 @@
       "code": "FNEW-021-REDUCE-MOSAIC",
       "url": "https://javgg.net/jav/fnew-021-reduce-mosaic/",
       "retry_after": 1769866949.602687
+    },
+    {
+      "code": "GQN-008-REDUCE-MOSAIC",
+      "url": "https://javgg.net/jav/gqn-008-reduce-mosaic/",
+      "retry_after": 1769867616.003229
     }
   ],
-  "last_run": "2026-01-29T13:47:53.446248"
+  "last_run": "2026-01-29T14:00:17.534028"
 }

@@ -1,6 +1,53 @@
 {
   "videos": [
     {
+      "code": "GQN-008-REDUCE-MOSAIC",
+      "title": "GQN-008 Reduce Mosaic",
+      "title_japanese": "",
+      "embed_url": "https://jav-vids.xyz/embed/apng95lbukeq",
+      "m3u8_url": "https://yjrnY6VWd3Y1oXUh.acek-cdn.com/hls2/01/07304/apng95lbukeq_,l,n,h,.urlset/master.m3u8?t=xFTzJgB8ZKSQnE9KfPKfGXEOGM8RBKN0nVIuY16OHJA&s=1769694807&e=129600&f=36522578&srv=ovC9UKBg4l5m&i=0.4&sp=500&p1=ovC9UKBg4l5m&p2=ovC9UKBg4l5m&asn=8075",
+      "thumbnail_url": "https://javgg.net/wp-content/uploads/2026/01/gqn-008.jpg",
+      "release_date": "",
+      "release_date_formatted": "",
+      "duration": "",
+      "duration_minutes": 0,
+      "studio": "",
+      "studio_japanese": "",
+      "director": "",
+      "series": "",
+      "models": [],
+      "tags": [],
+      "scraped_at": "2026-01-29T13:53:27.712970",
+      "javdb_available": false,
+      "javdb_not_found": true,
+      "processed_at": "2026-01-29T13:53:36.003687",
+      "source": "javgg",
+      "hosting_urls": {
+        "mixdrop": {
+          "embed_url": "",
+          "download_url": "",
+          "file_code": ""
+        },
+        "turboviplay": {
+          "embed_url": "",
+          "download_url": "",
+          "file_code": ""
+        },
+        "seekstreaming": {
+          "embed_url": "",
+          "download_url": "",
+          "file_code": ""
+        },
+        "uploady": {
+          "embed_url": "",
+          "download_url": "",
+          "file_code": ""
+        }
+      },
+      "uploaded_at": "2026-01-29T14:00:17.075877",
+      "preview_url": "https://archive.org/download/javmix-preview-gqn-008-reduce-mosaic-20260129/GQN-008-REDUCE-MOSAIC_preview.mp4"
+    },
+    {
       "code": "FNEW-021-REDUCE-MOSAIC",
       "title": "FNEW-021 Reduce Mosaic",
       "title_japanese": "",
@@ -960,7 +1007,7 @@
     }
   ],
   "stats": {
-    "total_videos": 20,
-    "last_updated": "2026-01-29T13:47:52.980647"
+    "total_videos": 21,
+    "last_updated": "2026-01-29T14:00:16.949970"
   }
 }
