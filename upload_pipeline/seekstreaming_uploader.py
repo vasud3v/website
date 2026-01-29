@@ -60,18 +60,36 @@ class SeekstreamingUploader:
                 'Content-Type': 'application/json'
             }
             
-            # Try to get video details
-            response = self.session.get(
-                f"{self.base_url}/api/v1/video/{video_id}",
-                headers=headers,
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                return response.json()
-            else:
-                print(f"[Seekstreaming] Could not fetch video details: {response.status_code}")
-                return None
+            # Retry loop for 404s (video processing lag)
+            max_retries = 3
+            for attempt in range(max_retries):
+                # Request video details
+                try:
+                    response = self.session.get(
+                        f"{self.base_url}/api/v1/video/{video_id}",
+                        headers=headers,
+                        timeout=30
+                    )
+                    
+                    if response.status_code == 200:
+                        return response.json()
+                    elif response.status_code == 404:
+                        if attempt < max_retries - 1:
+                            print(f"[Seekstreaming] Video details not ready yet (404), retrying in 2s...")
+                            time.sleep(2)
+                            continue
+                        else:
+                            print(f"[Seekstreaming] Could not fetch video details: {response.status_code}")
+                            return None
+                    else:
+                        print(f"[Seekstreaming] API Error: {response.status_code}")
+                        return None
+                except requests.exceptions.RequestException:
+                    if attempt < max_retries - 1:
+                         time.sleep(2)
+                         continue
+                    raise
+            return None
                 
         except Exception as e:
             print(f"[Seekstreaming] Error fetching video info: {str(e)}")
