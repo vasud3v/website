@@ -47,9 +47,34 @@ class AdvancedHLSDownloader:
         self.rate_limit_delay = 0
         self.consecutive_403s = 0
     
+    def get_key(self, key_uri, base_url):
+        """Fetch decryption key"""
+        if not key_uri.startswith('http'):
+            key_uri = base_url + key_uri
+        try:
+            response = self.session.get(key_uri, timeout=30)
+            response.raise_for_status()
+            return response.content
+        except Exception as e:
+            print(f"  ❌ Key fetch failed: {e}")
+            return None
+
+    def decrypt_segment(self, data, key, iv):
+        """Decrypt AES-128 segment"""
+        try:
+            cipher = AES.new(key, AES.MODE_CBC, iv)
+            decrypted = cipher.decrypt(data)
+            # Remove PKCS7 padding
+            pad_len = decrypted[-1]
+            if isinstance(pad_len, int) and 1 <= pad_len <= 16:
+                 return decrypted[:-pad_len]
+            return decrypted
+        except:
+            return data
+
     def download_segment(self, args):
         """Download a single segment"""
-        index, url, output_path, m3u8_url, base_url = args
+        index, url, output_path, m3u8_url, base_url, key_info = args
         
         # RESUME: Skip if already downloaded and valid
         if os.path.exists(output_path):
@@ -57,17 +82,15 @@ class AdvancedHLSDownloader:
             if size > 0:
                 return index, True, size, False
         
-        # Adaptive rate limiting
-        if self.rate_limit_delay > 0.1:
-            time.sleep(self.rate_limit_delay * 0.5)
+        # Adaptive rate limiting (Matches Jable V2 logic)
+        if self.rate_limit_delay > 0.15:
+            time.sleep(self.rate_limit_delay * 0.2)
         
         # Retry loop
         for attempt in range(3):
             try:
                 if attempt > 0:
                     time.sleep(0.2 * attempt)
-                    
-                    # Optional: Refresh URL logic could go here if links expire
                 
                 response = self.session.get(url, timeout=30)
                 response.raise_for_status()
@@ -76,6 +99,12 @@ class AdvancedHLSDownloader:
                 if len(data) == 0:
                     raise ValueError("Empty segment")
                 
+                # Decrypt if needed
+                if key_info:
+                    key, iv = key_info
+                    if key:
+                         data = self.decrypt_segment(data, key, iv)
+
                 # Atomic write
                 temp_path = output_path + '.tmp'
                 with open(temp_path, 'wb') as f:
@@ -190,12 +219,43 @@ class AdvancedHLSDownloader:
             if prev_progress:
                 print(f"  📂 Resuming: {prev_progress['downloaded']}/{prev_progress['total']} segments")
             
+            # Check for encryption and fetch key once
+            has_keys = playlist.keys and playlist.keys[0]
+            encryption_key = None
+            media_sequence_start = playlist.media_sequence if hasattr(playlist, 'media_sequence') else 0
+
+            if has_keys:
+                print(f"  🔐 Encryption detected: AES-128")
+                try:
+                    key_uri = playlist.keys[0].uri
+                    encryption_key = self.get_key(key_uri, base_url)
+                    if encryption_key:
+                         print(f"  🔑 Key fetched successfully")
+                except Exception as e:
+                    print(f"  ❌ Failed to fetch key: {e}")
+                    return False
+            
             # Prepare tasks
             tasks = []
             for i, seg in enumerate(segments):
                 url = base_url + seg.uri if not seg.uri.startswith('http') else seg.uri
                 path = os.path.join(temp_dir, f'seg_{i:05d}.ts')
-                tasks.append((i, url, path, m3u8_url, base_url))
+                
+                # encryption info for this segment
+                key_info = None
+                if seg.key and seg.key.method == 'AES-128':
+                     key = encryption_key if encryption_key else self.get_key(seg.key.uri, base_url)
+                     
+                     if seg.key.iv:
+                         iv = bytes.fromhex(seg.key.iv[2:] if seg.key.iv.startswith('0x') else seg.key.iv)
+                     else:
+                         # IV is the sequence number (big-endian 16 bytes)
+                         seq = media_sequence_start + i
+                         iv = seq.to_bytes(16, byteorder='big')
+                     
+                     key_info = (key, iv)
+                
+                tasks.append((i, url, path, m3u8_url, base_url, key_info))
             
             print(f"  ⚡ Starting download...")
             
@@ -307,14 +367,25 @@ class AdvancedHLSDownloader:
 
     def merge(self, temp_dir, output, total):
         try:
-            segments = sorted(glob.glob(os.path.join(temp_dir, "seg_*.ts")))
+            # Sort segments numerically by index
+            # Filename format: seg_00001.ts
+            segments = glob.glob(os.path.join(temp_dir, "seg_*.ts"))
+            
             if not segments: return False
+            
+            # Robust numeric sort
+            segments.sort(key=lambda x: int(os.path.basename(x).split('_')[1].split('.')[0]))
+            
+            if len(segments) < total * 0.95:  # Allow some leniency, but warn
+                 print(f"  ⚠️ Warning: Merging {len(segments)}/{total} segments")
+
             with open(output, 'wb') as outfile:
                 for seg in segments:
                     with open(seg, 'rb') as infile:
                         outfile.write(infile.read())
             return True
-        except:
+        except Exception as e:
+            print(f"  ❌ Merge error: {e}")
             return False
 
 

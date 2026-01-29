@@ -472,16 +472,8 @@ class JavaGGScraper:
             code = code_match.group(1).upper()
             print(f"  📝 Code: {code}")
             
-            # TRY METHOD 1: Requests-based scraping (bypasses Cloudflare better)
-            print(f"  🔄 Method 1: Trying requests-based scraping...", flush=True)
-            result = self._scrape_with_requests(video_url, code)
-            if result:
-                print(f"  ✅ Successfully scraped with requests!", flush=True)
-                return result
-            
-            print(f"  ⚠️ Requests method failed, trying Selenium...")
-            
-            # TRY METHOD 2: Selenium-based scraping (fallback)
+            # Method 1: Requests-based scraping removed as requested
+            # Directly use Selenium
             return self._scrape_with_selenium(video_url, code)
             
         except TimeoutError:
@@ -640,6 +632,16 @@ class JavaGGScraper:
             self._init_driver()
             
             print(f"  🌐 Loading page with Selenium...")
+            
+            # Ensure we only have one tab
+            if len(self.driver.window_handles) > 1:
+                print(f"  🧹 Closing {len(self.driver.window_handles) - 1} extra tabs/popups...")
+                current = self.driver.current_window_handle
+                for handle in self.driver.window_handles:
+                    if handle != current:
+                        self.driver.switch_to.window(handle)
+                        self.driver.close()
+                self.driver.switch_to.window(current)
             
             # Load the page
             try:
