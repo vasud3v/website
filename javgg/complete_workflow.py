@@ -429,9 +429,18 @@ class WorkflowManager:
                         if code in seen_codes:
                             continue
                         
-                        # Skip if already processed
+                        # Skip if already processed (check both progress AND database)
                         if code in self.progress['processed_videos']:
-                            continue
+                            # Double-check in database - if database is empty, re-process
+                            video_in_db = self.db_manager.get_video_by_code(code)
+                            if video_in_db and video_in_db.get('hosting'):
+                                # Video exists in DB with hosting data, skip
+                                continue
+                            else:
+                                # Video not in DB or no hosting data, remove from processed list and re-process
+                                print(f"  🔄 {code} marked as processed but not in database, will re-process")
+                                self.progress['processed_videos'].remove(code)
+                                self.save_progress()
                         
                         # Skip generic /jav/ link (category page)
                         if code in ['JAV', 'JAVGG', 'NEW-POST'] or url.rstrip('/').endswith('/jav'):
@@ -812,7 +821,7 @@ class WorkflowManager:
                 print(f"  ⚠️ JavaGG scraping failed, using minimal data")
                 video_dict = {
                     'code': video_code,
-                    'title': video_code,
+                    'title': '',  # Will be filled by JAVDatabase enrichment
                     'source_url': video_url,
                     'scraped_at': datetime.now().isoformat()
                 }
@@ -820,7 +829,7 @@ class WorkflowManager:
             print(f"  ⚠️ JavaGG scraping error: {str(e)[:100]}")
             video_dict = {
                 'code': video_code,
-                'title': video_code,
+                'title': '',  # Will be filled by JAVDatabase enrichment
                 'source_url': video_url,
                 'scraped_at': datetime.now().isoformat()
             }
@@ -1302,6 +1311,17 @@ class WorkflowManager:
         print("\n" + "="*70)
         print(f"PROCESSING VIDEO: {video_code}")
         print("="*70)
+        
+        # Check if video already has hosting data in database
+        existing_video = self.db_manager.get_video_by_code(video_code)
+        if existing_video and existing_video.get('hosting'):
+            print(f"  ℹ️ Video already in database with hosting data, skipping")
+            if video_code not in self.progress['processed_videos']:
+                self.progress['processed_videos'].append(video_code)
+                self.save_progress()
+            return True
+        elif existing_video and not existing_video.get('hosting'):
+            print(f"  🔄 Video in database but missing hosting data, will re-upload")
         
         video_file = None
         metadata = None

@@ -576,7 +576,37 @@ class JavaGGScraper:
             
             # Extract title
             title_elem = soup.find('h1', class_='entry-title') or soup.find('h1')
-            title = title_elem.text.strip() if title_elem else code
+            if title_elem:
+                h1_text = title_elem.text.strip()
+                # Check if h1 contains more than just the code
+                if h1_text and h1_text != code:
+                    # Format might be "CODE - English Title" or just "English Title"
+                    if ' - ' in h1_text:
+                        parts = h1_text.split(' - ', 1)
+                        if parts[0].strip() == code:
+                            title = parts[1].strip()
+                        else:
+                            title = h1_text
+                    else:
+                        title = h1_text
+                else:
+                    # h1 is just the code, try og:title
+                    og_title = soup.find('meta', property='og:title')
+                    if og_title:
+                        og_title_text = og_title.get('content', '')
+                        if ' - ' in og_title_text:
+                            parts = og_title_text.split(' - ', 1)
+                            if parts[0].strip() == code:
+                                title = parts[1].strip()
+                            else:
+                                title = og_title_text
+                        else:
+                            title = og_title_text
+                    else:
+                        title = code
+            else:
+                title = code
+            
             print(f"    📝 Video title: {title[:50]}...")
             
             # Extract thumbnail
@@ -830,10 +860,37 @@ class JavaGGScraper:
                 return None
             
             # Extract other metadata
-            title = code
             title_elem = soup.find('h1', class_='entry-title') or soup.find('h1')
             if title_elem:
-                title = title_elem.text.strip()
+                h1_text = title_elem.text.strip()
+                # Check if h1 contains more than just the code
+                if h1_text and h1_text != code:
+                    # Format might be "CODE - English Title" or just "English Title"
+                    if ' - ' in h1_text:
+                        parts = h1_text.split(' - ', 1)
+                        if parts[0].strip() == code:
+                            title = parts[1].strip()
+                        else:
+                            title = h1_text
+                    else:
+                        title = h1_text
+                else:
+                    # h1 is just the code, try og:title
+                    og_title = soup.find('meta', property='og:title')
+                    if og_title:
+                        og_title_text = og_title.get('content', '')
+                        if ' - ' in og_title_text:
+                            parts = og_title_text.split(' - ', 1)
+                            if parts[0].strip() == code:
+                                title = parts[1].strip()
+                            else:
+                                title = og_title_text
+                        else:
+                            title = og_title_text
+                    else:
+                        title = code
+            else:
+                title = code
             
             thumbnail_url = ""
             og_image = soup.find('meta', property='og:image')
@@ -942,10 +999,37 @@ class JavaGGScraper:
             if not title:
                 og_title = soup.find('meta', property='og:title')
                 if og_title:
-                    title = og_title.get('content', '')
+                    og_title_text = og_title.get('content', '')
+                    # og:title format might be "CODE - English Title"
+                    if ' - ' in og_title_text:
+                        parts = og_title_text.split(' - ', 1)
+                        if parts[0].strip() == code:
+                            title = parts[1].strip()
+                        else:
+                            title = og_title_text
+                    else:
+                        title = og_title_text
             
-            # Final fallback to code
-            if not title:
+            # If title is still empty or just the code, try h1
+            if not title or title == code:
+                title_elem = soup.find('h1', class_='entry-title') or soup.find('h1')
+                if title_elem:
+                    h1_text = title_elem.text.strip()
+                    # Check if h1 contains more than just the code
+                    if h1_text and h1_text != code:
+                        # Format might be "CODE - English Title" or just "English Title"
+                        if ' - ' in h1_text:
+                            parts = h1_text.split(' - ', 1)
+                            if parts[0].strip() == code:
+                                title = parts[1].strip()
+                            else:
+                                title = h1_text
+                        else:
+                            title = h1_text
+            
+            # Final fallback: use code with warning
+            if not title or title == code:
+                print(f"  ⚠️ Could not extract proper title, using code as fallback")
                 title = code
             
             # Extract embed URL (REAL VIDEO)

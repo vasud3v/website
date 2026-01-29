@@ -216,7 +216,7 @@ class DatabaseManager:
             print(f"⚠️ Error reading {filepath}: {e}")
         return default if default is not None else []
     
-    def _write_json(self, filepath: str, data: Any, backup: bool = True):
+    def _write_json(self, filepath: str, data: Any, backup: bool = True) -> bool:
         """Safely write JSON file with atomic write and backup"""
         try:
             # Ensure directory exists
@@ -228,14 +228,17 @@ class DatabaseManager:
             # Create backup if file exists
             if backup and os.path.exists(filepath):
                 backup_path = filepath + '.backup'
-                shutil.copy2(filepath, backup_path)
+                try:
+                    shutil.copy2(filepath, backup_path)
+                except Exception as backup_error:
+                    print(f"⚠️ Could not create backup: {backup_error}")
             
             # Atomic write
             temp_path = filepath + '.tmp'
             with open(temp_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
             
-            # Replace original
+            # Replace original (atomic on POSIX, near-atomic on Windows)
             if os.path.exists(filepath):
                 os.remove(filepath)
             os.rename(temp_path, filepath)
@@ -246,11 +249,12 @@ class DatabaseManager:
             import traceback
             traceback.print_exc()
             # Clean up temp file
-            if os.path.exists(filepath + '.tmp'):
+            temp_path = filepath + '.tmp'
+            if os.path.exists(temp_path):
                 try:
-                    os.remove(filepath + '.tmp')
-                except:
-                    pass
+                    os.remove(temp_path)
+                except Exception as cleanup_error:
+                    print(f"⚠️ Could not remove temp file: {cleanup_error}")
             return False
     
     def get_all_videos(self) -> List[Dict]:
@@ -356,17 +360,21 @@ class DatabaseManager:
             print(f"❌ Error adding/updating video: {e}")
             return False
     
-    def mark_as_failed(self, code: str = None, url: str = None, error: str = None, retry_count: int = 0):
+    def mark_as_failed(self, code: str = None, url: str = None, error: str = None, retry_count: int = 0) -> bool:
         """Mark video as failed"""
         try:
             failed_videos = self._read_json_locked(FAILED_DB, [])
+            
+            # Ensure it's a list
+            if not isinstance(failed_videos, list):
+                failed_videos = []
             
             # Find existing entry
             found = False
             for v in failed_videos:
                 if (code and v.get('code') == code) or (url and v.get('source_url') == url):
                     v['retry_count'] = retry_count + 1
-                    v['last_error'] = error
+                    v['last_error'] = str(error)[:500] if error else None  # Limit error message length
                     v['last_attempt'] = datetime.now().isoformat()
                     found = True
                     break
@@ -376,16 +384,19 @@ class DatabaseManager:
                     'code': code,
                     'source_url': url,
                     'retry_count': 1,
-                    'last_error': error,
+                    'last_error': str(error)[:500] if error else None,  # Limit error message length
                     'last_attempt': datetime.now().isoformat()
                 })
             
-            self._write_json_locked(FAILED_DB, failed_videos)
-            self.update_progress()
-            return True
+            if self._write_json_locked(FAILED_DB, failed_videos):
+                self.update_progress()
+                return True
+            return False
             
         except Exception as e:
             print(f"❌ Error marking as failed: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def get_failed_count(self, code: str = None, url: str = None) -> int:

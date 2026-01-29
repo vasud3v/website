@@ -167,12 +167,12 @@ def upload_video_with_validation(video_path, video_code, title=None):
     video = db_manager.get_video_by_code(video_code)
     
     if video:
-        if 'hosting_urls' not in video:
-            video['hosting_urls'] = {}
+        if 'hosting' not in video:
+            video['hosting'] = {}
         
         for host, result in results.items():
             if result['success']:
-                video['hosting_urls'][host] = {
+                video['hosting'][host] = {
                     'embed_url': result.get('embed_url', ''),
                     'download_url': result.get('url', ''),
                     'file_code': result.get('file_code', '')

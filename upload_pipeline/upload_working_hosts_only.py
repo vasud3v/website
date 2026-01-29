@@ -290,8 +290,8 @@ class WorkingHostsUploader:
                 print(f"⚠️  Video '{video_code}' not found in database")
                 return
             
-            if 'hosting_urls' not in video:
-                video['hosting_urls'] = {}
+            if 'hosting' not in video:
+                video['hosting'] = {}
             
             # Update hosting URLs
             for host, result in results.items():
@@ -305,7 +305,7 @@ class WorkingHostsUploader:
                         ''
                     )
                     
-                    video['hosting_urls'][host] = {
+                    video['hosting'][host] = {
                         'embed_url': result.get('embed_url', ''),
                         'download_url': result.get('url', result.get('download_url', '')),
                         'file_code': file_code

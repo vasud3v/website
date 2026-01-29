@@ -243,13 +243,6 @@ class FileLock:
         """Context manager exit - always release lock"""
         self.release()
         return False
-    
-    def __enter__(self):
-        self.acquire()
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.release()
 
 
 def load_json_safe(filepath, default=None):
@@ -300,9 +293,12 @@ def save_json_safe(filepath, data, use_lock=True):
     Returns:
         True if successful, False otherwise
     """
+    lock = None
     try:
         # Create directory if needed
-        os.makedirs(os.path.dirname(filepath) or '.', exist_ok=True)
+        dir_path = os.path.dirname(filepath)
+        if dir_path:
+            os.makedirs(dir_path, exist_ok=True)
         
         # Use file lock if requested
         if use_lock:
@@ -317,7 +313,6 @@ def save_json_safe(filepath, data, use_lock=True):
                     shutil.copy2(filepath, backup)
                 except Exception as backup_error:
                     print(f"⚠️ Could not create backup: {backup_error}")
-                    pass
             
             # Write to temp file first (atomic write)
             temp_file = filepath + '.tmp'
@@ -332,11 +327,13 @@ def save_json_safe(filepath, data, use_lock=True):
             return True
             
         finally:
-            if use_lock:
+            if use_lock and lock:
                 lock.release()
         
     except Exception as e:
         print(f"❌ Error saving {filepath}: {e}")
+        import traceback
+        traceback.print_exc()
         # Clean up temp file
         temp_file = filepath + '.tmp'
         if os.path.exists(temp_file):
@@ -344,7 +341,6 @@ def save_json_safe(filepath, data, use_lock=True):
                 os.remove(temp_file)
             except Exception as cleanup_error:
                 print(f"⚠️ Could not remove temp file: {cleanup_error}")
-                pass
         return False
 
 
@@ -520,3 +516,51 @@ def remove_process_lock(lock_file):
     except Exception as e:
         print(f"⚠️ Could not remove lock file: {e}")
         pass
+
+
+def fix_video_title(video_data):
+    """
+    Fix title fields in video data
+    Handles cases where title is just the code or fields are swapped
+    
+    Args:
+        video_data: Dictionary with video information
+        
+    Returns:
+        Fixed video_data dictionary
+    """
+    code = video_data.get('code', '')
+    title = video_data.get('title', '')
+    title_japanese = video_data.get('title_japanese', '')
+    
+    # Issue 1: Title is just the code
+    if title == code or not title:
+        # Try to extract from title_japanese
+        if title_japanese and ' - ' in title_japanese:
+            parts = title_japanese.split(' - ', 1)
+            if parts[0].strip() == code:
+                # Format: "CODE - English title"
+                title = parts[1].strip()
+                title_japanese = ''  # No actual Japanese text
+        elif title_japanese and title_japanese != code:
+            # Use title_japanese as title if it's not the code
+            title = title_japanese
+            title_japanese = ''
+    
+    # Issue 2: Detect if title_japanese is actually English
+    japanese_pattern = re.compile(r'[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]')
+    if title_japanese and not japanese_pattern.search(title_japanese):
+        # It's not Japanese, move to title if title is empty
+        if not title or title == code:
+            title = title_japanese
+        title_japanese = ''
+    
+    # Update video data
+    video_data['title'] = title
+    video_data['title_japanese'] = title_japanese
+    
+    # Add explicit English field
+    if 'title_english' not in video_data:
+        video_data['title_english'] = title
+    
+    return video_data

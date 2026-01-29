@@ -295,8 +295,8 @@ class MultiHostUploader:
                 return
             
             # Update hosting URLs
-            if 'hosting_urls' not in video:
-                video['hosting_urls'] = {}
+            if 'hosting' not in video:
+                video['hosting'] = {}
             
             successful_hosts = 0
             
@@ -306,8 +306,8 @@ class MultiHostUploader:
                     # Access URLs directly from result
                     
                     # Initialize host entry if not exists
-                    if host not in video['hosting_urls']:
-                        video['hosting_urls'][host] = {}
+                    if host not in video['hosting']:
+                        video['hosting'][host] = {}
                     
                     # Extract URLs - handle both new flat format and old nested format for compatibility
                     embed_url = result.get('embed_url', '')
@@ -324,7 +324,7 @@ class MultiHostUploader:
                     
                     # Validate we have actual URLs (not empty strings)
                     if embed_url or download_url:
-                        video['hosting_urls'][host] = {
+                        video['hosting'][host] = {
                             'embed_url': embed_url,
                             'download_url': download_url,
                             'file_code': file_code

@@ -126,6 +126,12 @@ class InternetArchiveUploader:
             
             filename = os.path.basename(preview_path)
             
+            # Check if file already exists in the item
+            if item.exists:
+                existing_files = [f['name'] for f in item.files]
+                if filename in existing_files:
+                    print(f"  ℹ️ File already exists in item, will overwrite")
+            
             result = item.upload(
                 preview_path,
                 metadata=ia_metadata,
@@ -138,7 +144,35 @@ class InternetArchiveUploader:
             )
             
             # Check if upload was successful
-            if result[0].status_code in [200, 201]:
+            # result is a list of Response objects
+            if not result or len(result) == 0:
+                error_msg = "Upload failed: No response from Internet Archive"
+                print(f"\n❌ {error_msg}")
+                return {
+                    'success': False,
+                    'error': error_msg
+                }
+            
+            # Check status code
+            status_code = result[0].status_code if hasattr(result[0], 'status_code') else None
+            
+            if status_code is None:
+                # Sometimes IA returns success without status code
+                # Check if file exists in item now
+                item.refresh()
+                existing_files = [f['name'] for f in item.files]
+                if filename in existing_files:
+                    print(f"  ✅ File verified in item (upload successful)")
+                    status_code = 200  # Treat as success
+                else:
+                    error_msg = "Upload failed: File not found in item after upload"
+                    print(f"\n❌ {error_msg}")
+                    return {
+                        'success': False,
+                        'error': error_msg
+                    }
+            
+            if status_code in [200, 201]:
                 # Generate direct MP4 link
                 direct_link = f"https://archive.org/download/{identifier}/{filename}"
                 
@@ -176,11 +210,13 @@ class InternetArchiveUploader:
                     'uploaded_at': datetime.now().isoformat()
                 }
             else:
-                error_msg = f"Upload failed with status code: {result[0].status_code}"
+                error_msg = f"Upload failed with status code: {status_code}"
                 print(f"\n❌ {error_msg}")
+                print(f"  Response: {result[0].text if hasattr(result[0], 'text') else 'No response text'}")
                 return {
                     'success': False,
-                    'error': error_msg
+                    'error': error_msg,
+                    'status_code': status_code
                 }
         
         except Exception as e:

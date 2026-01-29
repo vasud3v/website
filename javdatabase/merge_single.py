@@ -38,9 +38,23 @@ def merge_and_validate(source_data: dict, javdb_data: dict = None) -> dict:
     merged['javdb_available'] = True
     merged['javdb_url'] = javdb_data.get('source_url', '')
     
-    # === TITLE (prefer JAVDatabase) ===
-    merged['title'] = javdb_data.get('title') or source_data.get('title', '')
-    merged['title_japanese'] = javdb_data.get('title_jp') or source_data.get('title_japanese', '')
+    # === TITLE (prefer JAVDatabase, but validate it's not just the code) ===
+    javdb_title = javdb_data.get('title', '')
+    source_title = source_data.get('title', '')
+    code = source_data.get('code', '')
+    
+    # Use JAVDatabase title if it's not empty and not just the code
+    if javdb_title and javdb_title != code:
+        merged['title'] = javdb_title
+    # Otherwise use source title if it's not just the code
+    elif source_title and source_title != code:
+        merged['title'] = source_title
+    # Last resort: use code (but this shouldn't happen)
+    else:
+        merged['title'] = code
+    
+    # Japanese title from JAVDatabase
+    merged['title_japanese'] = javdb_data.get('title_jp', '') or source_data.get('title_japanese', '')
     
     # === VIDEO URLS (from JavaGG only) ===
     merged['embed_url'] = source_data.get('embed_url', '')
@@ -118,9 +132,9 @@ def merge_and_validate(source_data: dict, javdb_data: dict = None) -> dict:
         merged['rating_count'] = javdb_data['rating_count']
     
     # === HOSTING URLS (from JavaGG/upload pipeline) ===
-    hosting_urls = source_data.get('hosting_urls', {})
-    if hosting_urls:
-        merged['hosting_urls'] = hosting_urls
+    hosting = source_data.get('hosting', {})
+    if hosting:
+        merged['hosting'] = hosting
     
     # === UPLOAD TIMESTAMP ===
     uploaded_at = source_data.get('uploaded_at')

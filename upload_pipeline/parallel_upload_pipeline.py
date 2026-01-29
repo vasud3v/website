@@ -214,52 +214,65 @@ class ParallelUploadPipeline:
                 print(f"⚠️ Video '{video_title}' not found in main database, skipping sync")
                 return
             
-            # Update hosting URLs
-            if 'hosting_urls' not in video:
-                video['hosting_urls'] = {}
+            # Update hosting URLs - use 'hosting' not 'hosting_urls' for consistency
+            if 'hosting' not in video:
+                video['hosting'] = {}
             
             for host, result in results.items():
                 if result.get('success'):
                     # Initialize host entry if not exists
-                    if host not in video['hosting_urls']:
-                        video['hosting_urls'][host] = {}
+                    if host not in video['hosting']:
+                        video['hosting'][host] = {}
                     
                     # Map different host response formats
                     if host == 'seekstreaming':
-                        video['hosting_urls'][host] = {
+                        video['hosting'][host] = {
                             'embed_url': result.get('all_urls', {}).get('video_player', ''),
                             'download_url': result.get('all_urls', {}).get('video_downloader', ''),
-                            'file_code': result.get('all_urls', {}).get('video_player', '').split('#')[-1] if result.get('all_urls', {}).get('video_player') else ''
+                            'file_code': result.get('all_urls', {}).get('video_player', '').split('#')[-1] if result.get('all_urls', {}).get('video_player') else '',
+                            'upload_time': int(time.time())
                         }
                     elif host == 'streamtape':
-                        video['hosting_urls'][host] = {
+                        video['hosting'][host] = {
                             'embed_url': result.get('embed_url', ''),
                             'download_url': result.get('url', ''),
-                            'file_code': result.get('file_id', '')
+                            'file_code': result.get('file_id', ''),
+                            'upload_time': int(time.time())
                         }
                     elif host == 'turboviplay':
-                        video['hosting_urls'][host] = {
+                        video['hosting'][host] = {
                             'embed_url': result.get('embed_url', ''),
                             'download_url': result.get('url', ''),
-                            'file_code': result.get('video_id', '')
+                            'file_code': result.get('video_id', ''),
+                            'upload_time': int(time.time())
                         }
                     elif host == 'vidoza':
-                        video['hosting_urls'][host] = {
+                        video['hosting'][host] = {
                             'embed_url': result.get('embed_url', ''),
                             'download_url': result.get('url', ''),
-                            'file_code': result.get('video_id', '')
+                            'file_code': result.get('video_id', ''),
+                            'upload_time': int(time.time())
                         }
                     elif host == 'uploady':
-                        video['hosting_urls'][host] = {
+                        video['hosting'][host] = {
                             'embed_url': result.get('embed_url', ''),
                             'download_url': result.get('url', ''),
-                            'file_code': result.get('file_code', '')
+                            'file_code': result.get('file_code', ''),
+                            'upload_time': int(time.time())
+                        }
+                    elif host == 'mixdrop':
+                        video['hosting'][host] = {
+                            'embed_url': result.get('embed_url', ''),
+                            'download_url': result.get('url', ''),
+                            'file_code': result.get('file_code', ''),
+                            'upload_time': int(time.time())
                         }
                     elif host == 'upload18':
-                        video['hosting_urls'][host] = {
+                        video['hosting'][host] = {
                             'embed_url': result.get('embed_url', ''),
                             'download_url': result.get('url', ''),
-                            'file_code': result.get('file_code', '')
+                            'file_code': result.get('file_code', ''),
+                            'upload_time': int(time.time())
                         }
             
             # Update uploaded_at timestamp
