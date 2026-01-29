@@ -173,14 +173,25 @@ class JAVDatabaseScraper:
             measurements = None
             height = None
             
+            # Debug: Save page source for inspection
+            debug_save = False  # Set to True to debug
+            if debug_save:
+                debug_file = f"actress_profile_{actress_name.replace(' ', '_')}.html"
+                with open(debug_file, 'w', encoding='utf-8') as f:
+                    f.write(soup.prettify())
+                print(f"      Debug: Saved to {debug_file}")
+            
             # Look for profile details in various formats
             # Pattern 1: Look for <p class="mb-1"> tags with metadata
             info_paragraphs = soup.find_all('p', class_='mb-1')
+            print(f"      Found {len(info_paragraphs)} info paragraphs")
+            
             for p in info_paragraphs:
                 text = p.get_text(strip=True)
                 
                 # Extract birthdate
-                if 'Birth' in text or 'DOB' in text or 'Born' in text:
+                if 'Birth' in text or 'DOB' in text or 'Born' in text or 'Date of Birth' in text:
+                    print(f"      Birth text: {text}")
                     date_match = re.search(r'(\d{4}-\d{2}-\d{2})', text)
                     if date_match:
                         birthdate = date_match.group(1)
@@ -194,13 +205,15 @@ class JAVDatabaseScraper:
                             pass
                 
                 # Extract height
-                if 'Height' in text:
+                if 'Height' in text or 'height' in text:
+                    print(f"      Height text: {text}")
                     height_match = re.search(r'(\d+)\s*cm', text, re.I)
                     if height_match:
                         height = height_match.group(1) + ' cm'
                 
                 # Extract measurements (B-W-H)
-                if 'Measurements' in text or 'BWH' in text:
+                if 'Measurements' in text or 'BWH' in text or 'measurements' in text:
+                    print(f"      Measurements text: {text}")
                     # Look for pattern like "88-58-86" or "B88-W58-H86"
                     meas_match = re.search(r'(\d{2,3}[-\s]*\d{2,3}[-\s]*\d{2,3})', text)
                     if meas_match:
@@ -209,6 +222,7 @@ class JAVDatabaseScraper:
             # Pattern 2: Look in table format
             if not birthdate or not height or not measurements:
                 tables = soup.find_all('table')
+                print(f"      Found {len(tables)} tables")
                 for table in tables:
                     rows = table.find_all('tr')
                     for row in rows:
@@ -232,7 +246,16 @@ class JAVDatabaseScraper:
                                 if meas_match:
                                     measurements = meas_match.group(1)
             
-            # Pattern 3: Look for Japanese name
+            # Pattern 3: Look for any text containing measurements pattern
+            if not measurements:
+                all_text = soup.get_text()
+                # Look for B-W-H pattern anywhere in page
+                meas_match = re.search(r'(?:BWH|Measurements|measurements)[\s:]*(\d{2,3}[-\s]*\d{2,3}[-\s]*\d{2,3})', all_text, re.I)
+                if meas_match:
+                    measurements = meas_match.group(1)
+                    print(f"      Found measurements in text: {measurements}")
+            
+            # Pattern 4: Look for Japanese name
             # Often in format: "Name (Japanese Name)"
             if name and '(' in name and ')' in name:
                 parts = name.split('(')
