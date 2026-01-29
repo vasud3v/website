@@ -347,6 +347,7 @@ class AdvancedHLSDownloader:
             # Merge
             print(f"  🔗 Merging {downloaded} segments...")
             if not self.merge(temp_dir, str(temp_output), total):
+                return False
             
             # Validate merged video
             print(f"  🔍 Validating merged video...")
@@ -355,17 +356,6 @@ class AdvancedHLSDownloader:
                 print(f"  ❌ Validation failed: {msg}")
                 return False
             print(f"  ✅ Validation passed: {msg}")
-
-            
-            # Validate merged video
-            print(f"  🔍 Validating merged video...")
-            is_valid, msg = self.validate_merged_video(str(temp_output))
-            if not is_valid:
-                print(f"  ❌ Validation failed: {msg}")
-                return False
-            print(f"  ✅ Validation passed: {msg}")
-
-                return False
             
             # Convert
             if temp_output != output_path:
@@ -394,104 +384,64 @@ class AdvancedHLSDownloader:
             # Filename format: seg_00001.ts
             segments = glob.glob(os.path.join(temp_dir, "seg_*.ts"))
             
-            if not segments: return False
+            if not segments: 
+                return False
             
             # Robust numeric sort
             segments.sort(key=lambda x: int(os.path.basename(x).split('_')[1].split('.')[0]))
             
             if len(segments) < total * 0.95:  # Allow some leniency, but warn
-                 print(f"  ⚠️ Warning: Merging {len(segments)}/{total} segments")
+                print(f"  ⚠️ Warning: Merging {len(segments)}/{total} segments")
 
             with open(output, 'wb') as outfile:
                 for seg in segments:
                     with open(seg, 'rb') as infile:
                         outfile.write(infile.read())
             return True
-
-    
-    def validate_merged_video(self, video_path):
-        """Validate merged video file"""
-        try:
-            if not os.path.exists(video_path):
-                return False, "File not found"
-            
-            size_mb = os.path.getsize(video_path) / (1024 * 1024)
-            if size_mb < 10:
-                return False, f"File too small: {size_mb:.2f} MB"
-            
-            # Quick validation with ffprobe
-            import subprocess
-            cmd = [
-                'ffprobe',
-                '-v', 'error',
-                '-show_format',
-                '-of', 'json',
-                str(video_path)
-            ]
-            
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            
-            if result.returncode != 0:
-                return False, "ffprobe validation failed"
-            
-            data = json.loads(result.stdout)
-            format_name = data.get('format', {}).get('format_name', '')
-            
-            if 'png' in format_name.lower() or 'image' in format_name.lower():
-                return False, f"Invalid format: {format_name}"
-            
-            duration = float(data.get('format', {}).get('duration', 0))
-            if duration < 30:
-                return False, f"Duration too short: {duration}s"
-            
-            return True, f"Valid ({size_mb:.1f} MB, {duration:.0f}s)"
-            
-        except Exception as e:
-            return False, f"Validation error: {str(e)[:100]}"
-
-    
-    def validate_merged_video(self, video_path):
-        """Validate merged video file"""
-        try:
-            if not os.path.exists(video_path):
-                return False, "File not found"
-            
-            size_mb = os.path.getsize(video_path) / (1024 * 1024)
-            if size_mb < 10:
-                return False, f"File too small: {size_mb:.2f} MB"
-            
-            # Quick validation with ffprobe
-            import subprocess
-            cmd = [
-                'ffprobe',
-                '-v', 'error',
-                '-show_format',
-                '-of', 'json',
-                str(video_path)
-            ]
-            
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            
-            if result.returncode != 0:
-                return False, "ffprobe validation failed"
-            
-            data = json.loads(result.stdout)
-            format_name = data.get('format', {}).get('format_name', '')
-            
-            if 'png' in format_name.lower() or 'image' in format_name.lower():
-                return False, f"Invalid format: {format_name}"
-            
-            duration = float(data.get('format', {}).get('duration', 0))
-            if duration < 30:
-                return False, f"Duration too short: {duration}s"
-            
-            return True, f"Valid ({size_mb:.1f} MB, {duration:.0f}s)"
-            
-        except Exception as e:
-            return False, f"Validation error: {str(e)[:100]}"
         except Exception as e:
             print(f"  ❌ Merge error: {e}")
             return False
+
+    
+    def validate_merged_video(self, video_path):
+        """Validate merged video file"""
+        try:
+            if not os.path.exists(video_path):
+                return False, "File not found"
+            
+            size_mb = os.path.getsize(video_path) / (1024 * 1024)
+            if size_mb < 10:
+                return False, f"File too small: {size_mb:.2f} MB"
+            
+            # Quick validation with ffprobe
+            import subprocess
+            cmd = [
+                'ffprobe',
+                '-v', 'error',
+                '-show_format',
+                '-of', 'json',
+                str(video_path)
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            
+            if result.returncode != 0:
+                return False, "ffprobe validation failed"
+            
+            data = json.loads(result.stdout)
+            format_name = data.get('format', {}).get('format_name', '')
+            
+            if 'png' in format_name.lower() or 'image' in format_name.lower():
+                return False, f"Invalid format: {format_name}"
+            
+            duration = float(data.get('format', {}).get('duration', 0))
+            if duration < 30:
+                return False, f"Duration too short: {duration}s"
+            
+            return True, f"Valid ({size_mb:.1f} MB, {duration:.0f}s)"
+            
+        except Exception as e:
+            return False, f"Validation error: {str(e)[:100]}"
 
 
 if __name__ == "__main__":
