@@ -21,7 +21,8 @@
     "SCPX-545-REDUCE-MOSAIC",
     "MADV-619-REDUCE-MOSAIC",
     "FNEW-021-REDUCE-MOSAIC",
-    "GQN-008-REDUCE-MOSAIC"
+    "GQN-008-REDUCE-MOSAIC",
+    "FLAV-413-REDUCE-MOSAIC"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -109,7 +110,12 @@
       "code": "GQN-008-REDUCE-MOSAIC",
       "url": "https://javgg.net/jav/gqn-008-reduce-mosaic/",
       "retry_after": 1769867616.003229
+    },
+    {
+      "code": "FLAV-413-REDUCE-MOSAIC",
+      "url": "https://javgg.net/jav/flav-413-reduce-mosaic/",
+      "retry_after": 1769868305.52507
     }
   ],
-  "last_run": "2026-01-29T14:00:17.534028"
+  "last_run": "2026-01-29T14:09:21.668083"
 }
