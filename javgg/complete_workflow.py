@@ -582,7 +582,7 @@ class WorkflowManager:
                     print(f"  📥 Using advanced HLS downloader (32 workers + anti-throttling)...")
                     try:
                         from hls_downloader_advanced import AdvancedHLSDownloader
-                        hls_dl = AdvancedHLSDownloader() # Uses default 32 workers
+                        hls_dl = AdvancedHLSDownloader(max_workers=32)
                         
                         # Download with timeout
                         import signal
