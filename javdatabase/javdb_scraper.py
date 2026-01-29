@@ -45,12 +45,12 @@ class VideoMetadata:
     screenshots: List[str]
     actresses: List[str]  # Actress names
     actress_images: Dict[str, str]  # name -> image_url
-    actress_details: Dict[str, Dict] = None  # name -> full ActressData dict
     categories: List[str]
     description: str
     rating: float
     scraped_at: str
     javdb_url: str
+    actress_details: Dict[str, Dict] = None  # name -> full ActressData dict (must be last with default)
 
 
 class JAVDatabaseScraper:
