@@ -161,11 +161,28 @@ class SeekstreamingUploader:
             print(f"[Seekstreaming] Chunk size: {self.chunk_size / (1024*1024):.0f} MB")
             print()
             
+            print()
+            
+            # Step 1.5: Check for existing offset (Resume capability)
+            offset = 0
+            try:
+                head_resp = self.session.head(upload_location, headers={'Tus-Resumable': '1.0.0'})
+                if head_resp.status_code == 200:
+                    server_offset = int(head_resp.headers.get('Upload-Offset', 0))
+                    if server_offset > 0:
+                        print(f"[Seekstreaming] Resuming from offset {server_offset} ({server_offset/(1024*1024):.1f} MB)")
+                        offset = server_offset
+            except Exception as e:
+                print(f"[Seekstreaming] Warning: Could not check offset: {e}")
+
             start_time = time.time()
             
             # Step 2: Upload file in chunks with progress bar
             with open(video_path, 'rb') as f:
-                offset = 0
+                # Seek to current offset
+                if offset > 0:
+                    f.seek(offset)
+                
                 chunk_num = 0
                 total_chunks = (file_size + self.chunk_size - 1) // self.chunk_size
                 
