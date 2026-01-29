@@ -22,7 +22,8 @@
     "MADV-619-REDUCE-MOSAIC",
     "FNEW-021-REDUCE-MOSAIC",
     "GQN-008-REDUCE-MOSAIC",
-    "FLAV-413-REDUCE-MOSAIC"
+    "FLAV-413-REDUCE-MOSAIC",
+    "DOA-135-REDUCE-MOSAIC"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -115,7 +116,12 @@
       "code": "FLAV-413-REDUCE-MOSAIC",
       "url": "https://javgg.net/jav/flav-413-reduce-mosaic/",
       "retry_after": 1769868305.52507
+    },
+    {
+      "code": "DOA-135-REDUCE-MOSAIC",
+      "url": "https://javgg.net/jav/doa-135-reduce-mosaic/",
+      "retry_after": 1769868930.560186
     }
   ],
-  "last_run": "2026-01-29T14:09:21.668083"
+  "last_run": "2026-01-29T14:15:30.564147"
 }
