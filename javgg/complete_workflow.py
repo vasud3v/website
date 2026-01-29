@@ -42,6 +42,11 @@ print("DEBUG: Importing MultiHostUploader...", flush=True)
 from upload_to_all_hosts import MultiHostUploader
 print("DEBUG: Imported MultiHostUploader", flush=True)
 
+# Import Internet Archive uploader
+sys.path.insert(0, str(Path(__file__).parent.parent / 'upload_pipeline'))
+from internet_archive_uploader import InternetArchiveUploader
+print("DEBUG: Imported InternetArchiveUploader", flush=True)
+
 
 class WorkflowManager:
     """Manages the complete workflow"""
@@ -871,7 +876,8 @@ class WorkflowManager:
         print(f"\n🎬 Generating preview: {video_code}")
         
         # Skip preview for very large files (> 2GB) to save time
-        if file_size_mb > 2048:
+        # Skip preview for very large files (> 5GB) to save time
+        if file_size_mb > 5120:
             print(f"  ⏭️ Skipping preview for large file ({file_size_mb:.1f} MB)")
             return None
         
@@ -1007,11 +1013,25 @@ class WorkflowManager:
             urls['hosting'] = hosting_urls
             print(f"  ✅ Uploaded to {len(hosting_urls)} hosting sites")
             
-            # For preview, we'll skip Internet Archive for now (can add later)
-            # Internet Archive upload is complex and may not be needed
+            # Upload preview to Internet Archive
             if preview_file:
-                print(f"\n  ℹ️ Preview saved locally: {preview_file}")
-                urls['preview_file'] = preview_file
+                print(f"\n  📤 Uploading preview to Internet Archive...")
+                try:
+                    ia_uploader = InternetArchiveUploader()
+                    ia_result = ia_uploader.upload_preview(preview_file, video_code, metadata={'title': video_code})
+                    
+                    if ia_result.get('success'):
+                        print(f"     ✅ Internet Archive: Success")
+                        print(f"     🔗 URL: {ia_result.get('direct_mp4_link')}")
+                        urls['internet_archive'] = ia_result.get('direct_mp4_link')
+                        urls['preview_file'] = preview_file
+                    else:
+                        print(f"     ❌ Internet Archive: Failed ({ia_result.get('error')})")
+                except Exception as e:
+                    print(f"     ❌ Internet Archive error: {e}")
+                    # Keep local file if upload fails
+                    urls['preview_file'] = preview_file
+
             
             print(f"\n  ✅ Uploads complete")
             print(f"     - Hosting sites: {len(hosting_urls)} URLs")
