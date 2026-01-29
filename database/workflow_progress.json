@@ -19,7 +19,8 @@
     "FC2-PPV-4838212",
     "012926-001-CARIB",
     "SCPX-545-REDUCE-MOSAIC",
-    "MADV-619-REDUCE-MOSAIC"
+    "MADV-619-REDUCE-MOSAIC",
+    "FNEW-021-REDUCE-MOSAIC"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -97,7 +98,12 @@
       "code": "MADV-619-REDUCE-MOSAIC",
       "url": "https://javgg.net/jav/madv-619-reduce-mosaic/",
       "retry_after": 1769866428.465718
+    },
+    {
+      "code": "FNEW-021-REDUCE-MOSAIC",
+      "url": "https://javgg.net/jav/fnew-021-reduce-mosaic/",
+      "retry_after": 1769866949.602687
     }
   ],
-  "last_run": "2026-01-29T13:38:16.531474"
+  "last_run": "2026-01-29T13:47:53.446248"
 }
