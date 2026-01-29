@@ -17,6 +17,11 @@ import shutil
 import glob
 from pathlib import Path
 import random
+try:
+    from Crypto.Cipher import AES
+except ImportError:
+    AES = None
+    print("⚠️ pycryptodome not installed - decryption will fail")
 
 # Optimal default based on CDN analysis
 # Note: CDN throttles heavily (~0.1-0.2 MB/s) regardless of worker count

@@ -1110,27 +1110,34 @@ class WorkflowManager:
         print(f"\n💾 Committing changes for {video_code}...")
         
         max_retries = 3
+        max_retries = 3
         for attempt in range(max_retries):
             try:
-                # Add database files
-                subprocess.run(['git', 'add', 'database/combined_videos.json'], check=True, timeout=30)
-                subprocess.run(['git', 'add', 'database/workflow_progress.json'], check=True, timeout=30)
-                subprocess.run(['git', 'add', 'database/stats.json'], check=True, stderr=subprocess.DEVNULL, timeout=30)
-                subprocess.run(['git', 'add', 'database/progress_tracking.json'], check=True, stderr=subprocess.DEVNULL, timeout=30)
+                # Add database files - execute from base directory
+                subprocess.run(['git', 'add', 'database/combined_videos.json'], cwd=self.base_dir, check=True, timeout=30)
+                subprocess.run(['git', 'add', 'database/workflow_progress.json'], cwd=self.base_dir, check=True, timeout=30)
+                subprocess.run(['git', 'add', 'database/stats.json'], cwd=self.base_dir, check=True, stderr=subprocess.DEVNULL, timeout=30)
+                subprocess.run(['git', 'add', 'database/progress_tracking.json'], cwd=self.base_dir, check=True, stderr=subprocess.DEVNULL, timeout=30)
                 
                 # Check if there are changes
-                result = subprocess.run(['git', 'diff', '--staged', '--quiet'], capture_output=True, timeout=30)
+                result = subprocess.run(['git', 'diff', '--staged', '--quiet'], cwd=self.base_dir, capture_output=True, timeout=30)
                 
                 if result.returncode != 0:  # There are changes
                     # Commit
                     commit_msg = f"Update database: {video_code} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-                    subprocess.run(['git', 'commit', '-m', commit_msg], check=True, timeout=30)
+                    subprocess.run(['git', 'commit', '-m', commit_msg], cwd=self.base_dir, check=True, timeout=30)
                     
                     # Push with retry
                     push_success = False
                     for push_attempt in range(3):
                         try:
-                            subprocess.run(['git', 'push'], check=True, timeout=60)
+                            # Pull first to minimize conflicts
+                            try:
+                                subprocess.run(['git', 'pull', '--rebase'], cwd=self.base_dir, capture_output=True, timeout=60)
+                            except:
+                                pass
+
+                            subprocess.run(['git', 'push'], cwd=self.base_dir, check=True, timeout=60)
                             push_success = True
                             break
                         except subprocess.TimeoutExpired:
@@ -1140,11 +1147,6 @@ class WorkflowManager:
                         except subprocess.CalledProcessError as e:
                             print(f"  ⚠️ Push failed (attempt {push_attempt+1}/3): {e}")
                             if push_attempt < 2:
-                                # Pull first in case of conflicts
-                                try:
-                                    subprocess.run(['git', 'pull', '--rebase'], check=True, timeout=60)
-                                except:
-                                    pass
                                 time.sleep(5)
                     
                     if push_success:
