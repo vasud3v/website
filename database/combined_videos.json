@@ -1,6 +1,53 @@
 {
   "videos": [
     {
+      "code": "012926-001-CARIB",
+      "title": "012926-001-CARIB",
+      "title_japanese": "",
+      "embed_url": "https://jav-vids.xyz/embed/neaf5gyfzrxu",
+      "m3u8_url": "https://wt4PjIIVE9AGjPL.dramiyos-cdn.com/hls2/01/07306/neaf5gyfzrxu_,l,n,h,.urlset/master.m3u8?t=DlOl6OW6oSdP6MD0IqsHj2FBinjQgzVpAce7rDKB68w&s=1769692780&e=129600&f=36532179&srv=mnTs8JVdEBe4&i=0.4&sp=500&p1=mnTs8JVdEBe4&p2=mnTs8JVdEBe4&asn=8075",
+      "thumbnail_url": "https://javgg.net/wp-content/uploads/2026/01/012926-001-CARIB.jpg",
+      "release_date": "",
+      "release_date_formatted": "",
+      "duration": "",
+      "duration_minutes": 0,
+      "studio": "",
+      "studio_japanese": "",
+      "director": "",
+      "series": "",
+      "models": [],
+      "tags": [],
+      "scraped_at": "2026-01-29T13:19:41.067843",
+      "javdb_available": false,
+      "javdb_not_found": true,
+      "processed_at": "2026-01-29T13:19:49.366517",
+      "source": "javgg",
+      "hosting_urls": {
+        "mixdrop": {
+          "embed_url": "",
+          "download_url": "",
+          "file_code": ""
+        },
+        "turboviplay": {
+          "embed_url": "",
+          "download_url": "",
+          "file_code": ""
+        },
+        "seekstreaming": {
+          "embed_url": "",
+          "download_url": "",
+          "file_code": ""
+        },
+        "uploady": {
+          "embed_url": "",
+          "download_url": "",
+          "file_code": ""
+        }
+      },
+      "uploaded_at": "2026-01-29T13:21:25.273533",
+      "preview_url": "https://archive.org/download/javmix-preview-012926-001-carib-20260129/012926-001-CARIB_preview.mp4"
+    },
+    {
       "code": "FC2-PPV-4838212",
       "title": "FC2 PPV 4838212",
       "title_japanese": "",
@@ -772,7 +819,7 @@
     }
   ],
   "stats": {
-    "total_videos": 16,
-    "last_updated": "2026-01-29T13:18:23.346919"
+    "total_videos": 17,
+    "last_updated": "2026-01-29T13:21:25.263300"
   }
 }

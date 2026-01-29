@@ -16,7 +16,8 @@
     "FC2-PPV-4838706",
     "FC2-PPV-4835003",
     "FC2-PPV-4838725",
-    "FC2-PPV-4838212"
+    "FC2-PPV-4838212",
+    "012926-001-CARIB"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -79,7 +80,12 @@
       "code": "FC2-PPV-4838212",
       "url": "https://javgg.net/jav/fc2-ppv-4838212/",
       "retry_after": 1769865357.160993
+    },
+    {
+      "code": "012926-001-CARIB",
+      "url": "https://javgg.net/jav/012926-001-carib/",
+      "retry_after": 1769865589.366113
     }
   ],
-  "last_run": "2026-01-29T13:18:23.586882"
+  "last_run": "2026-01-29T13:21:25.326436"
 }
