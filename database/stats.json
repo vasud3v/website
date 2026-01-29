@@ -1,14 +1,15 @@
 {
-  "total_videos": 1,
+  "total_videos": 2,
   "total_size_bytes": 0,
   "by_hosting": {},
   "by_category": {},
   "by_model": {},
   "by_studio": {
+    "Momotaro Eizo": 1,
     "Prestige": 1
   },
-  "with_javdb": 1,
+  "with_javdb": 2,
   "with_cast": 0,
   "with_screenshots": 1,
-  "last_updated": "2026-01-29T11:40:35.498901"
+  "last_updated": "2026-01-29T11:56:16.906923"
 }
