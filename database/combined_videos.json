@@ -1,6 +1,53 @@
 {
   "videos": [
     {
+      "code": "CEMD-798-REDUCE-MOSAIC",
+      "title": "CEMD-798 Reduce Mosaic",
+      "title_japanese": "",
+      "embed_url": "https://jav-vids.xyz/embed/fjcixzije4nf",
+      "m3u8_url": "",
+      "thumbnail_url": "https://javgg.net/wp-content/uploads/2026/01/cemd-798.jpg",
+      "release_date": "",
+      "release_date_formatted": "",
+      "duration": "",
+      "duration_minutes": 0,
+      "studio": "",
+      "studio_japanese": "",
+      "director": "",
+      "series": "",
+      "models": [],
+      "tags": [],
+      "scraped_at": "2026-01-29T14:32:26.701621",
+      "javdb_available": false,
+      "javdb_not_found": true,
+      "processed_at": "2026-01-29T14:32:35.321131",
+      "source": "javgg",
+      "hosting_urls": {
+        "uploady": {
+          "embed_url": "",
+          "download_url": "",
+          "file_code": ""
+        },
+        "mixdrop": {
+          "embed_url": "",
+          "download_url": "",
+          "file_code": ""
+        },
+        "turboviplay": {
+          "embed_url": "",
+          "download_url": "",
+          "file_code": ""
+        },
+        "seekstreaming": {
+          "embed_url": "",
+          "download_url": "",
+          "file_code": ""
+        }
+      },
+      "uploaded_at": "2026-01-29T14:36:55.692954",
+      "preview_url": "https://archive.org/download/javmix-preview-cemd-798-reduce-mosaic-20260129/CEMD-798-REDUCE-MOSAIC_preview.mp4"
+    },
+    {
       "code": "CEMD-799-REDUCE-MOSAIC",
       "title": "CEMD-799 Reduce Mosaic",
       "title_japanese": "",
@@ -1119,7 +1166,7 @@
     }
   ],
   "stats": {
-    "total_videos": 24,
-    "last_updated": "2026-01-29T14:27:32.169197"
+    "total_videos": 25,
+    "last_updated": "2026-01-29T14:36:55.682409"
   }
 }
