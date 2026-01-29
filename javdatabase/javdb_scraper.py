@@ -117,13 +117,14 @@ class JAVDatabaseScraper:
             finally:
                 self.driver = None
     
-    def scrape_actress_profile(self, actress_name: str) -> Optional[ActressData]:
+    def scrape_actress_profile(self, actress_name: str, profile_url: Optional[str] = None) -> Optional[ActressData]:
         """
         Scrape actress profile from JAVDatabase
         Based on actual HTML structure with <b> tag parsing
         
         Args:
             actress_name: Name of actress (Japanese or English)
+            profile_url: Direct URL to actress profile (optional, skips search if provided)
             
         Returns:
             ActressData object or None
@@ -135,56 +136,69 @@ class JAVDatabaseScraper:
         try:
             self._ensure_driver()
             
-            from urllib.parse import quote
-            search_url = f"{self.BASE_URL}/idols/?q={quote(actress_name)}"
-            
-            print(f"    Searching actress: {actress_name}")
-            self.driver.get(search_url)
-            time.sleep(3)
-            
-            soup = BeautifulSoup(self.driver.page_source, 'html.parser')
-            
-            # Find all profile links
-            idol_links = soup.find_all('a', href=re.compile(r'/idols/[a-z0-9-]+/'))
-            valid_links = [l for l in idol_links if '/idols/?_' not in l.get('href', '')]
-            
-            if not valid_links:
-                print(f"    XX No profile found")
-                return None
-            
-            # Try to find best match by name similarity
-            best_link = None
-            best_score = 0
-            search_name_lower = actress_name.lower()
-            
-            for link in valid_links:
-                link_text = link.get_text(strip=True).lower()
-                # Exact match
-                if link_text == search_name_lower:
-                    best_link = link
-                    break
-                # Partial match - calculate score
-                if search_name_lower in link_text or link_text in search_name_lower:
-                    score = len(set(search_name_lower.split()) & set(link_text.split()))
-                    if score > best_score:
-                        best_score = score
+            # If profile URL is provided, use it directly
+            if profile_url:
+                print(f"    Using direct profile URL: {actress_name}")
+                if not profile_url.startswith('http'):
+                    profile_url = self.BASE_URL + profile_url
+                
+                print(f"    Visiting: {profile_url}")
+                self.driver.get(profile_url)
+                time.sleep(3)
+                
+                soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+            else:
+                # Fall back to search
+                from urllib.parse import quote
+                search_url = f"{self.BASE_URL}/idols/?q={quote(actress_name)}"
+                
+                print(f"    Searching actress: {actress_name}")
+                self.driver.get(search_url)
+                time.sleep(3)
+                
+                soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+                
+                # Find all profile links (exclude pagination and filter links)
+                idol_links = soup.find_all('a', href=re.compile(r'/idols/[a-z0-9-]+/$'))
+                valid_links = [l for l in idol_links if '/idols/?_' not in l.get('href', '') and '/idols/page/' not in l.get('href', '')]
+                
+                if not valid_links:
+                    print(f"    XX No profile found")
+                    return None
+                
+                # Try to find best match by name similarity
+                best_link = None
+                best_score = 0
+                search_name_lower = actress_name.lower()
+                
+                for link in valid_links:
+                    link_text = link.get_text(strip=True).lower()
+                    # Exact match
+                    if link_text == search_name_lower:
                         best_link = link
-            
-            # Fallback to first link
-            if not best_link:
-                best_link = valid_links[0]
-                print(f"    ⚠️ No exact match, using first result")
-            
-            # Visit profile
-            profile_url = best_link.get('href')
-            if not profile_url.startswith('http'):
-                profile_url = self.BASE_URL + profile_url
-            
-            print(f"    Visiting: {profile_url}")
-            self.driver.get(profile_url)
-            time.sleep(3)
-            
-            soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+                        break
+                    # Partial match - calculate score
+                    if search_name_lower in link_text or link_text in search_name_lower:
+                        score = len(set(search_name_lower.split()) & set(link_text.split()))
+                        if score > best_score:
+                            best_score = score
+                            best_link = link
+                
+                # Fallback to first link
+                if not best_link:
+                    best_link = valid_links[0]
+                    print(f"    ⚠️ No exact match, using first result")
+                
+                # Visit profile
+                profile_url = best_link.get('href')
+                if not profile_url.startswith('http'):
+                    profile_url = self.BASE_URL + profile_url
+                
+                print(f"    Visiting: {profile_url}")
+                self.driver.get(profile_url)
+                time.sleep(3)
+                
+                soup = BeautifulSoup(self.driver.page_source, 'html.parser')
             
             # Extract name from h1 (remove " - JAV Profile" suffix)
             name_elem = soup.find('h1', class_='idol-name')
@@ -407,9 +421,14 @@ class JAVDatabaseScraper:
                 if actress_name and actress_name not in ['All Idols', 'Most Favorited', 'Teen', 'Twenties', 'MILF']:
                     actresses.append(actress_name)
                     
-                    # Get full actress profile data
+                    # Get the direct profile URL from the link
+                    profile_url = link.get('href', '')
+                    if not profile_url.startswith('http'):
+                        profile_url = self.BASE_URL + profile_url
+                    
+                    # Get full actress profile data using direct URL
                     print(f"    Getting profile for: {actress_name}")
-                    actress_data = self.scrape_actress_profile(actress_name)
+                    actress_data = self.scrape_actress_profile(actress_name, profile_url=profile_url)
                     if actress_data:
                         # Store image URL for backward compatibility
                         if actress_data.image_url:
@@ -424,9 +443,19 @@ class JAVDatabaseScraper:
                             'age': actress_data.age,
                             'birthdate': actress_data.birthdate,
                             'measurements': actress_data.measurements,
-                            'height': actress_data.height
+                            'height': actress_data.height,
+                            'debut_date': actress_data.debut_date,
+                            'debut_age': actress_data.debut_age,
+                            'birthplace': actress_data.birthplace,
+                            'zodiac_sign': actress_data.zodiac_sign,
+                            'blood_type': actress_data.blood_type,
+                            'cup_size': actress_data.cup_size,
+                            'shoe_size': actress_data.shoe_size,
+                            'hair_length': actress_data.hair_length,
+                            'hair_color': actress_data.hair_color
                         }
                         print(f"      ✓ Profile saved: {actress_data.name}")
+                        print(f"      ✓ Age: {actress_data.age}, Cup: {actress_data.cup_size}, Height: {actress_data.height}")
             
             # Get other metadata from page
             release_date = ""
