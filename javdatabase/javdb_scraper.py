@@ -120,6 +120,7 @@ class JAVDatabaseScraper:
     def scrape_actress_profile(self, actress_name: str) -> Optional[ActressData]:
         """
         Scrape actress profile from JAVDatabase
+        Based on actual HTML structure with <b> tag parsing
         
         Args:
             actress_name: Name of actress (Japanese or English)
@@ -143,30 +144,56 @@ class JAVDatabaseScraper:
             
             soup = BeautifulSoup(self.driver.page_source, 'html.parser')
             
-            # Find first valid profile link
-            idol_links = soup.find_all('a', href=re.compile(r'/idols/[a-z0-9-]+/$'))
+            # Find all profile links
+            idol_links = soup.find_all('a', href=re.compile(r'/idols/[a-z0-9-]+/'))
             valid_links = [l for l in idol_links if '/idols/?_' not in l.get('href', '')]
             
             if not valid_links:
                 print(f"    XX No profile found")
                 return None
             
+            # Try to find best match by name similarity
+            best_link = None
+            best_score = 0
+            search_name_lower = actress_name.lower()
+            
+            for link in valid_links:
+                link_text = link.get_text(strip=True).lower()
+                # Exact match
+                if link_text == search_name_lower:
+                    best_link = link
+                    break
+                # Partial match - calculate score
+                if search_name_lower in link_text or link_text in search_name_lower:
+                    score = len(set(search_name_lower.split()) & set(link_text.split()))
+                    if score > best_score:
+                        best_score = score
+                        best_link = link
+            
+            # Fallback to first link
+            if not best_link:
+                best_link = valid_links[0]
+                print(f"    ⚠️ No exact match, using first result")
+            
             # Visit profile
-            profile_url = valid_links[0].get('href')
+            profile_url = best_link.get('href')
             if not profile_url.startswith('http'):
                 profile_url = self.BASE_URL + profile_url
             
+            print(f"    Visiting: {profile_url}")
             self.driver.get(profile_url)
-            time.sleep(2)
+            time.sleep(3)
             
             soup = BeautifulSoup(self.driver.page_source, 'html.parser')
             
-            # Extract data
-            name_elem = soup.find('h1')
-            name = name_elem.get_text(strip=True) if name_elem else actress_name
+            # Extract name from h1 (remove " - JAV Profile" suffix)
+            name_elem = soup.find('h1', class_='idol-name')
+            name = name_elem.get_text(strip=True).replace(' - JAV Profile', '') if name_elem else actress_name
             
-            # Get image
-            img = soup.find('img', src=re.compile(r'/idolimages/'))
+            # Get profile image (look for full-size image first)
+            img = soup.find('img', src=re.compile(r'/idolimages/full/'))
+            if not img:
+                img = soup.find('img', src=re.compile(r'/idolimages/'))
             image_url = ""
             if img:
                 image_url = img.get('src', '')
@@ -175,104 +202,94 @@ class JAVDatabaseScraper:
                 elif image_url.startswith('/'):
                     image_url = self.BASE_URL + image_url
             
-            # Get Japanese name and other details from profile page
-            name_jp = actress_name  # Default to input
+            # Initialize all fields
+            name_jp = actress_name
             age = None
             birthdate = None
+            debut_date = None
+            debut_age = None
+            birthplace = None
+            zodiac_sign = None
+            blood_type = None
             measurements = None
+            cup_size = None
             height = None
+            shoe_size = None
+            hair_length = None
+            hair_color = None
             
-            # Debug: Save page source for inspection
-            debug_save = False  # Set to True to debug
-            if debug_save:
-                debug_file = f"actress_profile_{actress_name.replace(' ', '_')}.html"
-                with open(debug_file, 'w', encoding='utf-8') as f:
-                    f.write(soup.prettify())
-                print(f"      Debug: Saved to {debug_file}")
+            # Extract data from <b> tags (JAVDatabase structure)
+            bold_tags = soup.find_all('b')
             
-            # Look for profile details in various formats
-            # Pattern 1: Look for <p class="mb-1"> tags with metadata
-            info_paragraphs = soup.find_all('p', class_='mb-1')
-            print(f"      Found {len(info_paragraphs)} info paragraphs")
-            
-            for p in info_paragraphs:
-                text = p.get_text(strip=True)
+            for b_tag in bold_tags:
+                label = b_tag.get_text(strip=True).rstrip(':')
                 
-                # Extract birthdate
-                if 'Birth' in text or 'DOB' in text or 'Born' in text or 'Date of Birth' in text:
-                    print(f"      Birth text: {text}")
-                    date_match = re.search(r'(\d{4}-\d{2}-\d{2})', text)
-                    if date_match:
-                        birthdate = date_match.group(1)
-                        # Calculate age
-                        try:
-                            from datetime import datetime
-                            birth_year = int(birthdate[:4])
-                            current_year = datetime.now().year
-                            age = str(current_year - birth_year)
-                        except:
-                            pass
+                # Find value after the <b> tag
+                value = None
+                for sibling in b_tag.next_siblings:
+                    if sibling.name == 'a':
+                        value = sibling.get_text(strip=True)
+                        break
+                    elif sibling.name == 'b':  # Next label
+                        break
+                    elif isinstance(sibling, str):
+                        text = sibling.strip().strip('-').strip()
+                        if text and text not in ['', '-']:
+                            value = text
+                            break
                 
-                # Extract height
-                if 'Height' in text or 'height' in text:
-                    print(f"      Height text: {text}")
-                    height_match = re.search(r'(\d+)\s*cm', text, re.I)
-                    if height_match:
-                        height = height_match.group(1) + ' cm'
-                
-                # Extract measurements (B-W-H)
-                if 'Measurements' in text or 'BWH' in text or 'measurements' in text:
-                    print(f"      Measurements text: {text}")
-                    # Look for pattern like "88-58-86" or "B88-W58-H86"
-                    meas_match = re.search(r'(\d{2,3}[-\s]*\d{2,3}[-\s]*\d{2,3})', text)
-                    if meas_match:
-                        measurements = meas_match.group(1)
+                # Map fields based on label
+                if label == 'Age' and value:
+                    age = value
+                elif label == 'DOB' and value:
+                    birthdate = value
+                elif label == 'Debut' and value:
+                    debut_date = value
+                elif label == 'Debut Age' and value:
+                    debut_age = value
+                elif label == 'Birthplace' and value:
+                    birthplace = value
+                elif label == 'Sign' and value:
+                    zodiac_sign = value
+                elif label == 'Blood' and value:
+                    blood_type = value
+                elif label == 'Cup' and value:
+                    cup_size = value
+                elif label == 'Height' and value:
+                    height = value
+                elif label == 'Shoe Size' and value:
+                    shoe_size = value if value != '?' else None
+                elif label == 'Measurements':
+                    # Measurements is plain text after <b>
+                    text_after = b_tag.next_sibling
+                    if isinstance(text_after, str):
+                        meas = text_after.strip().split()[0]
+                        if re.match(r'\d{2,3}-\d{2,3}-\d{2,3}', meas):
+                            measurements = meas
+                elif label == 'Hair Length(s)':
+                    # Can have multiple values
+                    hair_lengths = []
+                    for sibling in b_tag.next_siblings:
+                        if sibling.name == 'a' and '/idols/?_hair_length=' in sibling.get('href', ''):
+                            hair_lengths.append(sibling.get_text(strip=True))
+                        elif sibling.name == 'b':
+                            break
+                    hair_length = ', '.join(hair_lengths) if hair_lengths else None
+                elif label == 'Hair Color(s)':
+                    # Can have multiple values
+                    hair_colors = []
+                    for sibling in b_tag.next_siblings:
+                        if sibling.name == 'a' and '/idols/?_hair_color=' in sibling.get('href', ''):
+                            hair_colors.append(sibling.get_text(strip=True))
+                        elif sibling.name == 'b':
+                            break
+                    hair_color = ', '.join(hair_colors) if hair_colors else None
+                elif label == 'JP' and value:
+                    name_jp = value
             
-            # Pattern 2: Look in table format
-            if not birthdate or not height or not measurements:
-                tables = soup.find_all('table')
-                print(f"      Found {len(tables)} tables")
-                for table in tables:
-                    rows = table.find_all('tr')
-                    for row in rows:
-                        cells = row.find_all(['td', 'th'])
-                        if len(cells) >= 2:
-                            label = cells[0].get_text(strip=True).lower()
-                            value = cells[1].get_text(strip=True)
-                            
-                            if 'birth' in label or 'dob' in label:
-                                date_match = re.search(r'(\d{4}-\d{2}-\d{2})', value)
-                                if date_match:
-                                    birthdate = date_match.group(1)
-                            
-                            if 'height' in label:
-                                height_match = re.search(r'(\d+)', value)
-                                if height_match:
-                                    height = height_match.group(1) + ' cm'
-                            
-                            if 'measure' in label or 'bwh' in label:
-                                meas_match = re.search(r'(\d{2,3}[-\s]*\d{2,3}[-\s]*\d{2,3})', value)
-                                if meas_match:
-                                    measurements = meas_match.group(1)
-            
-            # Pattern 3: Look for any text containing measurements pattern
-            if not measurements:
-                all_text = soup.get_text()
-                # Look for B-W-H pattern anywhere in page
-                meas_match = re.search(r'(?:BWH|Measurements|measurements)[\s:]*(\d{2,3}[-\s]*\d{2,3}[-\s]*\d{2,3})', all_text, re.I)
-                if meas_match:
-                    measurements = meas_match.group(1)
-                    print(f"      Found measurements in text: {measurements}")
-            
-            # Pattern 4: Look for Japanese name
-            # Often in format: "Name (Japanese Name)"
-            if name and '(' in name and ')' in name:
-                parts = name.split('(')
-                if len(parts) == 2:
-                    name = parts[0].strip()
-                    name_jp = parts[1].replace(')', '').strip()
-            
-            print(f"      Details: age={age}, birth={birthdate}, height={height}, measurements={measurements}")
+            print(f"      ✓ {name}")
+            print(f"      ✓ Age: {age}, DOB: {birthdate}, Debut: {debut_date}")
+            print(f"      ✓ Measurements: {measurements}, Cup: {cup_size}, Height: {height}")
             
             actress_data = ActressData(
                 name=name,
@@ -282,17 +299,27 @@ class JAVDatabaseScraper:
                 age=age,
                 birthdate=birthdate,
                 measurements=measurements,
-                height=height
+                height=height,
+                debut_date=debut_date,
+                debut_age=debut_age,
+                birthplace=birthplace,
+                zodiac_sign=zodiac_sign,
+                blood_type=blood_type,
+                cup_size=cup_size,
+                shoe_size=shoe_size,
+                hair_length=hair_length,
+                hair_color=hair_color
             )
             
             # Cache it
             self.actress_cache[actress_name] = actress_data
-            print(f"    >> Found: {name}")
             
             return actress_data
             
         except Exception as e:
             print(f"    !! Error: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def scrape_video_metadata(self, video_code: str) -> Optional[VideoMetadata]:
