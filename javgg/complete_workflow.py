@@ -1052,24 +1052,41 @@ class WorkflowManager:
             # Load current database
             db_file = self.database_dir / 'combined_videos.json'
             with open(db_file, 'r', encoding='utf-8') as f:
-                db = json.load(f)
+                videos = json.load(f)
             
-            # Find video
-            for video in db['videos']:
-                if video['code'] == video_code:
+            # Database is a list of videos, not a dict
+            if not isinstance(videos, list):
+                print(f"  ⚠️ Database format error: expected list, got {type(videos)}")
+                return
+            
+            # Find and update video
+            video_found = False
+            for video in videos:
+                if video.get('code') == video_code:
                     video['hosting_urls'] = urls.get('hosting', {})
                     video['preview_url'] = urls.get('internet_archive', '')
                     video['uploaded_at'] = datetime.now().isoformat()
+                    video_found = True
+                    print(f"  ✅ Updated video: {video_code}")
+                    if urls.get('internet_archive'):
+                        print(f"     Preview URL: {urls['internet_archive'][:80]}...")
+                    print(f"     Hosting sites: {len(urls.get('hosting', {}))}")
                     break
+            
+            if not video_found:
+                print(f"  ⚠️ Video {video_code} not found in database")
+                return
             
             # Save database
             with open(db_file, 'w', encoding='utf-8') as f:
-                json.dump(db, f, indent=2, ensure_ascii=False)
+                json.dump(videos, f, indent=2, ensure_ascii=False)
             
-            print(f"  ✅ Metadata updated")
+            print(f"  ✅ Metadata updated in database")
             
         except Exception as e:
             print(f"  ❌ Error updating metadata: {str(e)}")
+            import traceback
+            traceback.print_exc()
     
     def cleanup_files(self, video_code: str):
         """
