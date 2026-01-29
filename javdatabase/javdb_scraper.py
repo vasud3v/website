@@ -166,20 +166,81 @@ class JAVDatabaseScraper:
                 elif image_url.startswith('/'):
                     image_url = self.BASE_URL + image_url
             
-            # Get Japanese name and other details
+            # Get Japanese name and other details from profile page
             name_jp = actress_name  # Default to input
             age = None
             birthdate = None
             measurements = None
             height = None
             
-            # Look for profile details
-            profile_info = soup.find('div', class_='idol-info')
-            if profile_info:
-                text = profile_info.get_text()
-                # Parse details (format varies)
-                # This is a simplified version
-                pass
+            # Look for profile details in various formats
+            # Pattern 1: Look for <p class="mb-1"> tags with metadata
+            info_paragraphs = soup.find_all('p', class_='mb-1')
+            for p in info_paragraphs:
+                text = p.get_text(strip=True)
+                
+                # Extract birthdate
+                if 'Birth' in text or 'DOB' in text or 'Born' in text:
+                    date_match = re.search(r'(\d{4}-\d{2}-\d{2})', text)
+                    if date_match:
+                        birthdate = date_match.group(1)
+                        # Calculate age
+                        try:
+                            from datetime import datetime
+                            birth_year = int(birthdate[:4])
+                            current_year = datetime.now().year
+                            age = str(current_year - birth_year)
+                        except:
+                            pass
+                
+                # Extract height
+                if 'Height' in text:
+                    height_match = re.search(r'(\d+)\s*cm', text, re.I)
+                    if height_match:
+                        height = height_match.group(1) + ' cm'
+                
+                # Extract measurements (B-W-H)
+                if 'Measurements' in text or 'BWH' in text:
+                    # Look for pattern like "88-58-86" or "B88-W58-H86"
+                    meas_match = re.search(r'(\d{2,3}[-\s]*\d{2,3}[-\s]*\d{2,3})', text)
+                    if meas_match:
+                        measurements = meas_match.group(1)
+            
+            # Pattern 2: Look in table format
+            if not birthdate or not height or not measurements:
+                tables = soup.find_all('table')
+                for table in tables:
+                    rows = table.find_all('tr')
+                    for row in rows:
+                        cells = row.find_all(['td', 'th'])
+                        if len(cells) >= 2:
+                            label = cells[0].get_text(strip=True).lower()
+                            value = cells[1].get_text(strip=True)
+                            
+                            if 'birth' in label or 'dob' in label:
+                                date_match = re.search(r'(\d{4}-\d{2}-\d{2})', value)
+                                if date_match:
+                                    birthdate = date_match.group(1)
+                            
+                            if 'height' in label:
+                                height_match = re.search(r'(\d+)', value)
+                                if height_match:
+                                    height = height_match.group(1) + ' cm'
+                            
+                            if 'measure' in label or 'bwh' in label:
+                                meas_match = re.search(r'(\d{2,3}[-\s]*\d{2,3}[-\s]*\d{2,3})', value)
+                                if meas_match:
+                                    measurements = meas_match.group(1)
+            
+            # Pattern 3: Look for Japanese name
+            # Often in format: "Name (Japanese Name)"
+            if name and '(' in name and ')' in name:
+                parts = name.split('(')
+                if len(parts) == 2:
+                    name = parts[0].strip()
+                    name_jp = parts[1].replace(')', '').strip()
+            
+            print(f"      Details: age={age}, birth={birthdate}, height={height}, measurements={measurements}")
             
             actress_data = ActressData(
                 name=name,
@@ -378,6 +439,61 @@ class JAVDatabaseScraper:
                 if link:
                     series = link.get_text(strip=True)
             
+            # Get categories/genres
+            categories = []
+            # Pattern 1: Look for "Genres:" or "Categories:" label
+            genre_elem = soup.find('b', string=re.compile(r'Genres?:|Categories:', re.I))
+            if genre_elem and genre_elem.parent:
+                p_tag = genre_elem.parent
+                # Get all <a> tags after the <b> tag
+                genre_links = p_tag.find_all('a')
+                for link in genre_links:
+                    genre = link.get_text(strip=True)
+                    if genre and genre not in categories:
+                        categories.append(genre)
+            
+            # Pattern 2: Look for links with /genres/ in href
+            if not categories:
+                genre_links = soup.find_all('a', href=re.compile(r'/genres/'))
+                for link in genre_links:
+                    genre = link.get_text(strip=True)
+                    # Filter out navigation items
+                    if genre and genre not in ['All Genres', 'Most Popular'] and genre not in categories:
+                        categories.append(genre)
+            
+            # Get description
+            description = ""
+            # Look for description in various places
+            desc_elem = soup.find('div', class_='movie-description')
+            if not desc_elem:
+                desc_elem = soup.find('p', class_='description')
+            if not desc_elem:
+                # Look for any paragraph with substantial text
+                paragraphs = soup.find_all('p')
+                for p in paragraphs:
+                    text = p.get_text(strip=True)
+                    if len(text) > 100 and video_code.upper() not in text.upper():
+                        desc_elem = p
+                        break
+            
+            if desc_elem:
+                description = desc_elem.get_text(strip=True)
+            
+            # Get rating
+            rating = 0.0
+            # Look for rating in various formats
+            rating_elem = soup.find('span', class_='rating')
+            if not rating_elem:
+                rating_elem = soup.find('div', class_='rating')
+            if rating_elem:
+                rating_text = rating_elem.get_text(strip=True)
+                rating_match = re.search(r'(\d+\.?\d*)', rating_text)
+                if rating_match:
+                    try:
+                        rating = float(rating_match.group(1))
+                    except:
+                        pass
+            
             # Get screenshots - look for multiple patterns and try to get full-size
             screenshots = []
             
@@ -438,11 +554,17 @@ class JAVDatabaseScraper:
             
             print(f"  >> Actresses: {', '.join(actresses) if actresses else 'None'}")
             print(f"  >> Actress images: {len(actress_images)}")
+            print(f"  >> Actress details: {len(actress_details)}")
             print(f"  >> Screenshots: {len(screenshots)}")
+            print(f"  >> Categories: {len(categories)} - {', '.join(categories[:5]) if categories else 'None'}")
             print(f"  >> Director: {director if director else 'None'}")
             print(f"  >> Studio: {studio if studio else 'None'}")
             print(f"  >> Label: {label if label else 'None'}")
             print(f"  >> Series: {series if series else 'None'}")
+            print(f"  >> Release Date: {release_date if release_date else 'None'}")
+            print(f"  >> Runtime: {runtime if runtime else 'None'}")
+            print(f"  >> Rating: {rating if rating > 0 else 'None'}")
+            print(f"  >> Description: {description[:100] if description else 'None'}...")
             
             return VideoMetadata(
                 code=video_code.upper(),
