@@ -377,6 +377,7 @@ def merge_javgg_and_javdb(javgg_data: dict, javdb_metadata) -> dict:
     # Add description if available
     if javdb_metadata.description:
         merged['description'] = javdb_metadata.description
+        print(f"     - Description: {len(javdb_metadata.description)} chars")
     
     # Prefer JAVDatabase title_jp if available and JavaGG doesn't have it
     if hasattr(javdb_metadata, 'title_jp') and javdb_metadata.title_jp and not merged.get('title_japanese'):
