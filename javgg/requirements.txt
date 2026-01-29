@@ -3,3 +3,4 @@ beautifulsoup4
 requests
 m3u8
 undetected-chromedriver
+webdriver-manager
