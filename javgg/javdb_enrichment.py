@@ -235,8 +235,16 @@ def merge_javgg_and_javdb(javgg_data: dict, javdb_metadata) -> dict:
     
     # Merge actresses (prefer JAVDatabase - deduplicated)
     if javdb_metadata.actresses:
-        merged['actresses'] = javdb_metadata.actresses
-        print(f"     - Merged actresses: {len(javdb_metadata.actresses)}")
+        # Remove duplicates while preserving order
+        unique_actresses = []
+        seen = set()
+        for actress in javdb_metadata.actresses:
+            if actress not in seen:
+                unique_actresses.append(actress)
+                seen.add(actress)
+        merged['actresses'] = unique_actresses
+        merged['models'] = unique_actresses  # Also populate models field
+        print(f"     - Merged actresses: {len(unique_actresses)}")
     
     # Add actress details (images, profile URLs, bio)
     # Handle different scraper versions (actress_details vs actress_images)
@@ -294,18 +302,38 @@ def merge_javgg_and_javdb(javgg_data: dict, javdb_metadata) -> dict:
     if hasattr(javdb_metadata, 'dvd_id') and javdb_metadata.dvd_id:
         merged['dvd_id'] = javdb_metadata.dvd_id
     
-    # Add release year
-    if hasattr(javdb_metadata, 'release_year') and javdb_metadata.release_year:
-        merged['release_year'] = javdb_metadata.release_year
-    elif hasattr(javdb_metadata, 'release_date') and javdb_metadata.release_date:
+    # Merge release date and formatted date
+    if hasattr(javdb_metadata, 'release_date') and javdb_metadata.release_date:
         merged['release_date'] = javdb_metadata.release_date
         merged['release_year'] = javdb_metadata.release_date[:4]
+        # Format as "Month Day, Year"
+        try:
+            from datetime import datetime
+            date_obj = datetime.strptime(javdb_metadata.release_date, '%Y-%m-%d')
+            merged['release_date_formatted'] = date_obj.strftime('%B %d, %Y')
+            print(f"     - Release Date: {merged['release_date_formatted']}")
+        except:
+            merged['release_date_formatted'] = javdb_metadata.release_date
+    elif hasattr(javdb_metadata, 'release_year') and javdb_metadata.release_year:
+        merged['release_year'] = javdb_metadata.release_year
     
-    # Add runtime minutes
-    if hasattr(javdb_metadata, 'runtime_minutes') and javdb_metadata.runtime_minutes:
+    # Merge runtime/duration
+    if hasattr(javdb_metadata, 'runtime') and javdb_metadata.runtime:
+        merged['runtime'] = javdb_metadata.runtime
+        merged['duration'] = javdb_metadata.runtime
+        # Extract minutes from runtime string (e.g., "145 min" -> 145)
+        try:
+            import re
+            minutes_match = re.search(r'(\d+)', javdb_metadata.runtime)
+            if minutes_match:
+                merged['duration_minutes'] = int(minutes_match.group(1))
+                print(f"     - Duration: {merged['duration_minutes']} minutes")
+        except:
+            pass
+    elif hasattr(javdb_metadata, 'runtime_minutes') and javdb_metadata.runtime_minutes:
         merged['runtime_minutes'] = javdb_metadata.runtime_minutes
-    elif hasattr(javdb_metadata, 'runtime') and javdb_metadata.runtime:
-         merged['runtime'] = javdb_metadata.runtime
+        merged['duration_minutes'] = javdb_metadata.runtime_minutes
+        merged['duration'] = f"{javdb_metadata.runtime_minutes} min"
     
     # Add rating and engagement metrics (check attributes exist)
     if hasattr(javdb_metadata, 'rating') and javdb_metadata.rating > 0:
@@ -329,9 +357,14 @@ def merge_javgg_and_javdb(javgg_data: dict, javdb_metadata) -> dict:
     # Merge categories/tags
     if javdb_metadata.categories:
         existing_tags = set(merged.get('tags', []))
+        existing_categories = set(merged.get('categories', []))
         javdb_categories = set(javdb_metadata.categories)
-        merged['tags'] = list(existing_tags | javdb_categories)
-        print(f"     - Total tags: {len(merged['tags'])}")
+        
+        # Merge all into both tags and categories
+        all_categories = existing_tags | existing_categories | javdb_categories
+        merged['tags'] = list(all_categories)
+        merged['categories'] = list(all_categories)
+        print(f"     - Total tags/categories: {len(merged['tags'])}")
     
     # Add cover URLs (both regular and large)
     if javdb_metadata.cover_url:
