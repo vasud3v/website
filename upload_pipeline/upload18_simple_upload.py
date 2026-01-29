@@ -1,113 +1,157 @@
-"""
-Simple upload script for Upload18
-Automatically saves to database
-"""
+import requests
 import os
-import sys
-from dotenv import load_dotenv
-from upload18_uploader import Upload18Uploader
-import json
-from datetime import datetime
+from pathlib import Path
+import time
+import urllib3
 
-load_dotenv()
+# Disable SSL warnings
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-DATABASE_PATH = "../database/upload18_host.json"
-
-def load_database():
-    """Load the database"""
-    if os.path.exists(DATABASE_PATH):
-        with open(DATABASE_PATH, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return {"videos": [], "stats": {"total_videos": 0, "total_size_mb": 0}}
-
-def save_database(data):
-    """Save the database"""
-    os.makedirs(os.path.dirname(DATABASE_PATH), exist_ok=True)
-    with open(DATABASE_PATH, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-
-def upload_video(video_path, title=None):
-    """Upload video and save to database"""
+class Upload18SimpleUploader:
+    """
+    Upload18 uploader based on official API v2 documentation
+    Handles queue retries for "Error on uploaded file" and "Please wait" messages
+    """
+    def __init__(self, api_key):
+        self.api_key = api_key
+        self.base_url = "https://upload18.com/api"
+        self.max_retries = 30
+        self.wait_seconds = 20
     
-    EMAIL = os.getenv('UPLOAD18_EMAIL')
-    USERNAME = os.getenv('UPLOAD18_USERNAME')
-    PASSWORD = os.getenv('UPLOAD18_PASSWORD')
-    API_KEY = os.getenv('UPLOAD18_API_KEY')
-    
-    if not all([EMAIL, USERNAME, PASSWORD, API_KEY]):
-        print("✗ Upload18 credentials not found in .env file")
-        print("  Required: UPLOAD18_EMAIL, UPLOAD18_USERNAME, UPLOAD18_PASSWORD, UPLOAD18_API_KEY")
-        return False
-    
-    if not os.path.exists(video_path):
-        print(f"✗ Video file not found: {video_path}")
-        return False
-    
-    print("=" * 70)
-    print("UPLOAD18 VIDEO UPLOADER")
-    print("=" * 70)
-    print()
-    
-    # Upload
-    uploader = Upload18Uploader(EMAIL, USERNAME, PASSWORD, API_KEY)
-    result = uploader.upload(video_path, title)
-    
-    if not result.get('success'):
-        print(f"\n✗ Upload failed: {result.get('error')}")
-        return False
-    
-    # Save to database
-    file_name = os.path.basename(video_path)
-    file_size_mb = os.path.getsize(video_path) / (1024 * 1024)
-    video_title = title or os.path.splitext(file_name)[0]
-    
-    db = load_database()
-    
-    new_video = {
-        "id": len(db['videos']) + 1,
-        "title": video_title,
-        "filename": file_name,
-        "file_size_mb": round(file_size_mb, 2),
-        "upload_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "vid": result['vid'],
-        "did": result['did'],
-        "video_player": result['url'],
-        "video_downloader": result['url'],
-        "embed_code": f'<iframe width="100%" height="100%" src="{result["url"]}" frameborder="0" allowfullscreen></iframe>'
-    }
-    
-    db['videos'].append(new_video)
-    db['stats']['total_videos'] = len(db['videos'])
-    db['stats']['total_size_mb'] = round(sum(v.get('file_size_mb', 0) for v in db['videos']), 2)
-    
-    save_database(db)
-    
-    print()
-    print("=" * 70)
-    print("✓ UPLOAD COMPLETE!")
-    print("=" * 70)
-    print(f"\nVideo Title: {video_title}")
-    print(f"Video ID: {result['vid']}")
-    print(f"DID: {result['did']}")
-    print(f"\nPlayer URL: {result['embed_url']}")
-    print(f"Download URL: {result['url']}")
-    print(f"Embed Code: {new_video['embed_code']}")
-    print(f"\n✓ Saved to database: {DATABASE_PATH}")
-    print()
-    
-    return True
+    def upload(self, video_path, title=None):
+        """Upload video to Upload18 with queue handling"""
+        try:
+            if not os.path.exists(video_path):
+                return {"success": False, "error": "Video file not found"}
+            
+            file_name = Path(video_path).name
+            title = title or Path(video_path).stem
+            file_size = os.path.getsize(video_path)
+            size_mb = file_size / (1024 * 1024)
+            
+            print(f"[Upload18] Starting upload: {file_name} ({size_mb:.1f} MB)")
+            print(f"[Upload18] Max retries: {self.max_retries}, Wait time: {self.wait_seconds}s")
+            
+            # Upload with retry logic for queue handling
+            attempt = 0
+            while attempt < self.max_retries:
+                attempt += 1
+                
+                try:
+                    print(f"\n[Upload18] Upload attempt {attempt}/{self.max_retries}...")
+                    
+                    with open(video_path, 'rb') as f:
+                        files = {'video': (file_name, f, 'video/mp4')}
+                        data = {
+                            'apikey': self.api_key,
+                            'cid': '15',  # Videos category (default)
+                            'fid': '18'   # Direct upload server (fid 18)
+                        }
+                        
+                        start_time = time.time()
+                        response = requests.post(
+                            f"{self.base_url}/upload",
+                            files=files,
+                            data=data,
+                            verify=False,
+                            timeout=1800
+                        )
+                        elapsed = time.time() - start_time
+                    
+                    if response.status_code == 200:
+                        result = response.json()
+                        status = result.get('status', '')
+                        msg = result.get('msg', '')
+                        msg_lower = msg.lower()
+                        
+                        print(f"[Upload18] Response ({elapsed:.1f}s): status={status}, msg={msg}")
+                        
+                        if status == 'success':
+                            vid = result.get('vid', '')
+                            did = result.get('did', '')
+                            print(f"[Upload18] ✓ Upload successful: vid={vid}, did={did}")
+                            
+                            return {
+                                "success": True,
+                                "host": "upload18",
+                                "vid": vid,
+                                "did": did,
+                                "url": f"https://upload18.com/{vid}",
+                                "embed_url": f"https://upload18.com/embed-{vid}.html",
+                                "file_code": vid
+                            }
+                        
+                        # Check for queue/processing messages that require retry
+                        # Based on official API docs queue examples
+                        retry_keywords = [
+                            'wait',
+                            'processing',
+                            'upload request',
+                            'error on uploaded file',
+                            'please wait before starting another'
+                        ]
+                        
+                        should_retry = any(keyword in msg_lower for keyword in retry_keywords)
+                        
+                        if should_retry:
+                            print(f"[Upload18] ⏳ Queue busy or processing: {msg}")
+                            print(f"[Upload18] Waiting {self.wait_seconds}s before retry...")
+                            time.sleep(self.wait_seconds)
+                            continue
+                        
+                        # Other error - don't retry
+                        print(f"[Upload18] ✗ Upload failed: {msg}")
+                        return {"success": False, "error": msg}
+                    else:
+                        print(f"[Upload18] HTTP {response.status_code}: {response.text[:200]}")
+                        if attempt < self.max_retries:
+                            print(f"[Upload18] Waiting {self.wait_seconds}s before retry...")
+                            time.sleep(self.wait_seconds)
+                            continue
+                        return {"success": False, "error": f"HTTP {response.status_code}"}
+                
+                except requests.exceptions.Timeout:
+                    print(f"[Upload18] Upload timeout")
+                    if attempt < self.max_retries:
+                        print(f"[Upload18] Waiting {self.wait_seconds}s before retry...")
+                        time.sleep(self.wait_seconds)
+                        continue
+                    return {"success": False, "error": "Upload timeout"}
+                
+                except Exception as e:
+                    print(f"[Upload18] Exception: {str(e)}")
+                    if attempt < self.max_retries:
+                        print(f"[Upload18] Waiting {self.wait_seconds}s before retry...")
+                        time.sleep(self.wait_seconds)
+                        continue
+                    return {"success": False, "error": str(e)}
+            
+            # Max retries reached
+            return {"success": False, "error": f"Upload failed after {self.max_retries} attempts (queue busy)"}
+                
+        except Exception as e:
+            print(f"[Upload18] Error: {str(e)}")
+            return {"success": False, "error": str(e)}
 
 
 if __name__ == "__main__":
+    import sys
+    from dotenv import load_dotenv
+    
+    load_dotenv()
+    
     if len(sys.argv) < 2:
-        print("Usage: python upload18_simple_upload.py <video_path> [title]")
-        print("\nExamples:")
-        print("  python upload18_simple_upload.py ../test.mp4")
-        print("  python upload18_simple_upload.py ../video.mp4 \"My Video Title\"")
+        print("Usage: python upload18_simple_upload.py <video_path>")
         sys.exit(1)
     
     video_path = sys.argv[1]
-    title = sys.argv[2] if len(sys.argv) > 2 else None
+    api_key = os.getenv("UPLOAD18_API_KEY")
     
-    success = upload_video(video_path, title)
-    sys.exit(0 if success else 1)
+    if not api_key:
+        print("Error: UPLOAD18_API_KEY not found in .env")
+        sys.exit(1)
+    
+    uploader = Upload18SimpleUploader(api_key)
+    result = uploader.upload(video_path)
+    
+    print(f"\nResult: {result}")

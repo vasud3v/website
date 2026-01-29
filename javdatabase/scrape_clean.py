@@ -56,6 +56,7 @@ class VideoMetadata:
     
     # Media URLs
     cover_url: Optional[str] = None
+    cover_url_dmm: Optional[str] = None  # DMM/FANZA cover (alternative)
     screenshots: List[str] = field(default_factory=list)
     
     # Cast (list of full profile objects)
@@ -91,7 +92,7 @@ class CleanJAVDBScraper:
         self.actress_cache = {}
         
     def _init_driver(self):
-        """Initialize browser"""
+        """Initialize browser with optimized settings"""
         if self.driver is None:
             print("Initializing browser...")
             try:
@@ -100,8 +101,18 @@ class CleanJAVDBScraper:
                     uc=True, 
                     headless=self.headless,
                     headless2=self.headless,  # Use new headless mode
-                    incognito=True
+                    incognito=True,
+                    # Add performance optimizations
+                    page_load_strategy='normal'  # Wait for full page load
                 )
+                
+                # Set default timeouts
+                self.driver.set_page_load_timeout(30)
+                self.driver.set_script_timeout(30)
+                
+                # Disable images to speed up loading (optional)
+                # self.driver.execute_cdp_cmd('Network.setBlockedURLs', {"urls": ["*.jpg", "*.jpeg", "*.png", "*.gif"]})
+                
                 time.sleep(2)
                 print("Browser ready\n")
             except Exception as e:
@@ -109,6 +120,8 @@ class CleanJAVDBScraper:
                 print("Trying non-headless mode...")
                 try:
                     self.driver = Driver(uc=True, headless=False)
+                    self.driver.set_page_load_timeout(30)
+                    self.driver.set_script_timeout(30)
                     time.sleep(2)
                     print("Browser ready (non-headless)\n")
                 except Exception as e2:
@@ -283,23 +296,50 @@ class CleanJAVDBScraper:
             code_lower = video_code.lower()
             url = f"https://www.javdatabase.com/movies/{code_lower}/"
             
-            self.driver.set_page_load_timeout(15)
-            
             print(f"  Fetching: {url}")
             
-            # Try with retry
-            max_retries = 2
+            # Try with retry and better timeout handling
+            max_retries = 3
+            page_loaded = False
+            
             for attempt in range(max_retries):
                 try:
+                    self.driver.set_page_load_timeout(20)
                     self.driver.get(url)
+                    page_loaded = True
                     break
-                except:
+                except TimeoutException:
+                    # Page is loading slowly, stop and use what we have
+                    print(f"  .. Timeout on attempt {attempt + 1}/{max_retries}, stopping page load...")
+                    try:
+                        self.driver.execute_script("window.stop();")
+                        time.sleep(1)
+                        # Check if we got enough content
+                        page_source = self.driver.page_source
+                        if len(page_source) > 5000:  # If we got substantial content
+                            print(f"  .. Got partial content, continuing...")
+                            page_loaded = True
+                            break
+                    except:
+                        pass
+                    
                     if attempt < max_retries - 1:
-                        print(f"  .. Retry {attempt + 1}/{max_retries}")
-                        time.sleep(2)
+                        print(f"  .. Retrying...")
+                        time.sleep(3)
                     else:
-                        print(f"  XX Timeout loading page")
+                        print(f"  XX Failed to load page after {max_retries} attempts")
                         return None
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        print(f"  .. Error: {str(e)[:50]}, retrying...")
+                        time.sleep(3)
+                    else:
+                        print(f"  XX Error loading page: {str(e)[:50]}")
+                        return None
+            
+            if not page_loaded:
+                print(f"  XX Could not load page")
+                return None
             
             time.sleep(2)
             soup = BeautifulSoup(self.driver.page_source, 'html.parser')
@@ -335,6 +375,9 @@ class CleanJAVDBScraper:
             
             # Cover image
             cover_url = None
+            cover_url_dmm = None
+            
+            # Get JAVDatabase cover (high quality webp)
             cover_img = soup.find('img', alt=re.compile(r'JAV Movie|Cover', re.I))
             if not cover_img:
                 imgs = soup.find_all('img', src=True)
@@ -350,6 +393,22 @@ class CleanJAVDBScraper:
                     cover_url = 'https:' + cover_url
                 elif cover_url.startswith('/'):
                     cover_url = 'https://www.javdatabase.com' + cover_url
+            
+            # Get DMM cover (alternative source)
+            # Look in meta tags or images
+            dmm_meta = soup.find('meta', property='og:image')
+            if dmm_meta:
+                dmm_url = dmm_meta.get('content', '')
+                if 'pics.dmm.co.jp' in dmm_url:
+                    cover_url_dmm = dmm_url
+            
+            # Also check twitter:image meta tag
+            if not cover_url_dmm:
+                twitter_meta = soup.find('meta', attrs={'name': 'twitter:image'})
+                if twitter_meta:
+                    dmm_url = twitter_meta.get('content', '')
+                    if 'pics.dmm.co.jp' in dmm_url:
+                        cover_url_dmm = dmm_url
             
             # Cast profiles
             cast = []
@@ -371,47 +430,79 @@ class CleanJAVDBScraper:
                     
                     print(f"     Actress: {name}")
                     
-                    # Visit profile
+                    # Visit profile with retry logic
+                    profile = None
+                    max_retries = 2
+                    
+                    for attempt in range(max_retries):
+                        try:
+                            profile_href = href if href.startswith('http') else 'https://www.javdatabase.com' + href
+                            
+                            # Set page load timeout
+                            self.driver.set_page_load_timeout(15)
+                            
+                            # Try to load page
+                            try:
+                                self.driver.get(profile_href)
+                                time.sleep(2)
+                            except TimeoutException:
+                                # Page is taking too long, stop loading and use what we have
+                                print(f"       Timeout loading page, stopping...")
+                                try:
+                                    self.driver.execute_script("window.stop();")
+                                    time.sleep(1)
+                                except:
+                                    pass
+                            
+                            # Try to extract profile even if page didn't fully load
+                            profile_soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+                            profile = self._extract_actress_profile(profile_soup, profile_href, name)
+                            
+                            if profile:
+                                cast.append(profile)
+                                details = []
+                                if profile.actress_age:
+                                    details.append(f"Age: {profile.actress_age}")
+                                if profile.actress_height_cm:
+                                    details.append(f"Height: {profile.actress_height_cm}cm")
+                                if profile.actress_bust_cm:
+                                    details.append(f"B{profile.actress_bust_cm}-W{profile.actress_waist_cm}-H{profile.actress_hips_cm}")
+                                if details:
+                                    print(f"       {', '.join(details)}")
+                                break  # Success, exit retry loop
+                            else:
+                                if attempt < max_retries - 1:
+                                    print(f"       No profile data, retrying...")
+                                    time.sleep(2)
+                                else:
+                                    print(f"       No profile data found")
+                            
+                        except Exception as e:
+                            if attempt < max_retries - 1:
+                                print(f"       Error: {str(e)[:50]}, retrying...")
+                                time.sleep(2)
+                            else:
+                                print(f"       Error: {str(e)[:50]}, skipping")
+                    
+                    # Navigate back to video page
                     try:
-                        profile_href = href if href.startswith('http') else 'https://www.javdatabase.com' + href
-                        
-                        self.driver.set_page_load_timeout(20)  # Increased timeout
-                        self.driver.get(profile_href)
-                        time.sleep(3)  # Increased wait time
-                        
-                        profile_soup = BeautifulSoup(self.driver.page_source, 'html.parser')
-                        profile = self._extract_actress_profile(profile_soup, profile_href, name)
-                        
-                        if profile:
-                            cast.append(profile)
-                            details = []
-                            if profile.actress_age:
-                                details.append(f"Age: {profile.actress_age}")
-                            if profile.actress_height_cm:
-                                details.append(f"Height: {profile.actress_height_cm}cm")
-                            if profile.actress_bust_cm:
-                                details.append(f"B{profile.actress_bust_cm}-W{profile.actress_waist_cm}-H{profile.actress_hips_cm}")
-                            if details:
-                                print(f"       {', '.join(details)}")
-                        
+                        # Increase timeout for going back
+                        self.driver.set_page_load_timeout(10)
                         self.driver.back()
                         time.sleep(1)
                     except TimeoutException:
-                        print(f"       Timeout (page took too long) - skipping")
+                        # If back() times out, reload the video page
+                        print(f"       Timeout going back, reloading video page...")
                         try:
                             self.driver.execute_script("window.stop();")
                             time.sleep(1)
-                            self.driver.back()
-                            time.sleep(1)
+                            self.driver.get(url)
+                            time.sleep(2)
+                            soup = BeautifulSoup(self.driver.page_source, 'html.parser')
                         except:
                             pass
                     except Exception as e:
-                        print(f"       Error: {str(e)[:50]}")
-                        try:
-                            self.driver.back()
-                            time.sleep(1)
-                        except:
-                            pass
+                        print(f"       Error navigating back: {str(e)[:50]}")
             
             # Extract metadata
             page_text = soup.get_text()
@@ -499,33 +590,64 @@ class CleanJAVDBScraper:
             # Screenshots - extract both thumbnail and high-quality versions
             screenshots = []
             
-            # Method 1: Look for images with data-image-href attribute (high-quality versions)
-            modal_imgs = soup.find_all('a', attrs={'data-image-href': True})
-            for link in modal_imgs:
-                hq_src = link.get('data-image-href', '')  # High quality with 'jp' suffix
-                if hq_src and 'pics.dmm.co.jp' in hq_src:
-                    if hq_src not in screenshots:
-                        screenshots.append(hq_src)
+            # Method 1: Look for <a> tags with data-image-href (full-size URL already provided)
+            # This works for mgstage.com (Prestige studio) and other sources
+            screenshot_links = soup.find_all('a', attrs={'data-image-href': True})
+            for link in screenshot_links:
+                full_size = link.get('data-image-href', '')
+                # Support multiple CDNs: mgstage.com, pics.dmm.co.jp, etc.
+                if full_size and ('cap_e_' in full_size or 'pics.dmm.co.jp' in full_size):
+                    if full_size.startswith('//'):
+                        full_size = 'https:' + full_size
+                    elif full_size.startswith('/'):
+                        full_size = 'https://www.javdatabase.com' + full_size
+                    if full_size not in screenshots:
+                        screenshots.append(full_size)
             
-            # Method 2: If no high-quality found, use data-image-src (standard quality)
+            # Method 2: Look for data-image-src attribute (standard quality)
             if not screenshots:
                 modal_imgs = soup.find_all('a', attrs={'data-image-src': True})
                 for link in modal_imgs:
                     src = link.get('data-image-src', '')
                     if src and 'pics.dmm.co.jp' in src:
-                        if src not in screenshots:
-                            screenshots.append(src)
-            
-            # Method 3: Look for screenshot images with alt text containing "Screenshot"
-            if not screenshots:
-                screenshot_imgs = soup.find_all('img', alt=re.compile(r'Screenshot', re.I))
-                for img in screenshot_imgs:
-                    src = img.get('src', '')
-                    if src and 'pics.dmm.co.jp' in src:
                         if src.startswith('//'):
                             src = 'https:' + src
                         if src not in screenshots:
                             screenshots.append(src)
+            
+            # Method 3: Look for images with "Screenshot" alt text and convert thumbnails to full-size
+            if not screenshots:
+                screenshot_imgs = soup.find_all('img', alt=re.compile(r'Screenshot', re.I))
+                for img in screenshot_imgs:
+                    src = img.get('src', '')
+                    if src:
+                        # Convert mgstage thumbnails (cap_t1_) to full-size (cap_e_)
+                        if 'cap_t1_' in src:
+                            src = src.replace('cap_t1_', 'cap_e_')
+                        
+                        # Ensure proper URL format
+                        if src.startswith('//'):
+                            src = 'https:' + src
+                        elif src.startswith('/'):
+                            src = 'https://www.javdatabase.com' + src
+                        
+                        if src not in screenshots:
+                            screenshots.append(src)
+            
+            # Method 4: Look for all mgstage images with cap_t1_ pattern
+            if not screenshots:
+                all_imgs = soup.find_all('img', src=re.compile(r'cap_t1_'))
+                for img in all_imgs:
+                    src = img.get('src', '')
+                    if src:
+                        # Convert to full-size version
+                        full_size = src.replace('cap_t1_', 'cap_e_')
+                        if full_size.startswith('//'):
+                            full_size = 'https:' + full_size
+                        elif full_size.startswith('/'):
+                            full_size = 'https://www.javdatabase.com' + full_size
+                        if full_size not in screenshots:
+                            screenshots.append(full_size)
             
             print(f"     Release: {release_date}, Runtime: {runtime_minutes}min")
             print(f"     Studio: {studio}, Genres: {len(genres)}")
@@ -536,6 +658,7 @@ class CleanJAVDBScraper:
                 title=title,
                 title_jp=title_jp,
                 cover_url=cover_url,
+                cover_url_dmm=cover_url_dmm,
                 screenshots=screenshots,
                 cast=cast,
                 release_date=release_date,

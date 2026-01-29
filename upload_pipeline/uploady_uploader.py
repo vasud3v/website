@@ -77,89 +77,66 @@ class UploadyUploader:
             print(f"[Uploady] Upload server: {upload_url}")
             print(f"[Uploady] Session ID: {sess_id}")
             
-            # Upload file with progress bar
+            # Upload file
             print(f"[Uploady] Uploading file...")
             file_size = os.path.getsize(video_path)
+            size_mb = file_size / (1024 * 1024)
             
             with open(video_path, 'rb') as f:
-                # Wrap file with tqdm progress bar
-                with tqdm(total=file_size, unit='B', unit_scale=True, unit_divisor=1024, 
-                         desc=f"📤 {file_name}", leave=False) as pbar:
+                files = {'file': (file_name, f, 'video/mp4')}
+                data = {'sess_id': sess_id}
+                
+                start_time = time.time()
+                
+                try:
+                    response = self.session.post(
+                        upload_url,
+                        files=files,
+                        data=data,
+                        timeout=1800
+                    )
+                except Exception as e:
+                    return {"success": False, "error": f"Upload failed: {str(e)}"}
+                
+                elapsed = time.time() - start_time
+                speed = (size_mb / elapsed) if elapsed > 0 else 0
+                
+                print(f"[Uploady] Upload completed in {elapsed:.1f}s ({speed:.2f} MB/s)")
+                print(f"[Uploady] Response status: {response.status_code}")
+            
+            if response.status_code == 200:
+                result = response.json()
+                print(f"[Uploady] Response: {result}")
+                
+                # Response can be a list or dict
+                if isinstance(result, list) and len(result) > 0:
+                    result = result[0]
+                
+                if isinstance(result, dict):
+                    # Check for errors
+                    file_status = result.get('file_status')
+                    if file_status == 'failed':
+                        error_msg = result.get('file_code', 'Unknown error')
+                        return {"success": False, "error": f"Upload failed: {error_msg}"}
                     
-                    # Create a wrapper that updates progress
-                    class ProgressFileWrapper:
-                        def __init__(self, file_obj, progress_bar):
-                            self.file_obj = file_obj
-                            self.progress_bar = progress_bar
-                            self.bytes_read = 0
+                    file_code = result.get('file_code')
+                    if file_code and file_code != 'undef':
+                        print(f"[Uploady] ✓ Upload successful: {file_code}")
                         
-                        def read(self, size=-1):
-                            data = self.file_obj.read(size)
-                            self.bytes_read += len(data)
-                            self.progress_bar.update(len(data))
-                            return data
-                        
-                        def __len__(self):
-                            return file_size
-                    
-                    progress_file = ProgressFileWrapper(f, pbar)
-                    
-                    files = {'file': (file_name, progress_file, 'video/mp4')}
-                    data = {
-                        'sess_id': sess_id
-                    }
-                    
-                    start_time = time.time()
-                    
-                    try:
-                        response = self.session.post(
-                            upload_url,
-                            files=files,
-                            data=data,
-                            timeout=1800
-                        )
-                    except Exception as e:
-                        return {"success": False, "error": f"Upload failed: {str(e)}"}
-                    
-                    elapsed = time.time() - start_time
-                    speed_mbps = (file_size / (1024*1024)) / elapsed if elapsed > 0 else 0
-                    
-                    print(f"\n[Uploady] Upload completed in {elapsed:.1f}s (avg {speed_mbps:.2f} MB/s)")
-                    print(f"[Uploady] Response status: {response.status_code}")
-                    
-                    if response.status_code == 200:
-                        result = response.json()
-                        print(f"[Uploady] Response: {result}")
-                        
-                        # Response can be a list or dict
-                        if isinstance(result, list) and len(result) > 0:
-                            result = result[0]
-                        
-                        if isinstance(result, dict):
-                            # Check for errors
-                            file_status = result.get('file_status')
-                            if file_status == 'failed':
-                                error_msg = result.get('file_code', 'Unknown error')
-                                return {"success": False, "error": f"Upload failed: {error_msg}"}
-                            
-                            file_code = result.get('file_code')
-                            if file_code and file_code != 'undef':
-                                print(f"[Uploady] ✓ Upload successful: {file_code}")
-                                
-                                return {
-                                    "success": True,
-                                    "host": "uploady",
-                                    "file_code": file_code,
-                                    "url": f"https://uploady.io/{file_code}",
-                                    "embed_url": f"https://uploady.io/embed-{file_code}.html"
-                                }
-                            else:
-                                error_reason = result.get('file_status', 'Unknown error')
-                                return {"success": False, "error": f"Upload rejected: {error_reason}"}
-                        else:
-                            return {"success": False, "error": f"Unexpected response format: {result}"}
+                        return {
+                            "success": True,
+                            "host": "uploady",
+                            "file_code": file_code,
+                            "url": f"https://uploady.io/{file_code}",
+                            "embed_url": f"https://uploady.io/embed-{file_code}.html"
+                        }
                     else:
-                        return {"success": False, "error": f"HTTP {response.status_code}: {response.text[:200]}"}
+                        error_reason = result.get('file_status', 'Unknown error')
+                        return {"success": False, "error": f"Upload rejected: {error_reason}"}
+                else:
+                    return {"success": False, "error": f"Unexpected response format: {result}"}
+            else:
+                return {"success": False, "error": f"HTTP {response.status_code}: {response.text[:200]}"}
                     
         except Exception as e:
             print(f"[Uploady] Error: {str(e)}")

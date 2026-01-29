@@ -27,29 +27,16 @@ class SeekstreamingUploader:
         self.session.mount('https://', adapter)
         
     def _print_progress_bar(self, current, total, start_time, prefix='Progress'):
-        """Print a progress bar with speed and ETA"""
-        bar_length = 40
+        """Print a simple progress indicator"""
         progress = current / total
-        filled = int(bar_length * progress)
-        bar = '█' * filled + '░' * (bar_length - filled)
-        
-        elapsed = time.time() - start_time
-        speed = (current / (1024*1024)) / elapsed if elapsed > 0 else 0
-        
-        if progress > 0:
-            eta = (elapsed / progress) - elapsed
-            eta_str = f"{int(eta)}s"
-        else:
-            eta_str = "calculating..."
-        
         percent = progress * 100
         current_mb = current / (1024*1024)
         total_mb = total / (1024*1024)
         
-        # Clear line and print progress
-        sys.stdout.write('\r')
-        sys.stdout.write(f"{prefix}: |{bar}| {percent:.1f}% ({current_mb:.1f}/{total_mb:.1f} MB) "
-                        f"Speed: {speed:.2f} MB/s ETA: {eta_str}  ")
+        elapsed = time.time() - start_time
+        speed = (current / (1024*1024)) / elapsed if elapsed > 0 else 0
+        
+        sys.stdout.write(f'\r{prefix}: {percent:.1f}% ({current_mb:.1f}/{total_mb:.1f} MB) Speed: {speed:.2f} MB/s  ')
         sys.stdout.flush()
     
     def get_video_info(self, video_id):
@@ -283,25 +270,26 @@ class SeekstreamingUploader:
                 actual_video_id = tus_upload_id
             
             # Extract all possible URLs using the actual video ID
-            print(f"[Seekstreaming] Extracting video URLs...")
+            print(f"[Seekstreaming] Generating embed URLs...")
             all_urls = self._extract_all_urls(actual_video_id)
-            
-            # Try to get additional video info from API
-            video_info = self.get_video_info(actual_video_id)
             
             result = {
                 "success": True,
                 "host": "seekstreaming",
                 "file_code": actual_video_id,
                 "video_id": actual_video_id,
+                "embed_url": all_urls["video_player"],
+                "url": all_urls["video_player"],
+                "download_url": all_urls["video_downloader"],
                 "all_urls": all_urls,
                 "upload_time": elapsed,
                 "speed_mbps": speed_mbps
             }
             
-            # Add video info if available
-            if video_info:
-                result["video_info"] = video_info
+            # Note: Video details may not be immediately available
+            # The video is processing on the server
+            print(f"[Seekstreaming] ✓ Video uploaded successfully")
+            print(f"[Seekstreaming] ℹ️  Video is processing on server (may take a few minutes)")
             
             return result
             

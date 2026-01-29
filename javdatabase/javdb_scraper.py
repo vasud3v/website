@@ -301,35 +301,130 @@ class JAVDatabaseScraper:
             description = ""
             rating = 0.0
             
-            # Look for metadata in structured format
-            # JAVDatabase uses various formats, try to extract what we can
-            page_text = soup.get_text()
+            # Look for metadata in structured format using HTML parsing
+            # JAVDatabase uses <p class="mb-1"><b>Field:</b> value</p> format
             
             # Try to find release date
-            date_match = re.search(r'Release Date:?\s*(\d{4}-\d{2}-\d{2})', page_text)
-            if date_match:
-                release_date = date_match.group(1)
+            release_date = ""
+            date_elem = soup.find('b', string=re.compile(r'Release Date:', re.I))
+            if date_elem and date_elem.parent:
+                date_text = date_elem.parent.get_text()
+                date_match = re.search(r'(\d{4}-\d{2}-\d{2})', date_text)
+                if date_match:
+                    release_date = date_match.group(1)
             
             # Try to find runtime
-            runtime_match = re.search(r'Runtime:?\s*(\d+)\s*min', page_text)
-            if runtime_match:
-                runtime = runtime_match.group(1) + ' min'
+            runtime = ""
+            runtime_elem = soup.find('b', string=re.compile(r'Runtime:', re.I))
+            if runtime_elem and runtime_elem.parent:
+                runtime_text = runtime_elem.parent.get_text()
+                runtime_match = re.search(r'(\d+)\s*min', runtime_text)
+                if runtime_match:
+                    runtime = runtime_match.group(1) + ' min'
             
-            # Get screenshots
+            # Try to find director
+            director = ""
+            director_elem = soup.find('b', string=re.compile(r'Director:', re.I))
+            if director_elem and director_elem.parent:
+                # Get the parent <p> tag
+                p_tag = director_elem.parent
+                # Look for <a> tag after the <b> tag
+                link = p_tag.find('a')
+                if link:
+                    director = link.get_text(strip=True)
+            
+            # Try to find studio
+            studio = ""
+            studio_elem = soup.find('b', string=re.compile(r'Studio:', re.I))
+            if studio_elem and studio_elem.parent:
+                p_tag = studio_elem.parent
+                link = p_tag.find('a')
+                if link:
+                    studio = link.get_text(strip=True)
+            
+            # Try to find label (not present in this video, but keep for others)
+            label = ""
+            label_elem = soup.find('b', string=re.compile(r'Label:', re.I))
+            if label_elem and label_elem.parent:
+                p_tag = label_elem.parent
+                link = p_tag.find('a')
+                if link:
+                    label = link.get_text(strip=True)
+            
+            # Try to find series
+            series = ""
+            series_elem = soup.find('b', string=re.compile(r'JAV Series:', re.I))
+            if series_elem and series_elem.parent:
+                p_tag = series_elem.parent
+                link = p_tag.find('a')
+                if link:
+                    series = link.get_text(strip=True)
+            
+            # Get screenshots - look for multiple patterns and try to get full-size
             screenshots = []
-            screenshot_imgs = soup.find_all('img', src=re.compile(r'/screenshots/'))
-            for img in screenshot_imgs:
-                src = img.get('src', '')
-                if src:
-                    if src.startswith('//'):
-                        src = 'https:' + src
-                    elif src.startswith('/'):
-                        src = self.BASE_URL + src
-                    screenshots.append(src)
+            
+            # Pattern 1: Look for <a> tags with data-image-href (full-size URL already provided)
+            screenshot_links = soup.find_all('a', attrs={'data-image-href': True})
+            for link in screenshot_links:
+                full_size = link.get('data-image-href', '')
+                if full_size and 'cap_e_' in full_size:  # mgstage full-size pattern
+                    if full_size.startswith('//'):
+                        full_size = 'https:' + full_size
+                    elif full_size.startswith('/'):
+                        full_size = 'https://www.javdatabase.com' + full_size
+                    if full_size not in screenshots:
+                        screenshots.append(full_size)
+            
+            # Pattern 2: Look for images with "Screenshot" in alt text and convert to full-size
+            if not screenshots:
+                screenshot_imgs = soup.find_all('img', alt=re.compile(r'Screenshot', re.I))
+                for img in screenshot_imgs:
+                    src = img.get('src', '')
+                    if src and 'cap_t1_' in src:  # mgstage screenshot pattern (thumbnail)
+                        # Convert to full-size version by replacing cap_t1_ with cap_e_
+                        full_size = src.replace('cap_t1_', 'cap_e_')
+                        if full_size.startswith('//'):
+                            full_size = 'https:' + full_size
+                        elif full_size.startswith('/'):
+                            full_size = 'https://www.javdatabase.com' + full_size
+                        if full_size not in screenshots:
+                            screenshots.append(full_size)
+            
+            # Pattern 3: Look for images from mgstage with cap_t1_ pattern
+            if not screenshots:
+                all_imgs = soup.find_all('img', src=re.compile(r'cap_t1_'))
+                for img in all_imgs:
+                    src = img.get('src', '')
+                    if src:
+                        # Convert to full-size version
+                        full_size = src.replace('cap_t1_', 'cap_e_')
+                        if full_size.startswith('//'):
+                            full_size = 'https:' + full_size
+                        elif full_size.startswith('/'):
+                            full_size = 'https://www.javdatabase.com' + full_size
+                        if full_size not in screenshots:
+                            screenshots.append(full_size)
+            
+            # Pattern 4: Original pattern for /screenshots/ URLs
+            if not screenshots:
+                screenshot_imgs = soup.find_all('img', src=re.compile(r'/screenshots/'))
+                for img in screenshot_imgs:
+                    src = img.get('src', '')
+                    if src:
+                        if src.startswith('//'):
+                            src = 'https:' + src
+                        elif src.startswith('/'):
+                            src = self.BASE_URL + src
+                        if src not in screenshots:
+                            screenshots.append(src)
             
             print(f"  >> Actresses: {', '.join(actresses) if actresses else 'None'}")
             print(f"  >> Actress images: {len(actress_images)}")
             print(f"  >> Screenshots: {len(screenshots)}")
+            print(f"  >> Director: {director if director else 'None'}")
+            print(f"  >> Studio: {studio if studio else 'None'}")
+            print(f"  >> Label: {label if label else 'None'}")
+            print(f"  >> Series: {series if series else 'None'}")
             
             return VideoMetadata(
                 code=video_code.upper(),

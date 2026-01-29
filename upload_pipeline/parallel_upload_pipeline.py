@@ -1,10 +1,15 @@
 import os
+import sys
 import json
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
+
+# Add parent directory to path for database_manager import
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from database_manager import db_manager
 
 from seekstreaming_uploader import SeekstreamingUploader
 from streamtape_uploader import StreamtapeUploader
@@ -162,6 +167,11 @@ class ParallelUploadPipeline:
         # Save results
         self._save_results(video_path, title, results, total_time)
         
+        # Sync to main database
+        if successful > 0:
+            print(f"\n🔄 Syncing to main database...")
+            self._sync_to_main_database(title, results)
+        
         return {
             "video_path": video_path,
             "title": title,
@@ -201,6 +211,76 @@ class ParallelUploadPipeline:
                     'embed_url': result.get('embed_url')
                 }
         return urls
+    
+    def _sync_to_main_database(self, video_title, results):
+        """Sync upload results to main combined_videos.json"""
+        try:
+            # Find video by title/code in main database
+            video = db_manager.get_video_by_code(video_title)
+            
+            if not video:
+                print(f"⚠️ Video '{video_title}' not found in main database, skipping sync")
+                return
+            
+            # Update hosting URLs
+            if 'hosting_urls' not in video:
+                video['hosting_urls'] = {}
+            
+            for host, result in results.items():
+                if result.get('success'):
+                    # Initialize host entry if not exists
+                    if host not in video['hosting_urls']:
+                        video['hosting_urls'][host] = {}
+                    
+                    # Map different host response formats
+                    if host == 'seekstreaming':
+                        video['hosting_urls'][host] = {
+                            'embed_url': result.get('all_urls', {}).get('video_player', ''),
+                            'download_url': result.get('all_urls', {}).get('video_downloader', ''),
+                            'file_code': result.get('all_urls', {}).get('video_player', '').split('#')[-1] if result.get('all_urls', {}).get('video_player') else ''
+                        }
+                    elif host == 'streamtape':
+                        video['hosting_urls'][host] = {
+                            'embed_url': result.get('embed_url', ''),
+                            'download_url': result.get('url', ''),
+                            'file_code': result.get('file_id', '')
+                        }
+                    elif host == 'turboviplay':
+                        video['hosting_urls'][host] = {
+                            'embed_url': result.get('embed_url', ''),
+                            'download_url': result.get('url', ''),
+                            'file_code': result.get('video_id', '')
+                        }
+                    elif host == 'vidoza':
+                        video['hosting_urls'][host] = {
+                            'embed_url': result.get('embed_url', ''),
+                            'download_url': result.get('url', ''),
+                            'file_code': result.get('video_id', '')
+                        }
+                    elif host == 'uploady':
+                        video['hosting_urls'][host] = {
+                            'embed_url': result.get('embed_url', ''),
+                            'download_url': result.get('url', ''),
+                            'file_code': result.get('file_code', '')
+                        }
+                    elif host == 'upload18':
+                        video['hosting_urls'][host] = {
+                            'embed_url': result.get('embed_url', ''),
+                            'download_url': result.get('url', ''),
+                            'file_code': result.get('file_code', '')
+                        }
+            
+            # Update uploaded_at timestamp
+            video['uploaded_at'] = datetime.now().isoformat()
+            
+            # Save back to main database
+            if db_manager.add_or_update_video(video):
+                print(f"✓ Synced hosting URLs to main database for '{video_title}'")
+            else:
+                print(f"✗ Failed to sync to main database")
+                
+        except Exception as e:
+            print(f"✗ Error syncing to main database: {e}")
 
 
 def main():

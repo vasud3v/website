@@ -1003,9 +1003,9 @@ class WorkflowManager:
                 if result.get('success'):
                     print(f"     ✅ {host}: Success")
                     hosting_urls[host] = {
-                        'embed_url': result.get('embed_url', ''),
-                        'download_url': result.get('download_url', ''),
-                        'file_code': result.get('file_code', '')
+                        'embed_url': result.get('embed_url', '') or result.get('video_player', ''),
+                        'download_url': result.get('download_url', '') or result.get('url', '') or result.get('video_downloader', ''),
+                        'file_code': result.get('file_code', '') or result.get('file_id', '') or result.get('video_id', '')
                     }
                 else:
                     print(f"     ❌ {host}: Failed")

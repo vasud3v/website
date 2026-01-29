@@ -8,25 +8,17 @@ import os
 from pathlib import Path
 from typing import Optional, Dict
 
-# Try to import from javdatabase package
-try:
-    from javdatabase.javdb_scraper import JAVDatabaseScraper
-    # Define a wrapper function to match the expected interface if needed, or update usage
-    # For now, just disabling the missing module import
-    raise ImportError("Improved scraper not found") 
-except ImportError:
+# Import JAVDatabase scraper
+javdb_path = Path(__file__).parent.parent / "javdatabase"
+sys.path.insert(0, str(javdb_path))
 
-    # Fallback to original scraper
-    javdb_path = Path(__file__).parent.parent / "javdatabase"
-    sys.path.insert(0, str(javdb_path))
-    
-    try:
-        from javdb_scraper import JAVDatabaseScraper
-        JAVDB_AVAILABLE = True
-        print("✓ Using original JAVDatabase scraper")
-    except ImportError as e:
-        print(f"⚠️ JAVDatabase scraper not available: {e}")
-        JAVDB_AVAILABLE = False
+try:
+    from javdb_scraper import JAVDatabaseScraper
+    JAVDB_AVAILABLE = True
+    print("✓ JAVDatabase scraper available")
+except ImportError as e:
+    print(f"⚠️ JAVDatabase scraper not available: {e}")
+    JAVDB_AVAILABLE = False
 
 
 def enrich_with_javdb(javgg_data: dict, headless: bool = True, skip_actress_images: bool = False) -> Optional[dict]:
@@ -63,20 +55,18 @@ def enrich_with_javdb(javgg_data: dict, headless: bool = True, skip_actress_imag
         javgg_data['javdb_skip_reason'] = skip_reason
         return javgg_data
     
-    scraper = None
     try:
         print(f"  📊 Fetching metadata from JAVDatabase...")
         
-        # Use fallback scraper logic since improved scraper isn't available
-        if 'JAVDatabaseScraper' in globals():
-            temp_scraper = JAVDatabaseScraper(headless=headless)
+        # Use JAVDatabase scraper
+        temp_scraper = JAVDatabaseScraper(headless=headless)
+        try:
+            javdb_metadata = temp_scraper.scrape_video_metadata(video_code)
+        finally:
             try:
-                javdb_metadata = temp_scraper.scrape_video_metadata(video_code)
-            finally:
                 temp_scraper.close()
-        else:
-            # Try to use improved scraper (no need for scraper object)
-            javdb_metadata = scrape_javdb_metadata(video_code, headless=headless)
+            except:
+                pass
         
         if javdb_metadata:
             print(f"  ✅ JAVDatabase data retrieved")
@@ -108,10 +98,6 @@ def enrich_with_javdb(javgg_data: dict, headless: bool = True, skip_actress_imag
         javgg_data['javdb_available'] = False
         javgg_data['javdb_error'] = str(e)[:200]
         return javgg_data
-        
-    finally:
-        # No cleanup needed with improved scraper
-        pass
 
 
 def should_skip_javdb_enrichment(video_code: str) -> tuple:

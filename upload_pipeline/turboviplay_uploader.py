@@ -66,55 +66,34 @@ class TurboviplayUploader:
             
             print(f"[Turboviplay] Upload server: {upload_url}")
             
-            # Upload file with progress bar
+            # Upload file
             print(f"[Turboviplay] Uploading file...")
             file_size = os.path.getsize(video_path)
+            size_mb = file_size / (1024 * 1024)
             
             with open(video_path, 'rb') as f:
-                # Wrap file with tqdm progress bar
-                with tqdm(total=file_size, unit='B', unit_scale=True, unit_divisor=1024, 
-                         desc=f"📤 {file_name}", leave=False) as pbar:
-                    
-                    # Create a wrapper that updates progress
-                    class ProgressFileWrapper:
-                        def __init__(self, file_obj, progress_bar):
-                            self.file_obj = file_obj
-                            self.progress_bar = progress_bar
-                            self.bytes_read = 0
-                        
-                        def read(self, size=-1):
-                            data = self.file_obj.read(size)
-                            self.bytes_read += len(data)
-                            self.progress_bar.update(len(data))
-                            return data
-                        
-                        def __len__(self):
-                            return file_size
-                    
-                    progress_file = ProgressFileWrapper(f, pbar)
-                    
-                    files = {'file': (file_name, progress_file, 'video/mp4')}
-                    data = {'keyapi': self.api_key}
-                    
-                    start_time = time.time()
-                    
-                    try:
-                        response = self.session.post(
-                            upload_url,
-                            files=files,
-                            data=data,
-                            timeout=1800  # 30 minutes timeout
-                        )
-                    except requests.exceptions.Timeout:
-                        return {"success": False, "error": "Upload timeout. File may be too large or network is slow."}
-                    except requests.exceptions.ConnectionError as e:
-                        return {"success": False, "error": f"Connection error: {str(e)}"}
-                    
-                    elapsed = time.time() - start_time
-                    speed_mbps = (file_size / (1024*1024)) / elapsed if elapsed > 0 else 0
-                    
-                    print(f"\n[Turboviplay] Upload completed in {elapsed:.1f}s (avg {speed_mbps:.2f} MB/s)")
-                    print(f"[Turboviplay] Response status: {response.status_code}")
+                files = {'file': (file_name, f, 'video/mp4')}
+                data = {'keyapi': self.api_key}
+                
+                start_time = time.time()
+                
+                try:
+                    response = self.session.post(
+                        upload_url,
+                        files=files,
+                        data=data,
+                        timeout=1800
+                    )
+                except requests.exceptions.Timeout:
+                    return {"success": False, "error": "Upload timeout"}
+                except requests.exceptions.ConnectionError as e:
+                    return {"success": False, "error": f"Connection error: {str(e)}"}
+                
+                elapsed = time.time() - start_time
+                speed = (size_mb / elapsed) if elapsed > 0 else 0
+                
+                print(f"[Turboviplay] Upload completed in {elapsed:.1f}s ({speed:.2f} MB/s)")
+                print(f"[Turboviplay] Response status: {response.status_code}")
                 
                 if response.status_code == 200:
                     # Check if response is empty
