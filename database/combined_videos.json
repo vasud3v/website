@@ -1,6 +1,53 @@
 {
   "videos": [
     {
+      "code": "FC2-PPV-4838212",
+      "title": "FC2 PPV 4838212",
+      "title_japanese": "",
+      "embed_url": "https://jav-vids.xyz/embed/7cqavq9d42qw",
+      "m3u8_url": "https://pfabiWMFmEza.dramiyos-cdn.com/hls2/01/07306/hlks2ja00tof_h/master.m3u8?t=h0-_sLpUALtye_ZeISILKsoGofgcu85PTgmR0nBPkNg&s=1769692556&e=129600&f=36532111&srv=Sk5m2v7Qct4h&i=0.4&sp=500&p1=Sk5m2v7Qct4h&p2=Sk5m2v7Qct4h&asn=8075",
+      "thumbnail_url": "https://javgg.net/wp-content/uploads/2026/01/1769401152.69.png",
+      "release_date": "",
+      "release_date_formatted": "",
+      "duration": "",
+      "duration_minutes": 0,
+      "studio": "",
+      "studio_japanese": "",
+      "director": "",
+      "series": "",
+      "models": [],
+      "tags": [],
+      "scraped_at": "2026-01-29T13:15:57.160841",
+      "javdb_available": false,
+      "javdb_skip_reason": "FC2PPV videos are not indexed on JAVDatabase (amateur content)",
+      "processed_at": "2026-01-29T13:15:57.161414",
+      "source": "javgg",
+      "hosting_urls": {
+        "uploady": {
+          "embed_url": "",
+          "download_url": "",
+          "file_code": ""
+        },
+        "mixdrop": {
+          "embed_url": "",
+          "download_url": "",
+          "file_code": ""
+        },
+        "turboviplay": {
+          "embed_url": "",
+          "download_url": "",
+          "file_code": ""
+        },
+        "seekstreaming": {
+          "embed_url": "",
+          "download_url": "",
+          "file_code": ""
+        }
+      },
+      "uploaded_at": "2026-01-29T13:18:23.356245",
+      "preview_url": "https://archive.org/download/javmix-preview-fc2-ppv-4838212-20260129/FC2-PPV-4838212_preview.mp4"
+    },
+    {
       "code": "FC2-PPV-4838725",
       "title": "FC2 PPV 4838725",
       "title_japanese": "",
@@ -725,7 +772,7 @@
     }
   ],
   "stats": {
-    "total_videos": 15,
-    "last_updated": "2026-01-29T13:13:22.725542"
+    "total_videos": 16,
+    "last_updated": "2026-01-29T13:18:23.346919"
   }
 }
