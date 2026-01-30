@@ -56,7 +56,8 @@
     "NPJS-152",
     "SVBGR-004",
     "SY-219",
-    "SIRO-5618"
+    "SIRO-5618",
+    "PASN-006"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -71,7 +72,13 @@
       "url": "https://javgg.net/jav/siro-5618/",
       "retry_after": 1769958703.772162,
       "retry_count": 0
+    },
+    {
+      "code": "PASN-006",
+      "url": "https://javgg.net/jav/pasn-006/",
+      "retry_after": 1769959159.251359,
+      "retry_count": 0
     }
   ],
-  "last_run": "2026-01-30T15:14:16.027718"
+  "last_run": "2026-01-30T15:25:17.706835"
 }
