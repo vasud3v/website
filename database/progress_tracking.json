@@ -1,9 +1,9 @@
 {
-  "last_updated": "2026-01-30T05:36:07.425474",
+  "last_updated": "2026-01-30T05:44:46.943298",
   "total_videos": 43,
-  "total_processed": 4,
+  "total_processed": 5,
   "total_failed": 0,
-  "success_rate": 9.30232558139535,
-  "last_video_code": "MIDA-535",
+  "success_rate": 11.627906976744185,
+  "last_video_code": "MIDA-509",
   "last_video_url": null
 }
