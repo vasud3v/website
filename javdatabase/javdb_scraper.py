@@ -592,7 +592,8 @@ class JAVDatabaseScraper:
             screenshot_links = soup.find_all('a', attrs={'data-image-href': True})
             for link in screenshot_links:
                 full_size = link.get('data-image-href', '')
-                if full_size and 'cap_e_' in full_size:  # mgstage full-size pattern
+                if full_size:
+                    # Handle different CDN patterns
                     if full_size.startswith('//'):
                         full_size = 'https:' + full_size
                     elif full_size.startswith('/'):
@@ -605,9 +606,22 @@ class JAVDatabaseScraper:
                 screenshot_imgs = soup.find_all('img', alt=re.compile(r'Screenshot', re.I))
                 for img in screenshot_imgs:
                     src = img.get('src', '')
-                    if src and 'cap_t1_' in src:  # mgstage screenshot pattern (thumbnail)
-                        # Convert to full-size version by replacing cap_t1_ with cap_e_
-                        full_size = src.replace('cap_t1_', 'cap_e_')
+                    if src:
+                        # Handle mgstage thumbnails (cap_t1_ -> cap_e_)
+                        if 'cap_t1_' in src:
+                            full_size = src.replace('cap_t1_', 'cap_e_')
+                        # Handle DMM thumbnails (mikr00066-1.jpg -> mikr00066jp-1.jpg)
+                        elif 'dmm.co.jp' in src and '-' in src:
+                            # Replace the last occurrence of the code pattern with 'jp' suffix
+                            # e.g., mikr00066-1.jpg -> mikr00066jp-1.jpg
+                            parts = src.rsplit('-', 1)
+                            if len(parts) == 2:
+                                full_size = parts[0] + 'jp-' + parts[1]
+                            else:
+                                full_size = src
+                        else:
+                            full_size = src
+                        
                         if full_size.startswith('//'):
                             full_size = 'https:' + full_size
                         elif full_size.startswith('/'):
