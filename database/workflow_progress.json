@@ -54,15 +54,17 @@
     "SVFLA-016",
     "WAAA-612",
     "NPJS-152",
-    "SVBGR-004"
+    "SVBGR-004",
+    "SY-219"
   ],
   "failed_videos": [],
   "pending_enrichment": [
     {
       "code": "DLDSS-460",
       "url": "https://javgg.net/jav/dldss-460/",
-      "retry_after": 1769935025.718948
+      "retry_after": 1769935025.718948,
+      "retry_count": 0
     }
   ],
-  "last_run": "2026-01-30T09:56:41.358070"
+  "last_run": "2026-01-30T15:08:49.167708"
 }
