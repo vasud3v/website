@@ -1,11 +1,11 @@
 {
-  "total_videos": 80,
+  "total_videos": 81,
   "total_size_bytes": 0,
   "by_hosting": {
-    "uploady": 44,
-    "mixdrop": 55,
-    "turboviplay": 55,
-    "seekstreaming": 54
+    "mixdrop": 56,
+    "turboviplay": 56,
+    "seekstreaming": 55,
+    "uploady": 44
   },
   "by_category": {
     "VR": 54,
@@ -178,5 +178,5 @@
   "with_javdb": 54,
   "with_cast": 0,
   "with_screenshots": 54,
-  "last_updated": "2026-01-30T19:25:00.193233"
+  "last_updated": "2026-01-30T19:35:20.181099"
 }
