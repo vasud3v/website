@@ -1,9 +1,9 @@
 {
-  "last_updated": "2026-01-30T19:35:20.178676",
-  "total_videos": 81,
-  "total_processed": 56,
+  "last_updated": "2026-01-30T19:46:26.565068",
+  "total_videos": 82,
+  "total_processed": 57,
   "total_failed": 0,
-  "success_rate": 69.1358024691358,
-  "last_video_code": "SNOS-098-ENGLISH-SUBTITLE",
+  "success_rate": 69.51219512195121,
+  "last_video_code": "SNOS-091-ENGLISH-SUBTITLE",
   "last_video_url": null
 }
