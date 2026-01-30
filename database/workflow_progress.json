@@ -69,15 +69,14 @@
     "300MIUM-1305",
     "013026-001-CARIB",
     "250BOINBB-455",
-    "DDH-379",
     "393OTIM-616",
     "393OTIM-617",
     "393OTIM-618",
-    "200GANA-3322",
     "393OTIM-615",
     "FNS-122-ENGLISH-SUBTITLE",
     "DLDSS-461-ENGLISH-SUBTITLE",
-    "TPPN-269-ENGLISH-SUBTITLE"
+    "TPPN-269-ENGLISH-SUBTITLE",
+    "DDH-379"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -220,5 +219,5 @@
       "retry_count": 0
     }
   ],
-  "last_run": "2026-01-30T17:51:31.840356"
+  "last_run": "2026-01-30T18:44:11.062214"
 }
