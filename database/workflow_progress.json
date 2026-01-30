@@ -75,7 +75,8 @@
     "393OTIM-618",
     "200GANA-3322",
     "393OTIM-615",
-    "FNS-122-ENGLISH-SUBTITLE"
+    "FNS-122-ENGLISH-SUBTITLE",
+    "DLDSS-461-ENGLISH-SUBTITLE"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -204,7 +205,13 @@
       "url": "https://javgg.net/jav/fns-122-english-subtitle/",
       "retry_after": 1769966819.336666,
       "retry_count": 0
+    },
+    {
+      "code": "DLDSS-461-ENGLISH-SUBTITLE",
+      "url": "https://javgg.net/jav/dldss-461-english-subtitle/",
+      "retry_after": 1769967407.811869,
+      "retry_count": 0
     }
   ],
-  "last_run": "2026-01-30T17:32:29.082684"
+  "last_run": "2026-01-30T17:41:54.026878"
 }
