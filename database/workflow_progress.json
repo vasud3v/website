@@ -60,7 +60,8 @@
     "PASN-006",
     "FC2-PPV-4839600",
     "FC2-PPV-4839443",
-    "FC2-PPV-4839350"
+    "FC2-PPV-4839350",
+    "FC2-PPV-4836668"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -99,7 +100,13 @@
       "url": "https://javgg.net/jav/fc2-ppv-4839350/",
       "retry_after": 1769960524.080341,
       "retry_count": 0
+    },
+    {
+      "code": "FC2-PPV-4836668",
+      "url": "https://javgg.net/jav/fc2-ppv-4836668/",
+      "retry_after": 1769960814.533362,
+      "retry_count": 0
     }
   ],
-  "last_run": "2026-01-30T15:44:52.056367"
+  "last_run": "2026-01-30T15:49:11.136292"
 }
