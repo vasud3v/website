@@ -45,9 +45,16 @@
     "MIDA-529",
     "MIDA-506",
     "WAAA-613",
-    "JUFE-611"
+    "JUFE-611",
+    "DLDSS-460"
   ],
   "failed_videos": [],
-  "pending_enrichment": [],
-  "last_run": "2026-01-30T08:32:48.245020"
+  "pending_enrichment": [
+    {
+      "code": "DLDSS-460",
+      "url": "https://javgg.net/jav/dldss-460/",
+      "retry_after": 1769935025.718948
+    }
+  ],
+  "last_run": "2026-01-30T08:42:37.638061"
 }
