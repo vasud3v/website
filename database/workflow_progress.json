@@ -53,7 +53,8 @@
     "CAWD-935",
     "SVFLA-016",
     "WAAA-612",
-    "NPJS-152"
+    "NPJS-152",
+    "SVBGR-004"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -63,5 +64,5 @@
       "retry_after": 1769935025.718948
     }
   ],
-  "last_run": "2026-01-30T09:47:17.932589"
+  "last_run": "2026-01-30T09:56:41.358070"
 }
