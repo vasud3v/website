@@ -1,6 +1,72 @@
 {
   "videos": [
     {
+      "code": "SNOS-052-ENGLISH-SUBTITLE",
+      "title": "SNOS-052 English Subtitle",
+      "title_japanese": "",
+      "embed_url": "https://jav-vids.xyz/embed/dxqhn6e1214w",
+      "m3u8_url": "https://pfabiWMFmEza.dramiyos-cdn.com/hls2/01/07309/dxqhn6e1214w_,l,n,h,.urlset/master.m3u8?t=ph6zfQweJ888B-lFGjRipiz8LB3BrBu4f9tdX79lzMo&s=1769810288&e=129600&f=36548884&srv=xqivjlloycyx&i=0.4&sp=500&p1=xqivjlloycyx&p2=xqivjlloycyx&asn=8075",
+      "thumbnail_url": "https://javgg.net/wp-content/uploads/2026/01/snos-052.jpg",
+      "release_date": "",
+      "release_date_formatted": "",
+      "duration": "",
+      "duration_minutes": 0,
+      "studio": "",
+      "studio_japanese": "",
+      "director": "",
+      "series": "",
+      "models": [],
+      "tags": [],
+      "categories": [],
+      "scraped_at": "2026-01-30T21:58:08.883531",
+      "javdb_available": false,
+      "javdb_not_found": true,
+      "processed_at": "2026-01-30T21:58:17.296561",
+      "source": "javgg",
+      "hosting": {
+        "turboviplay": {
+          "embed_url": "https://emturbovid.com/t/697d2a88c30b7",
+          "download_url": "https://turboviplay.com/v/697d2a88c30b7",
+          "file_code": "697d2a88c30b7"
+        },
+        "mixdrop": {
+          "embed_url": "https://mxdrop.to/e/ow997e8pavlvm6",
+          "download_url": "https://mxdrop.to/f/ow997e8pavlvm6",
+          "file_code": "ow997e8pavlvm6"
+        },
+        "seekstreaming": {
+          "embed_url": "https://javcore.embedseek.com/#nfhfk",
+          "download_url": "https://javcore.embedseek.com/#nfhfk",
+          "file_code": "nfhfk"
+        }
+      },
+      "uploaded_at": "2026-01-30T22:04:44.986805",
+      "hosting_urls": {
+        "turboviplay": {
+          "embed_url": "https://emturbovid.com/t/697d2a88c30b7",
+          "download_url": "https://turboviplay.com/v/697d2a88c30b7",
+          "file_code": "697d2a88c30b7"
+        },
+        "mixdrop": {
+          "embed_url": "https://mxdrop.to/e/ow997e8pavlvm6",
+          "download_url": "https://mxdrop.to/f/ow997e8pavlvm6",
+          "file_code": "ow997e8pavlvm6"
+        },
+        "seekstreaming": {
+          "embed_url": "https://javcore.embedseek.com/#nfhfk",
+          "download_url": "https://javcore.embedseek.com/#nfhfk",
+          "file_code": "nfhfk"
+        }
+      },
+      "preview_url": "https://archive.org/download/javmix-preview-snos-052-english-subtitle-20260130/SNOS-052-ENGLISH-SUBTITLE_preview.mp4",
+      "preview_embed_url": "https://archive.org/embed/javmix-preview-snos-052-english-subtitle-20260130",
+      "preview_embed_code": "<iframe src=\"https://archive.org/embed/javmix-preview-snos-052-english-subtitle-20260130\" width=\"640\" height=\"480\" frameborder=\"0\" webkitallowfullscreen=\"true\" mozallowfullscreen=\"true\" allowfullscreen></iframe>",
+      "preview_embed_code_small": "<iframe src=\"https://archive.org/embed/javmix-preview-snos-052-english-subtitle-20260130\" width=\"480\" height=\"360\" frameborder=\"0\" allowfullscreen></iframe>",
+      "preview_embed_code_large": "<iframe src=\"https://archive.org/embed/javmix-preview-snos-052-english-subtitle-20260130\" width=\"854\" height=\"480\" frameborder=\"0\" allowfullscreen></iframe>",
+      "preview_player_link": "https://archive.org/details/javmix-preview-snos-052-english-subtitle-20260130",
+      "preview_identifier": "javmix-preview-snos-052-english-subtitle-20260130"
+    },
+    {
       "code": "SNOS-054-ENGLISH-SUBTITLE",
       "title": "SNOS-054 English Subtitle",
       "title_japanese": "",
@@ -9695,7 +9761,7 @@
     }
   ],
   "stats": {
-    "total_videos": 94,
-    "last_updated": "2026-01-30T21:52:53.571620"
+    "total_videos": 95,
+    "last_updated": "2026-01-30T22:04:44.957186"
   }
 }
