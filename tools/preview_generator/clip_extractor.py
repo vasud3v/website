@@ -22,7 +22,7 @@ class ClipExtractor:
         start_time: float, 
         duration: float, 
         output_path: str,
-        resolution: str = "720",
+        resolution: str = "360",
         crf: int = 28,
         fps: int = 30,
         speed: float = 1.0
@@ -93,7 +93,7 @@ class ClipExtractor:
     def extract_multiple_clips(
         self,
         timestamps: List[Tuple[float, float]],
-        resolution: str = "720",
+        resolution: str = "360",
         crf: int = 23,
         fps: int = 30,
         speed: float = 1.0,
@@ -415,7 +415,7 @@ if __name__ == "__main__":
     
     # Extract a test clip
     test_clip = "test_clip.mp4"
-    success = extractor.extract_clip(10.0, 5.0, test_clip, resolution="720", crf=28)
+    success = extractor.extract_clip(10.0, 5.0, test_clip, resolution="360", crf=28)
     
     if success:
         print(f"✓ Test clip created: {test_clip}")

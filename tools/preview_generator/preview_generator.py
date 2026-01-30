@@ -30,7 +30,7 @@ class PreviewGenerator:
         output_path: str = None,
         target_duration: float = None,  # Auto-calculate if not specified
         clip_duration: float = 2.5,  # Duration of each clip in seconds
-        resolution: str = "720",
+        resolution: str = "360",
         crf: int = 23,  # Better quality (lower = better, 23 is high quality)
         fps: int = 30,
         create_gif: bool = False,
@@ -266,7 +266,7 @@ def main():
         print("  --target N          Target duration in seconds (default: auto-calculated)")
         print("  --clips N           Number of clips (default: auto-calculated)")
         print("  --duration N        Clip duration in seconds (default: 2.5)")
-        print("  --resolution N      Target height (default: 720)")
+        print("  --resolution N      Target height (default: 360)")
         print("  --crf N             Compression quality 18-28 (default: 23)")
         print("  --fps N             Frame rate (default: 30)")
         print("  --gif               Also create GIF version")
@@ -295,7 +295,7 @@ def main():
         'output_path': None,
         'target_duration': None,  # Auto-calculate by default
         'clip_duration': 2.5,
-        'resolution': '720',
+        'resolution': '360',
         'crf': 23,
         'fps': 30,
         'create_gif': False,
