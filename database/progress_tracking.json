@@ -1,9 +1,9 @@
 {
-  "last_updated": "2026-01-30T09:20:09.733360",
-  "total_videos": 50,
-  "total_processed": 27,
+  "last_updated": "2026-01-30T09:28:44.989114",
+  "total_videos": 51,
+  "total_processed": 28,
   "total_failed": 0,
-  "success_rate": 54.0,
-  "last_video_code": "CAWD-935",
+  "success_rate": 54.90196078431373,
+  "last_video_code": "SVFLA-016",
   "last_video_url": null
 }
