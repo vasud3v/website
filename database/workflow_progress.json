@@ -88,7 +88,8 @@
     "SNOS-073-ENGLISH-SUBTITLE",
     "SNOS-072-ENGLISH-SUBTITLE",
     "SNOS-071-ENGLISH-SUBTITLE",
-    "SNOS-067-ENGLISH-SUBTITLE"
+    "SNOS-067-ENGLISH-SUBTITLE",
+    "SNOS-066-ENGLISH-SUBTITLE"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -295,7 +296,13 @@
       "url": "https://javgg.net/jav/snos-067-english-subtitle/",
       "retry_after": 1769978713.628989,
       "retry_count": 0
+    },
+    {
+      "code": "SNOS-066-ENGLISH-SUBTITLE",
+      "url": "https://javgg.net/jav/snos-066-english-subtitle/",
+      "retry_after": 1769979410.092682,
+      "retry_count": 0
     }
   ],
-  "last_run": "2026-01-30T20:51:34.714993"
+  "last_run": "2026-01-30T21:03:34.655337"
 }

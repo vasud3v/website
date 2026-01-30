@@ -1,6 +1,82 @@
 {
   "videos": [
     {
+      "code": "SNOS-066-ENGLISH-SUBTITLE",
+      "title": "SNOS-066 English Subtitle",
+      "title_japanese": "",
+      "embed_url": "https://jav-vids.xyz/embed/9iv8y54cid24",
+      "m3u8_url": "https://ESrZaEKj9iFIuE8.dramiyos-cdn.com/hls2/01/07309/9iv8y54cid24_,l,n,h,.urlset/master.m3u8?t=pk-rS2Yi8DdGluGT1MrZqRH96kpFG3ZalDMfnrNJepo&s=1769806600&e=129600&f=36549024&srv=os1i9vbvddq9&i=0.4&sp=500&p1=os1i9vbvddq9&p2=os1i9vbvddq9&asn=8075",
+      "thumbnail_url": "https://javgg.net/wp-content/uploads/2026/01/snos-066.jpg",
+      "release_date": "",
+      "release_date_formatted": "",
+      "duration": "",
+      "duration_minutes": 0,
+      "studio": "",
+      "studio_japanese": "",
+      "director": "",
+      "series": "",
+      "models": [],
+      "tags": [],
+      "categories": [],
+      "scraped_at": "2026-01-30T20:56:41.637337",
+      "javdb_available": false,
+      "javdb_not_found": true,
+      "processed_at": "2026-01-30T20:56:50.095958",
+      "source": "javgg",
+      "hosting": {
+        "uploady": {
+          "embed_url": "https://uploady.io/embed-zygqerkuhwob.html",
+          "download_url": "https://uploady.io/zygqerkuhwob",
+          "file_code": "zygqerkuhwob"
+        },
+        "mixdrop": {
+          "embed_url": "https://mxdrop.to/e/q199ldl4txljj3o",
+          "download_url": "https://mxdrop.to/f/q199ldl4txljj3o",
+          "file_code": "q199ldl4txljj3o"
+        },
+        "turboviplay": {
+          "embed_url": "https://emturbovid.com/t/697d1c14b4219",
+          "download_url": "https://turboviplay.com/v/697d1c14b4219",
+          "file_code": "697d1c14b4219"
+        },
+        "seekstreaming": {
+          "embed_url": "https://javcore.embedseek.com/#bgdod",
+          "download_url": "https://javcore.embedseek.com/#bgdod",
+          "file_code": "bgdod"
+        }
+      },
+      "uploaded_at": "2026-01-30T21:03:34.278292",
+      "hosting_urls": {
+        "uploady": {
+          "embed_url": "https://uploady.io/embed-zygqerkuhwob.html",
+          "download_url": "https://uploady.io/zygqerkuhwob",
+          "file_code": "zygqerkuhwob"
+        },
+        "mixdrop": {
+          "embed_url": "https://mxdrop.to/e/q199ldl4txljj3o",
+          "download_url": "https://mxdrop.to/f/q199ldl4txljj3o",
+          "file_code": "q199ldl4txljj3o"
+        },
+        "turboviplay": {
+          "embed_url": "https://emturbovid.com/t/697d1c14b4219",
+          "download_url": "https://turboviplay.com/v/697d1c14b4219",
+          "file_code": "697d1c14b4219"
+        },
+        "seekstreaming": {
+          "embed_url": "https://javcore.embedseek.com/#bgdod",
+          "download_url": "https://javcore.embedseek.com/#bgdod",
+          "file_code": "bgdod"
+        }
+      },
+      "preview_url": "https://archive.org/download/javmix-preview-snos-066-english-subtitle-20260130/SNOS-066-ENGLISH-SUBTITLE_preview.mp4",
+      "preview_embed_url": "https://archive.org/embed/javmix-preview-snos-066-english-subtitle-20260130",
+      "preview_embed_code": "<iframe src=\"https://archive.org/embed/javmix-preview-snos-066-english-subtitle-20260130\" width=\"640\" height=\"480\" frameborder=\"0\" webkitallowfullscreen=\"true\" mozallowfullscreen=\"true\" allowfullscreen></iframe>",
+      "preview_embed_code_small": "<iframe src=\"https://archive.org/embed/javmix-preview-snos-066-english-subtitle-20260130\" width=\"480\" height=\"360\" frameborder=\"0\" allowfullscreen></iframe>",
+      "preview_embed_code_large": "<iframe src=\"https://archive.org/embed/javmix-preview-snos-066-english-subtitle-20260130\" width=\"854\" height=\"480\" frameborder=\"0\" allowfullscreen></iframe>",
+      "preview_player_link": "https://archive.org/details/javmix-preview-snos-066-english-subtitle-20260130",
+      "preview_identifier": "javmix-preview-snos-066-english-subtitle-20260130"
+    },
+    {
       "code": "SNOS-067-ENGLISH-SUBTITLE",
       "title": "SNOS-067 English Subtitle",
       "title_japanese": "",
@@ -9252,7 +9328,7 @@
     }
   ],
   "stats": {
-    "total_videos": 88,
-    "last_updated": "2026-01-30T20:51:34.270689"
+    "total_videos": 89,
+    "last_updated": "2026-01-30T21:03:34.250554"
   }
 }
