@@ -1,0 +1,298 @@
+{
+  "videos": [
+    {
+      "id": 1,
+      "title": "MIDA-512",
+      "filename": "MIDA-512.mp4",
+      "file_size_mb": 5164.44,
+      "upload_date": "2026-01-29 19:50:42",
+      "video_player": "https://javcore.embedseek.com/#3tmuo",
+      "video_downloader": "https://javcore.embedseek.com/#3tmuo",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#3tmuo\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 2,
+      "title": "ATID-664",
+      "filename": "ATID-664.mp4",
+      "file_size_mb": 2699.47,
+      "upload_date": "2026-01-29 19:59:35",
+      "video_player": "https://javcore.embedseek.com/#x5b3y",
+      "video_downloader": "https://javcore.embedseek.com/#x5b3y",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#x5b3y\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 3,
+      "title": "MIDA-494",
+      "filename": "MIDA-494.mp4",
+      "file_size_mb": 2519.49,
+      "upload_date": "2026-01-29 20:08:10",
+      "video_player": "https://javcore.embedseek.com/#lhosl",
+      "video_downloader": "https://javcore.embedseek.com/#lhosl",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#lhosl\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 4,
+      "title": "MIDA-535",
+      "filename": "MIDA-535.mp4",
+      "file_size_mb": 6363.2,
+      "upload_date": "2026-01-29 20:24:58",
+      "video_player": "https://javcore.embedseek.com/#8ipca",
+      "video_downloader": "https://javcore.embedseek.com/#8ipca",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#8ipca\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 5,
+      "title": "MIDA-509",
+      "filename": "MIDA-509.mp4",
+      "file_size_mb": 5510.4,
+      "upload_date": "2026-01-29 20:38:26",
+      "video_player": "https://javcore.embedseek.com/#haw6v",
+      "video_downloader": "https://javcore.embedseek.com/#haw6v",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#haw6v\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 6,
+      "title": "MIDA-507",
+      "filename": "MIDA-507.mp4",
+      "file_size_mb": 2634.66,
+      "upload_date": "2026-01-29 20:47:15",
+      "video_player": "https://javcore.embedseek.com/#k3jsv",
+      "video_downloader": "https://javcore.embedseek.com/#k3jsv",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#k3jsv\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 7,
+      "title": "MIDA-501",
+      "filename": "MIDA-501.mp4",
+      "file_size_mb": 2898.49,
+      "upload_date": "2026-01-29 20:55:24",
+      "video_player": "https://javcore.embedseek.com/#cunb8",
+      "video_downloader": "https://javcore.embedseek.com/#cunb8",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#cunb8\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 8,
+      "title": "MIDA-496",
+      "filename": "MIDA-496.mp4",
+      "file_size_mb": 6665.68,
+      "upload_date": "2026-01-29 21:11:46",
+      "video_player": "https://javcore.embedseek.com/#9jzmp",
+      "video_downloader": "https://javcore.embedseek.com/#9jzmp",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#9jzmp\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 9,
+      "title": "MIDA-504",
+      "filename": "MIDA-504.mp4",
+      "file_size_mb": 3490.75,
+      "upload_date": "2026-01-29 21:24:00",
+      "video_player": "https://javcore.embedseek.com/#m15q1",
+      "video_downloader": "https://javcore.embedseek.com/#m15q1",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#m15q1\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 10,
+      "title": "MIDA-502",
+      "filename": "MIDA-502.mp4",
+      "file_size_mb": 2539.18,
+      "upload_date": "2026-01-29 21:32:24",
+      "video_player": "https://javcore.embedseek.com/#t61oo",
+      "video_downloader": "https://javcore.embedseek.com/#t61oo",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#t61oo\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 11,
+      "title": "MIDA-503",
+      "filename": "MIDA-503.mp4",
+      "file_size_mb": 2721.81,
+      "upload_date": "2026-01-29 21:41:38",
+      "video_player": "https://javcore.embedseek.com/#ise9j",
+      "video_downloader": "https://javcore.embedseek.com/#ise9j",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#ise9j\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 12,
+      "title": "CAWD-946",
+      "filename": "CAWD-946.mp4",
+      "file_size_mb": 2598.68,
+      "upload_date": "2026-01-29 21:50:22",
+      "video_player": "https://javcore.embedseek.com/#wyirb",
+      "video_downloader": "https://javcore.embedseek.com/#wyirb",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#wyirb\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 13,
+      "title": "ATID-665",
+      "filename": "ATID-665.mp4",
+      "file_size_mb": 3848.16,
+      "upload_date": "2026-01-29 22:01:54",
+      "video_player": "https://javcore.embedseek.com/#upfm6",
+      "video_downloader": "https://javcore.embedseek.com/#upfm6",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#upfm6\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 14,
+      "title": "CLUB-903",
+      "filename": "CLUB-903.mp4",
+      "file_size_mb": 2665.83,
+      "upload_date": "2026-01-29 22:10:30",
+      "video_player": "https://javcore.embedseek.com/#ped1v",
+      "video_downloader": "https://javcore.embedseek.com/#ped1v",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#ped1v\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 15,
+      "title": "CAWD-942",
+      "filename": "CAWD-942.mp4",
+      "file_size_mb": 5167.65,
+      "upload_date": "2026-01-29 22:23:07",
+      "video_player": "https://javcore.embedseek.com/#k3jay",
+      "video_downloader": "https://javcore.embedseek.com/#k3jay",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#k3jay\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 16,
+      "title": "CAWD-936",
+      "filename": "CAWD-936.mp4",
+      "file_size_mb": 3091.5,
+      "upload_date": "2026-01-29 22:32:08",
+      "video_player": "https://javcore.embedseek.com/#m15df",
+      "video_downloader": "https://javcore.embedseek.com/#m15df",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#m15df\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 17,
+      "title": "CAWD-938",
+      "filename": "CAWD-938.mp4",
+      "file_size_mb": 5162.62,
+      "upload_date": "2026-01-29 22:45:08",
+      "video_player": "https://javcore.embedseek.com/#bgr1h",
+      "video_downloader": "https://javcore.embedseek.com/#bgr1h",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#bgr1h\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 18,
+      "title": "MIDA-511",
+      "filename": "MIDA-511.mp4",
+      "file_size_mb": 3281.2,
+      "upload_date": "2026-01-29 22:55:18",
+      "video_player": "https://javcore.embedseek.com/#gnkrf",
+      "video_downloader": "https://javcore.embedseek.com/#gnkrf",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#gnkrf\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 19,
+      "title": "MIDA-529",
+      "filename": "MIDA-529.mp4",
+      "file_size_mb": 3302.6,
+      "upload_date": "2026-01-29 23:05:06",
+      "video_player": "https://javcore.embedseek.com/#8ipub",
+      "video_downloader": "https://javcore.embedseek.com/#8ipub",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#8ipub\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 20,
+      "title": "MIDA-506",
+      "filename": "MIDA-506.mp4",
+      "file_size_mb": 3397.3,
+      "upload_date": "2026-01-29 23:15:38",
+      "video_player": "https://javcore.embedseek.com/#nf3kt",
+      "video_downloader": "https://javcore.embedseek.com/#nf3kt",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#nf3kt\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 21,
+      "title": "MIDA-498",
+      "filename": "MIDA-498.mp4",
+      "file_size_mb": 2664.51,
+      "upload_date": "2026-01-29 23:23:59",
+      "video_player": "https://javcore.embedseek.com/#wyi8o",
+      "video_downloader": "https://javcore.embedseek.com/#wyi8o",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#wyi8o\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 22,
+      "title": "CAWD-945",
+      "filename": "CAWD-945.mp4",
+      "file_size_mb": 2444.81,
+      "upload_date": "2026-01-29 23:31:53",
+      "video_player": "https://javcore.embedseek.com/#5cgpc",
+      "video_downloader": "https://javcore.embedseek.com/#5cgpc",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#5cgpc\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 23,
+      "title": "MIDA-497",
+      "filename": "MIDA-497.mp4",
+      "file_size_mb": 3768.3,
+      "upload_date": "2026-01-29 23:43:37",
+      "video_player": "https://javcore.embedseek.com/#gnkxq",
+      "video_downloader": "https://javcore.embedseek.com/#gnkxq",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#gnkxq\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 24,
+      "title": "MIDA-495",
+      "filename": "MIDA-495.mp4",
+      "file_size_mb": 2759.4,
+      "upload_date": "2026-01-29 23:52:04",
+      "video_player": "https://javcore.embedseek.com/#bgrzt",
+      "video_downloader": "https://javcore.embedseek.com/#bgrzt",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#bgrzt\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 25,
+      "title": "MIDA-471",
+      "filename": "MIDA-471.mp4",
+      "file_size_mb": 2639.44,
+      "upload_date": "2026-01-30 00:00:41",
+      "video_player": "https://javcore.embedseek.com/#8ipbi",
+      "video_downloader": "https://javcore.embedseek.com/#8ipbi",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#8ipbi\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 26,
+      "title": "CAWD-939",
+      "filename": "CAWD-939.mp4",
+      "file_size_mb": 2576.65,
+      "upload_date": "2026-01-30 00:08:58",
+      "video_player": "https://javcore.embedseek.com/#lhoja",
+      "video_downloader": "https://javcore.embedseek.com/#lhoja",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#lhoja\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 27,
+      "title": "BF-741",
+      "filename": "BF-741.mp4",
+      "file_size_mb": 2601.81,
+      "upload_date": "2026-01-30 00:17:38",
+      "video_player": "https://javcore.embedseek.com/#5cgoe",
+      "video_downloader": "https://javcore.embedseek.com/#5cgoe",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#5cgoe\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 28,
+      "title": "CAWD-929",
+      "filename": "CAWD-929.mp4",
+      "file_size_mb": 2720.04,
+      "upload_date": "2026-01-30 00:26:13",
+      "video_player": "https://javcore.embedseek.com/#t6111",
+      "video_downloader": "https://javcore.embedseek.com/#t6111",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#t6111\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 29,
+      "title": "ATID-642",
+      "filename": "ATID-642.mp4",
+      "file_size_mb": 2694.83,
+      "upload_date": "2026-01-30 00:34:38",
+      "video_player": "https://javcore.embedseek.com/#8ipjh",
+      "video_downloader": "https://javcore.embedseek.com/#8ipjh",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#8ipjh\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    }
+  ],
+  "stats": {
+    "total_videos": 29,
+    "total_size_mb": 100592.9
+  }
+}
