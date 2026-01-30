@@ -86,7 +86,8 @@
     "FNS-181-ENGLISH-SUBTITLE",
     "HUBLK-063-ENGLISH-SUBTITLE",
     "NMSL-025-ENGLISH-SUBTITLE",
-    "MIDA-498"
+    "MIDA-498",
+    "CAWD-945"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -361,5 +362,5 @@
       "retry_count": 0
     }
   ],
-  "last_run": "2026-01-30T23:15:22.383191"
+  "last_run": "2026-01-30T23:24:25.565497"
 }
