@@ -84,7 +84,8 @@
     "200GANA-3322",
     "HUNTC-464-ENGLISH-SUBTITLE",
     "FNS-181-ENGLISH-SUBTITLE",
-    "HUBLK-063-ENGLISH-SUBTITLE"
+    "HUBLK-063-ENGLISH-SUBTITLE",
+    "NMSL-025-ENGLISH-SUBTITLE"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -351,7 +352,13 @@
       "url": "https://javgg.net/jav/hublk-063-english-subtitle/",
       "retry_after": 1769985877.490566,
       "retry_count": 0
+    },
+    {
+      "code": "NMSL-025-ENGLISH-SUBTITLE",
+      "url": "https://javgg.net/jav/nmsl-025-english-subtitle/",
+      "retry_after": 1769986700.250965,
+      "retry_count": 0
     }
   ],
-  "last_run": "2026-01-30T22:52:52.558286"
+  "last_run": "2026-01-30T23:05:20.344805"
 }
