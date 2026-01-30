@@ -30,9 +30,10 @@
     "MIDA-535",
     "MIDA-509",
     "MIDA-507",
-    "MIDA-501"
+    "MIDA-501",
+    "MIDA-496"
   ],
   "failed_videos": [],
   "pending_enrichment": [],
-  "last_run": "2026-01-30T06:02:04.181087"
+  "last_run": "2026-01-30T06:14:58.918999"
 }
