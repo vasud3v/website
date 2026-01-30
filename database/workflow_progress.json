@@ -61,7 +61,8 @@
     "FC2-PPV-4839600",
     "FC2-PPV-4839443",
     "FC2-PPV-4839350",
-    "FC2-PPV-4836668"
+    "FC2-PPV-4836668",
+    "FC2-PPV-4836205"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -106,7 +107,13 @@
       "url": "https://javgg.net/jav/fc2-ppv-4836668/",
       "retry_after": 1769960814.533362,
       "retry_count": 0
+    },
+    {
+      "code": "FC2-PPV-4836205",
+      "url": "https://javgg.net/jav/fc2-ppv-4836205/",
+      "retry_after": 1769961117.222176,
+      "retry_count": 0
     }
   ],
-  "last_run": "2026-01-30T15:49:11.136292"
+  "last_run": "2026-01-30T15:54:30.438658"
 }
