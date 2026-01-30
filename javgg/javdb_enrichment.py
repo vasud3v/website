@@ -356,19 +356,11 @@ def merge_javgg_and_javdb(javgg_data: dict, javdb_metadata) -> dict:
     if hasattr(javdb_metadata, 'popularity_rank') and javdb_metadata.popularity_rank > 0:
         merged['popularity_rank'] = javdb_metadata.popularity_rank
     
-    # Merge categories/tags
+    # Merge categories (no tags field)
     if javdb_metadata.categories:
-        existing_tags = set(merged.get('tags', []))
-        existing_categories = set(merged.get('categories', []))
-        javdb_categories = set(javdb_metadata.categories)
-        
-        # Tags: Merge all sources
-        merged['tags'] = list(existing_tags | existing_categories | javdb_categories)
-        
         # Categories: Only use JAVDatabase categories (more accurate)
-        merged['categories'] = list(javdb_categories)
-        
-        print(f"     - Tags: {len(merged['tags'])}, Categories: {len(merged['categories'])}")
+        merged['categories'] = list(javdb_metadata.categories)
+        print(f"     - Categories: {len(merged['categories'])}")
     
     # Add cover URLs (both regular and large)
     if javdb_metadata.cover_url:
@@ -382,6 +374,11 @@ def merge_javgg_and_javdb(javgg_data: dict, javdb_metadata) -> dict:
     if javdb_metadata.description:
         merged['description'] = javdb_metadata.description
         print(f"     - Description: {len(javdb_metadata.description)} chars")
+    
+    # Update title with full JAVDatabase title (h1 has complete title)
+    if javdb_metadata.title and len(javdb_metadata.title) > len(merged.get('title', '')):
+        merged['title'] = javdb_metadata.title
+        print(f"     - Updated title: {javdb_metadata.title[:80]}...")
     
     # Prefer JAVDatabase title_jp if available
     # Note: JAVDatabase doesn't provide Japanese titles, only English
