@@ -66,7 +66,8 @@
     "DDH-380",
     "801SKEJ-052",
     "758REFUCK-217",
-    "300MIUM-1305"
+    "300MIUM-1305",
+    "013026-001-CARIB"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -141,7 +142,13 @@
       "url": "https://javgg.net/jav/300mium-1305/",
       "retry_after": 1769962478.376434,
       "retry_count": 0
+    },
+    {
+      "code": "013026-001-CARIB",
+      "url": "https://javgg.net/jav/013026-001-carib/",
+      "retry_after": 1769962797.626617,
+      "retry_count": 0
     }
   ],
-  "last_run": "2026-01-30T16:17:19.749877"
+  "last_run": "2026-01-30T16:22:52.485958"
 }
