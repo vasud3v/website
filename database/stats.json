@@ -1,10 +1,10 @@
 {
-  "total_videos": 82,
+  "total_videos": 83,
   "total_size_bytes": 0,
   "by_hosting": {
-    "mixdrop": 57,
-    "turboviplay": 57,
-    "seekstreaming": 56,
+    "mixdrop": 58,
+    "turboviplay": 58,
+    "seekstreaming": 57,
     "uploady": 44
   },
   "by_category": {
@@ -178,5 +178,5 @@
   "with_javdb": 54,
   "with_cast": 0,
   "with_screenshots": 54,
-  "last_updated": "2026-01-30T19:46:26.567509"
+  "last_updated": "2026-01-30T19:59:44.498856"
 }
