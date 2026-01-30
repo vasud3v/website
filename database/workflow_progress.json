@@ -79,7 +79,8 @@
     "DDH-379",
     "200GANA-3322",
     "SNOS-101-ENGLISH-SUBTITLE",
-    "SNOS-100-ENGLISH-SUBTITLE"
+    "SNOS-100-ENGLISH-SUBTITLE",
+    "SNOS-099-ENGLISH-SUBTITLE"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -232,7 +233,13 @@
       "url": "https://javgg.net/jav/snos-100-english-subtitle/",
       "retry_after": 1769972726.788158,
       "retry_count": 0
+    },
+    {
+      "code": "SNOS-099-ENGLISH-SUBTITLE",
+      "url": "https://javgg.net/jav/snos-099-english-subtitle/",
+      "retry_after": 1769973473.431567,
+      "retry_count": 0
     }
   ],
-  "last_run": "2026-01-30T19:12:07.178578"
+  "last_run": "2026-01-30T19:25:00.791283"
 }
