@@ -796,9 +796,14 @@ class WorkflowManager:
         
         return None
     
-    def enrich_and_save(self, video_url: str, video_code: str) -> Dict:
+    def enrich_and_save(self, video_url: str, video_code: str, is_retry: bool = False) -> Dict:
         """
         Scrape, enrich and save video metadata
+        
+        Args:
+            video_url: URL of the video
+            video_code: Video code (e.g. DLDSS-460)
+            is_retry: If True, don't add to pending queue (already in retry loop)
         """
         print(f"\n📊 Enriching metadata: {video_code}")
         
@@ -845,15 +850,31 @@ class WorkflowManager:
             
             # Check if JAVDatabase enrichment failed
             if not enriched_data.get('javdb_available'):
-                print(f"  ⚠️ JAVDatabase not available - adding to retry queue")
-                self.progress['pending_enrichment'].append({
-                    'code': video_code,
-                    'url': video_url,
-                    'retry_after': (datetime.now().timestamp() + 2 * 24 * 3600)  # 2 days
-                })
+                print(f"  ⚠️ JAVDatabase not available")
+                
+                # Only add to retry queue if this is NOT already a retry attempt
+                if not is_retry:
+                    print(f"  📋 Adding to retry queue")
+                    
+                    # Check if already in pending queue (avoid duplicates)
+                    already_pending = any(item['code'] == video_code for item in self.progress['pending_enrichment'])
+                    
+                    if not already_pending:
+                        self.progress['pending_enrichment'].append({
+                            'code': video_code,
+                            'url': video_url,
+                            'retry_after': (datetime.now().timestamp() + 2 * 24 * 3600),  # 2 days
+                            'retry_count': 0  # Initialize retry counter
+                        })
+                        print(f"  ✅ Added to retry queue (will retry in 2 days)")
+                    else:
+                        print(f"  ℹ️ Already in retry queue")
+                else:
+                    print(f"  ℹ️ Retry attempt failed, will be handled by retry logic")
+                
                 # Still save what we have
                 save_video_to_database(video_dict, enriched=False)
-                print(f"  ✅ Basic metadata saved (will retry JAVDatabase later)")
+                print(f"  ✅ Basic metadata saved")
                 return video_dict
             
             # Save to database
@@ -1450,26 +1471,51 @@ class WorkflowManager:
             
             current_time = datetime.now().timestamp()
             still_pending = []
+            max_retry_attempts = 3  # Maximum retry attempts before giving up
             
             for item in self.progress['pending_enrichment']:
-                # Force retry for debugging
-                if True or current_time >= item['retry_after']:
-                    print(f"\n🔄 Retrying: {item['code']}")
+                # Initialize retry_count if not present (for backwards compatibility)
+                if 'retry_count' not in item:
+                    item['retry_count'] = 0
+                
+                # Check if max retries exceeded
+                if item['retry_count'] >= max_retry_attempts:
+                    print(f"\n⏭️ Skipping {item['code']}: Max retries ({max_retry_attempts}) exceeded")
+                    print(f"  Video likely not available on JAVDatabase")
+                    # Don't add back to pending - it's permanently failed
+                    continue
+                
+                # Check if it's time to retry (respect retry_after timestamp)
+                if current_time >= item.get('retry_after', 0):
+                    print(f"\n🔄 Retrying: {item['code']} (Attempt {item['retry_count'] + 1}/{max_retry_attempts})")
                     
-                    # Try to enrich again
-                    metadata = self.enrich_and_save(item['url'], item['code'])
+                    # Increment retry count
+                    item['retry_count'] += 1
+                    
+                    # Try to enrich again (pass is_retry=True to prevent re-adding to queue)
+                    metadata = self.enrich_and_save(item['url'], item['code'], is_retry=True)
                     
                     if metadata and metadata.get('javdb_available'):
                         print(f"  ✅ Enrichment successful")
+                        # Don't add back to pending - success!
                     else:
-                        # Add back to pending with new retry time
+                        # Add back to pending with new retry time (2 days from now)
                         item['retry_after'] = current_time + 2 * 24 * 3600
                         still_pending.append(item)
+                        print(f"  ⏳ Will retry again in 2 days (attempt {item['retry_count']}/{max_retry_attempts})")
                 else:
+                    # Not time to retry yet, keep in pending
+                    time_until_retry = int((item['retry_after'] - current_time) / 3600)
+                    print(f"\n⏸️ {item['code']}: Not time to retry yet ({time_until_retry}h remaining)")
                     still_pending.append(item)
             
             self.progress['pending_enrichment'] = still_pending
             self.save_progress()
+            
+            print(f"\n📊 Retry Summary:")
+            print(f"  Still pending: {len(still_pending)}")
+            print(f"  Gave up on: {len(self.progress['pending_enrichment']) - len(still_pending)}")
+            
         except Exception as e:
             print(f"  ❌ Error in retry_pending_enrichments: {str(e)[:200]}")
             import traceback
