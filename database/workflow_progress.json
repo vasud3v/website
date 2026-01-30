@@ -28,9 +28,10 @@
     "ATID-664",
     "MIDA-494",
     "MIDA-535",
-    "MIDA-509"
+    "MIDA-509",
+    "MIDA-507"
   ],
   "failed_videos": [],
   "pending_enrichment": [],
-  "last_run": "2026-01-30T05:44:47.440320"
+  "last_run": "2026-01-30T05:53:16.612905"
 }
