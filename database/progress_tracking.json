@@ -1,9 +1,9 @@
 {
-  "last_updated": "2026-01-30T09:10:30.562932",
-  "total_videos": 49,
-  "total_processed": 26,
+  "last_updated": "2026-01-30T09:20:09.733360",
+  "total_videos": 50,
+  "total_processed": 27,
   "total_failed": 0,
-  "success_rate": 53.06122448979592,
-  "last_video_code": "CLUB-900",
+  "success_rate": 54.0,
+  "last_video_code": "CAWD-935",
   "last_video_url": null
 }
