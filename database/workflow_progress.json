@@ -46,7 +46,8 @@
     "MIDA-506",
     "WAAA-613",
     "JUFE-611",
-    "DLDSS-460"
+    "DLDSS-460",
+    "CAWD-926"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -56,5 +57,5 @@
       "retry_after": 1769935025.718948
     }
   ],
-  "last_run": "2026-01-30T08:42:37.638061"
+  "last_run": "2026-01-30T08:52:56.304393"
 }
