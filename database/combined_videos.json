@@ -1,6 +1,82 @@
 {
   "videos": [
     {
+      "code": "SNOS-100-ENGLISH-SUBTITLE",
+      "title": "SNOS-100 English Subtitle",
+      "title_japanese": "",
+      "embed_url": "https://jav-vids.xyz/embed/z1j3vwmllr6i",
+      "m3u8_url": "https://m5QqjwpATPzb.acek-cdn.com/hls2/01/07309/z1j3vwmllr6i_,l,n,h,.urlset/master.m3u8?t=tlVOfU7dvFad9S_k5s2FN2DMRCOlspJxomAhHbzxrC4&s=1769799917&e=129600&f=36549186&srv=Sk5m2v7Qct4h&i=0.4&sp=500&p1=Sk5m2v7Qct4h&p2=Sk5m2v7Qct4h&asn=8075",
+      "thumbnail_url": "https://javgg.net/wp-content/uploads/2026/01/snos-100.jpg",
+      "release_date": "",
+      "release_date_formatted": "",
+      "duration": "",
+      "duration_minutes": 0,
+      "studio": "",
+      "studio_japanese": "",
+      "director": "",
+      "series": "",
+      "models": [],
+      "tags": [],
+      "categories": [],
+      "scraped_at": "2026-01-30T19:05:18.507665",
+      "javdb_available": false,
+      "javdb_not_found": true,
+      "processed_at": "2026-01-30T19:05:26.790896",
+      "source": "javgg",
+      "hosting": {
+        "mixdrop": {
+          "embed_url": "https://mxdrop.to/e/03jj9xn4ux3j4q",
+          "download_url": "https://mxdrop.to/f/03jj9xn4ux3j4q",
+          "file_code": "03jj9xn4ux3j4q"
+        },
+        "turboviplay": {
+          "embed_url": "https://emturbovid.com/t/697d01fc49627",
+          "download_url": "https://turboviplay.com/v/697d01fc49627",
+          "file_code": "697d01fc49627"
+        },
+        "uploady": {
+          "embed_url": "https://uploady.io/embed-0fxr5c5m4923.html",
+          "download_url": "https://uploady.io/0fxr5c5m4923",
+          "file_code": "0fxr5c5m4923"
+        },
+        "seekstreaming": {
+          "embed_url": "https://javcore.embedseek.com/#6orpz",
+          "download_url": "https://javcore.embedseek.com/#6orpz",
+          "file_code": "6orpz"
+        }
+      },
+      "uploaded_at": "2026-01-30T19:12:06.797829",
+      "hosting_urls": {
+        "mixdrop": {
+          "embed_url": "https://mxdrop.to/e/03jj9xn4ux3j4q",
+          "download_url": "https://mxdrop.to/f/03jj9xn4ux3j4q",
+          "file_code": "03jj9xn4ux3j4q"
+        },
+        "turboviplay": {
+          "embed_url": "https://emturbovid.com/t/697d01fc49627",
+          "download_url": "https://turboviplay.com/v/697d01fc49627",
+          "file_code": "697d01fc49627"
+        },
+        "uploady": {
+          "embed_url": "https://uploady.io/embed-0fxr5c5m4923.html",
+          "download_url": "https://uploady.io/0fxr5c5m4923",
+          "file_code": "0fxr5c5m4923"
+        },
+        "seekstreaming": {
+          "embed_url": "https://javcore.embedseek.com/#6orpz",
+          "download_url": "https://javcore.embedseek.com/#6orpz",
+          "file_code": "6orpz"
+        }
+      },
+      "preview_url": "https://archive.org/download/javmix-preview-snos-100-english-subtitle-20260130/SNOS-100-ENGLISH-SUBTITLE_preview.mp4",
+      "preview_embed_url": "https://archive.org/embed/javmix-preview-snos-100-english-subtitle-20260130",
+      "preview_embed_code": "<iframe src=\"https://archive.org/embed/javmix-preview-snos-100-english-subtitle-20260130\" width=\"640\" height=\"480\" frameborder=\"0\" webkitallowfullscreen=\"true\" mozallowfullscreen=\"true\" allowfullscreen></iframe>",
+      "preview_embed_code_small": "<iframe src=\"https://archive.org/embed/javmix-preview-snos-100-english-subtitle-20260130\" width=\"480\" height=\"360\" frameborder=\"0\" allowfullscreen></iframe>",
+      "preview_embed_code_large": "<iframe src=\"https://archive.org/embed/javmix-preview-snos-100-english-subtitle-20260130\" width=\"854\" height=\"480\" frameborder=\"0\" allowfullscreen></iframe>",
+      "preview_player_link": "https://archive.org/details/javmix-preview-snos-100-english-subtitle-20260130",
+      "preview_identifier": "javmix-preview-snos-100-english-subtitle-20260130"
+    },
+    {
       "code": "SNOS-101-ENGLISH-SUBTITLE",
       "title": "SNOS-101 English Subtitle",
       "title_japanese": "",
@@ -8522,7 +8598,7 @@
     }
   ],
   "stats": {
-    "total_videos": 78,
-    "last_updated": "2026-01-30T19:00:14.658153"
+    "total_videos": 79,
+    "last_updated": "2026-01-30T19:12:06.770959"
   }
 }
