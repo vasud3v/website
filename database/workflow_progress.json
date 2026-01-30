@@ -28,9 +28,10 @@
     "MIDA-471",
     "CAWD-939",
     "BF-741",
-    "CAWD-929"
+    "CAWD-929",
+    "ATID-642"
   ],
   "failed_videos": [],
   "pending_enrichment": [],
-  "last_run": "2026-01-30T00:26:14.300022"
+  "last_run": "2026-01-30T00:34:40.654495"
 }
