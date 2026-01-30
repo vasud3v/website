@@ -25,9 +25,10 @@
     "MIRD-274",
     "MIKR-066",
     "MIDA-512",
-    "ATID-664"
+    "ATID-664",
+    "MIDA-494"
   ],
   "failed_videos": [],
   "pending_enrichment": [],
-  "last_run": "2026-01-30T05:18:30.780937"
+  "last_run": "2026-01-30T05:26:44.402348"
 }
