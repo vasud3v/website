@@ -275,8 +275,10 @@ def merge_javgg_and_javdb(javgg_data: dict, javdb_metadata) -> dict:
         merged['studio'] = javdb_metadata.studio
         if hasattr(javdb_metadata, 'studio_url') and javdb_metadata.studio_url:
             merged['studio_url'] = javdb_metadata.studio_url
-        # Keep studio_japanese from JavaGG if available
-        if not merged.get('studio_japanese'):
+        # Don't overwrite studio_japanese if JavaGG already has it with actual Japanese
+        # Only set it if empty or if it's just English
+        if not merged.get('studio_japanese') or merged.get('studio_japanese') == merged.get('studio'):
+            # JAVDatabase doesn't provide Japanese studio names, keep English
             merged['studio_japanese'] = javdb_metadata.studio
         print(f"     - Studio: {javdb_metadata.studio}")
     
@@ -360,11 +362,13 @@ def merge_javgg_and_javdb(javgg_data: dict, javdb_metadata) -> dict:
         existing_categories = set(merged.get('categories', []))
         javdb_categories = set(javdb_metadata.categories)
         
-        # Merge all into both tags and categories
-        all_categories = existing_tags | existing_categories | javdb_categories
-        merged['tags'] = list(all_categories)
-        merged['categories'] = list(all_categories)
-        print(f"     - Total tags/categories: {len(merged['tags'])}")
+        # Tags: Merge all sources
+        merged['tags'] = list(existing_tags | existing_categories | javdb_categories)
+        
+        # Categories: Only use JAVDatabase categories (more accurate)
+        merged['categories'] = list(javdb_categories)
+        
+        print(f"     - Tags: {len(merged['tags'])}, Categories: {len(merged['categories'])}")
     
     # Add cover URLs (both regular and large)
     if javdb_metadata.cover_url:
@@ -379,9 +383,17 @@ def merge_javgg_and_javdb(javgg_data: dict, javdb_metadata) -> dict:
         merged['description'] = javdb_metadata.description
         print(f"     - Description: {len(javdb_metadata.description)} chars")
     
-    # Prefer JAVDatabase title_jp if available and JavaGG doesn't have it
-    if hasattr(javdb_metadata, 'title_jp') and javdb_metadata.title_jp and not merged.get('title_japanese'):
-        merged['title_japanese'] = javdb_metadata.title_jp
+    # Prefer JAVDatabase title_jp if available
+    # Note: JAVDatabase doesn't provide Japanese titles, only English
+    # Keep JavaGG's title_japanese if it has actual Japanese characters
+    if hasattr(javdb_metadata, 'title_jp') and javdb_metadata.title_jp:
+        # Check if current title_japanese is empty or just English
+        current_title_jp = merged.get('title_japanese', '')
+        has_japanese = any('\u3040' <= c <= '\u309F' or '\u30A0' <= c <= '\u30FF' or '\u4E00' <= c <= '\u9FFF' for c in current_title_jp)
+        if not has_japanese:
+            # Don't overwrite with English title from JAVDatabase
+            # Keep it empty if JavaGG didn't find Japanese
+            pass
     
     return merged
 
