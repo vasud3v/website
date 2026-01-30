@@ -47,7 +47,8 @@
     "WAAA-613",
     "JUFE-611",
     "DLDSS-460",
-    "CAWD-926"
+    "CAWD-926",
+    "CLUB-902"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -57,5 +58,5 @@
       "retry_after": 1769935025.718948
     }
   ],
-  "last_run": "2026-01-30T08:52:56.304393"
+  "last_run": "2026-01-30T09:01:40.177332"
 }
