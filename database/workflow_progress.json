@@ -72,7 +72,8 @@
     "DDH-379",
     "393OTIM-616",
     "393OTIM-617",
-    "393OTIM-618"
+    "393OTIM-618",
+    "200GANA-3322"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -183,7 +184,13 @@
       "url": "https://javgg.net/jav/393otim-618/",
       "retry_after": 1769965188.864514,
       "retry_count": 0
+    },
+    {
+      "code": "200GANA-3322",
+      "url": "https://javgg.net/jav/200gana-3322/",
+      "retry_after": 1769966157.649636,
+      "retry_count": 0
     }
   ],
-  "last_run": "2026-01-30T17:08:59.629904"
+  "last_run": "2026-01-30T17:15:57.670775"
 }
