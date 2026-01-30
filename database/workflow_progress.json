@@ -58,7 +58,8 @@
     "SY-219",
     "SIRO-5618",
     "PASN-006",
-    "FC2-PPV-4839600"
+    "FC2-PPV-4839600",
+    "FC2-PPV-4839443"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -85,7 +86,13 @@
       "url": "https://javgg.net/jav/fc2-ppv-4839600/",
       "retry_after": 1769959705.058571,
       "retry_count": 0
+    },
+    {
+      "code": "FC2-PPV-4839443",
+      "url": "https://javgg.net/jav/fc2-ppv-4839443/",
+      "retry_after": 1769960104.175716,
+      "retry_count": 0
     }
   ],
-  "last_run": "2026-01-30T15:32:02.271581"
+  "last_run": "2026-01-30T15:39:00.142336"
 }
