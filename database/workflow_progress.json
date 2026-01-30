@@ -51,7 +51,8 @@
     "CLUB-902",
     "CLUB-900",
     "CAWD-935",
-    "SVFLA-016"
+    "SVFLA-016",
+    "WAAA-612"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -61,5 +62,5 @@
       "retry_after": 1769935025.718948
     }
   ],
-  "last_run": "2026-01-30T09:28:45.470419"
+  "last_run": "2026-01-30T09:38:23.817926"
 }
