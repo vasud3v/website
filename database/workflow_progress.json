@@ -57,7 +57,8 @@
     "SVBGR-004",
     "SY-219",
     "SIRO-5618",
-    "PASN-006"
+    "PASN-006",
+    "FC2-PPV-4839600"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -78,7 +79,13 @@
       "url": "https://javgg.net/jav/pasn-006/",
       "retry_after": 1769959159.251359,
       "retry_count": 0
+    },
+    {
+      "code": "FC2-PPV-4839600",
+      "url": "https://javgg.net/jav/fc2-ppv-4839600/",
+      "retry_after": 1769959705.058571,
+      "retry_count": 0
     }
   ],
-  "last_run": "2026-01-30T15:25:17.706835"
+  "last_run": "2026-01-30T15:32:02.271581"
 }
