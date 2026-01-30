@@ -85,7 +85,8 @@
     "HUNTC-464-ENGLISH-SUBTITLE",
     "FNS-181-ENGLISH-SUBTITLE",
     "HUBLK-063-ENGLISH-SUBTITLE",
-    "NMSL-025-ENGLISH-SUBTITLE"
+    "NMSL-025-ENGLISH-SUBTITLE",
+    "MIDA-498"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -360,5 +361,5 @@
       "retry_count": 0
     }
   ],
-  "last_run": "2026-01-30T23:05:20.344805"
+  "last_run": "2026-01-30T23:15:22.383191"
 }
