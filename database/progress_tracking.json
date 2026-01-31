@@ -1,9 +1,9 @@
 {
-  "last_updated": "2026-01-31T15:50:05.473841",
-  "total_videos": 127,
-  "total_processed": 124,
+  "last_updated": "2026-01-31T15:59:50.265444",
+  "total_videos": 128,
+  "total_processed": 125,
   "total_failed": 0,
-  "success_rate": 97.63779527559055,
-  "last_video_code": "DVEH-076",
+  "success_rate": 97.65625,
+  "last_video_code": "ADN-756",
   "last_video_url": null
 }
