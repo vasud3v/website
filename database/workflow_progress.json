@@ -84,7 +84,8 @@
     "200GANA-3322",
     "MIDA-497",
     "MIDA-495",
-    "MIDA-471"
+    "MIDA-471",
+    "CAWD-939"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -359,5 +360,5 @@
       "retry_count": 0
     }
   ],
-  "last_run": "2026-01-31T02:12:39.995674"
+  "last_run": "2026-01-31T02:20:49.684172"
 }
