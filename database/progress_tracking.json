@@ -1,9 +1,9 @@
 {
-  "last_updated": "2026-01-31T06:12:42.813217",
-  "total_videos": 103,
-  "total_processed": 101,
+  "last_updated": "2026-01-31T06:21:05.800195",
+  "total_videos": 104,
+  "total_processed": 102,
   "total_failed": 0,
-  "success_rate": 98.05825242718447,
-  "last_video_code": "MIAB-603",
+  "success_rate": 98.07692307692307,
+  "last_video_code": "FOCS-298",
   "last_video_url": null
 }
