@@ -114,7 +114,8 @@
     "NIMA-075",
     "WAAA-614",
     "WAAA-620",
-    "WAAA-615"
+    "WAAA-615",
+    "YUJ-054"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -389,5 +390,5 @@
       "retry_count": 0
     }
   ],
-  "last_run": "2026-01-31T13:45:59.841304"
+  "last_run": "2026-01-31T13:55:26.839017"
 }
