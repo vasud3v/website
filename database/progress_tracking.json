@@ -1,9 +1,9 @@
 {
-  "last_updated": "2026-01-31T03:23:06.866652",
+  "last_updated": "2026-01-31T03:38:00.322151",
   "total_videos": 99,
-  "total_processed": 87,
+  "total_processed": 88,
   "total_failed": 0,
-  "success_rate": 87.87878787878788,
-  "last_video_code": "MNGS-040",
+  "success_rate": 88.88888888888889,
+  "last_video_code": "MIRD-279",
   "last_video_url": null
 }
