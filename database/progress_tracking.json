@@ -1,9 +1,9 @@
 {
-  "last_updated": "2026-01-31T14:15:11.383997",
-  "total_videos": 118,
-  "total_processed": 115,
+  "last_updated": "2026-01-31T14:25:35.660309",
+  "total_videos": 119,
+  "total_processed": 116,
   "total_failed": 0,
-  "success_rate": 97.45762711864407,
-  "last_video_code": "MIAB-608",
+  "success_rate": 97.47899159663865,
+  "last_video_code": "MIAB-571",
   "last_video_url": null
 }
