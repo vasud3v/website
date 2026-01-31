@@ -1,9 +1,9 @@
 {
-  "last_updated": "2026-01-31T05:32:04.130386",
-  "total_videos": 100,
-  "total_processed": 98,
+  "last_updated": "2026-01-31T05:51:03.431499",
+  "total_videos": 101,
+  "total_processed": 99,
   "total_failed": 0,
-  "success_rate": 98.0,
-  "last_video_code": "MIAB-609",
+  "success_rate": 98.01980198019803,
+  "last_video_code": "FPRE-213",
   "last_video_url": null
 }
