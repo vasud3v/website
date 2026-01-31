@@ -115,7 +115,8 @@
     "WAAA-614",
     "WAAA-620",
     "WAAA-615",
-    "YUJ-054"
+    "YUJ-054",
+    "YUJ-053"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -390,5 +391,5 @@
       "retry_count": 0
     }
   ],
-  "last_run": "2026-01-31T13:55:26.839017"
+  "last_run": "2026-01-31T14:05:36.513677"
 }
