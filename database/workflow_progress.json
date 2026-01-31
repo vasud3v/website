@@ -93,7 +93,8 @@
     "WAAA-610",
     "MIMK-264",
     "MNGS-040",
-    "MIRD-279"
+    "MIRD-279",
+    "WAAA-616"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -368,5 +369,5 @@
       "retry_count": 0
     }
   ],
-  "last_run": "2026-01-31T03:38:00.652003"
+  "last_run": "2026-01-31T03:48:33.687034"
 }
