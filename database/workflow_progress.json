@@ -98,7 +98,8 @@
     "SAME-220",
     "WAAA-628",
     "WAAA-611",
-    "WAAA-609"
+    "WAAA-609",
+    "SAME-215"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -373,5 +374,5 @@
       "retry_count": 0
     }
   ],
-  "last_run": "2026-01-31T04:26:51.100678"
+  "last_run": "2026-01-31T04:36:27.328959"
 }
