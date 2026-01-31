@@ -1,9 +1,9 @@
 {
-  "last_updated": "2026-01-31T15:05:14.152239",
-  "total_videos": 123,
-  "total_processed": 120,
+  "last_updated": "2026-01-31T15:18:23.468864",
+  "total_videos": 124,
+  "total_processed": 121,
   "total_failed": 0,
-  "success_rate": 97.5609756097561,
-  "last_video_code": "FOCS-297",
+  "success_rate": 97.58064516129032,
+  "last_video_code": "DVEH-077",
   "last_video_url": null
 }
