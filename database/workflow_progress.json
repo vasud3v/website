@@ -133,7 +133,8 @@
     "ADN-751",
     "NPJB-116",
     "NIMA-076",
-    "RBK-126"
+    "RBK-126",
+    "VAGU-290"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -408,5 +409,5 @@
       "retry_count": 0
     }
   ],
-  "last_run": "2026-01-31T17:07:19.193773"
+  "last_run": "2026-01-31T17:17:36.479953"
 }
