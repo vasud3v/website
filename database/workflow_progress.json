@@ -91,7 +91,8 @@
     "ATID-642",
     "ADN-753",
     "WAAA-610",
-    "MIMK-264"
+    "MIMK-264",
+    "MNGS-040"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -366,5 +367,5 @@
       "retry_count": 0
     }
   ],
-  "last_run": "2026-01-31T03:12:49.831816"
+  "last_run": "2026-01-31T03:23:09.531557"
 }
