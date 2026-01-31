@@ -135,7 +135,8 @@
     "NIMA-076",
     "RBK-126",
     "VAGU-290",
-    "UFD-082"
+    "UFD-082",
+    "VEC-759"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -410,5 +411,5 @@
       "retry_count": 0
     }
   ],
-  "last_run": "2026-01-31T17:27:29.594246"
+  "last_run": "2026-01-31T17:36:03.205959"
 }
