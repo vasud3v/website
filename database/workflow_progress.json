@@ -109,7 +109,8 @@
     "SAME-202",
     "SAME-209",
     "RBK-119",
-    "RBK-127"
+    "RBK-127",
+    "NPJS-249"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -384,5 +385,5 @@
       "retry_count": 0
     }
   ],
-  "last_run": "2026-01-31T12:52:20.188322"
+  "last_run": "2026-01-31T13:04:23.984730"
 }
