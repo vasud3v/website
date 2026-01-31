@@ -125,7 +125,8 @@
     "FOCS-297",
     "DVEH-077",
     "CLUB-898",
-    "CLUB-904"
+    "CLUB-904",
+    "DVEH-076"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -400,5 +401,5 @@
       "retry_count": 0
     }
   ],
-  "last_run": "2026-01-31T15:36:57.956609"
+  "last_run": "2026-01-31T15:50:05.930024"
 }
