@@ -1079,10 +1079,290 @@
       "video_player": "https://javcore.embedseek.com/#x5pj5",
       "video_downloader": "https://javcore.embedseek.com/#x5pj5",
       "embed_code": "<iframe src=\"https://javcore.embedseek.com/#x5pj5\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 109,
+      "title": "RBK-127",
+      "filename": "RBK-127.mp4",
+      "file_size_mb": 3333.11,
+      "upload_date": "2026-01-31 12:52:19",
+      "video_player": "https://javcore.embedseek.com/#vzcbb",
+      "video_downloader": "https://javcore.embedseek.com/#vzcbb",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#vzcbb\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 110,
+      "title": "NPJS-249",
+      "filename": "NPJS-249.mp4",
+      "file_size_mb": 3531.63,
+      "upload_date": "2026-01-31 13:04:23",
+      "video_player": "https://javcore.embedseek.com/#owksj",
+      "video_downloader": "https://javcore.embedseek.com/#owksj",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#owksj\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 111,
+      "title": "NIMA-075",
+      "filename": "NIMA-075.mp4",
+      "file_size_mb": 2577.81,
+      "upload_date": "2026-01-31 13:13:35",
+      "video_player": "https://javcore.embedseek.com/#bgdhe",
+      "video_downloader": "https://javcore.embedseek.com/#bgdhe",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#bgdhe\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 112,
+      "title": "WAAA-614",
+      "filename": "WAAA-614.mp4",
+      "file_size_mb": 2689.46,
+      "upload_date": "2026-01-31 13:23:36",
+      "video_player": "https://javcore.embedseek.com/#cuvxj",
+      "video_downloader": "https://javcore.embedseek.com/#cuvxj",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#cuvxj\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 113,
+      "title": "WAAA-620",
+      "filename": "WAAA-620.mp4",
+      "file_size_mb": 2785.33,
+      "upload_date": "2026-01-31 13:34:45",
+      "video_player": "https://javcore.embedseek.com/#s918g",
+      "video_downloader": "https://javcore.embedseek.com/#s918g",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#s918g\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 114,
+      "title": "WAAA-615",
+      "filename": "WAAA-615.mp4",
+      "file_size_mb": 2653.97,
+      "upload_date": "2026-01-31 13:45:59",
+      "video_player": "https://javcore.embedseek.com/#8ij16",
+      "video_downloader": "https://javcore.embedseek.com/#8ij16",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#8ij16\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 115,
+      "title": "YUJ-054",
+      "filename": "YUJ-054.mp4",
+      "file_size_mb": 2641.32,
+      "upload_date": "2026-01-31 13:55:26",
+      "video_player": "https://javcore.embedseek.com/#9jqid",
+      "video_downloader": "https://javcore.embedseek.com/#9jqid",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#9jqid\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 116,
+      "title": "YUJ-053",
+      "filename": "YUJ-053.mp4",
+      "file_size_mb": 2830.68,
+      "upload_date": "2026-01-31 14:05:36",
+      "video_player": "https://javcore.embedseek.com/#handi",
+      "video_downloader": "https://javcore.embedseek.com/#handi",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#handi\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 117,
+      "title": "MIAB-608",
+      "filename": "MIAB-608.mp4",
+      "file_size_mb": 2540.27,
+      "upload_date": "2026-01-31 14:15:11",
+      "video_player": "https://javcore.embedseek.com/#5ceqe",
+      "video_downloader": "https://javcore.embedseek.com/#5ceqe",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#5ceqe\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 118,
+      "title": "MIAB-571",
+      "filename": "MIAB-571.mp4",
+      "file_size_mb": 2804.6,
+      "upload_date": "2026-01-31 14:25:35",
+      "video_player": "https://javcore.embedseek.com/#gnluc",
+      "video_downloader": "https://javcore.embedseek.com/#gnluc",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#gnluc\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 119,
+      "title": "MIAB-607",
+      "filename": "MIAB-607.mp4",
+      "file_size_mb": 2507.63,
+      "upload_date": "2026-01-31 14:35:01",
+      "video_player": "https://javcore.embedseek.com/#vzcjj",
+      "video_downloader": "https://javcore.embedseek.com/#vzcjj",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#vzcjj\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 120,
+      "title": "JUTA-188",
+      "filename": "JUTA-188.mp4",
+      "file_size_mb": 2826.29,
+      "upload_date": "2026-01-31 14:45:29",
+      "video_player": "https://javcore.embedseek.com/#hanx3",
+      "video_downloader": "https://javcore.embedseek.com/#hanx3",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#hanx3\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 121,
+      "title": "FPRE-214",
+      "filename": "FPRE-214.mp4",
+      "file_size_mb": 2650.6,
+      "upload_date": "2026-01-31 14:55:20",
+      "video_player": "https://javcore.embedseek.com/#bgdsw",
+      "video_downloader": "https://javcore.embedseek.com/#bgdsw",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#bgdsw\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 122,
+      "title": "FOCS-297",
+      "filename": "FOCS-297.mp4",
+      "file_size_mb": 2609.35,
+      "upload_date": "2026-01-31 15:05:14",
+      "video_player": "https://javcore.embedseek.com/#x5py9",
+      "video_downloader": "https://javcore.embedseek.com/#x5py9",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#x5py9\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 123,
+      "title": "DVEH-077",
+      "filename": "DVEH-077.mp4",
+      "file_size_mb": 3713.37,
+      "upload_date": "2026-01-31 15:18:23",
+      "video_player": "https://javcore.embedseek.com/#8ijfq",
+      "video_downloader": "https://javcore.embedseek.com/#8ijfq",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#8ijfq\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 124,
+      "title": "CLUB-898",
+      "filename": "CLUB-898.mp4",
+      "file_size_mb": 2689.2,
+      "upload_date": "2026-01-31 15:27:39",
+      "video_player": "https://javcore.embedseek.com/#nfho1",
+      "video_downloader": "https://javcore.embedseek.com/#nfho1",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#nfho1\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 125,
+      "title": "CLUB-904",
+      "filename": "CLUB-904.mp4",
+      "file_size_mb": 2598.21,
+      "upload_date": "2026-01-31 15:36:57",
+      "video_player": "https://javcore.embedseek.com/#wy3j8",
+      "video_downloader": "https://javcore.embedseek.com/#wy3j8",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#wy3j8\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 126,
+      "title": "DVEH-076",
+      "filename": "DVEH-076.mp4",
+      "file_size_mb": 3644.88,
+      "upload_date": "2026-01-31 15:50:05",
+      "video_player": "https://javcore.embedseek.com/#upzhd",
+      "video_downloader": "https://javcore.embedseek.com/#upzhd",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#upzhd\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 127,
+      "title": "ADN-756",
+      "filename": "ADN-756.mp4",
+      "file_size_mb": 2646.52,
+      "upload_date": "2026-01-31 15:59:50",
+      "video_player": "https://javcore.embedseek.com/#abf3l",
+      "video_downloader": "https://javcore.embedseek.com/#abf3l",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#abf3l\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 128,
+      "title": "ADN-759",
+      "filename": "ADN-759.mp4",
+      "file_size_mb": 2439.55,
+      "upload_date": "2026-01-31 16:07:26",
+      "video_player": "https://javcore.embedseek.com/#8ijzr",
+      "video_downloader": "https://javcore.embedseek.com/#8ijzr",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#8ijzr\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 129,
+      "title": "ADN-744",
+      "filename": "ADN-744.mp4",
+      "file_size_mb": 3305.85,
+      "upload_date": "2026-01-31 16:19:31",
+      "video_player": "https://javcore.embedseek.com/#jm89n",
+      "video_downloader": "https://javcore.embedseek.com/#jm89n",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#jm89n\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 130,
+      "title": "ADN-751",
+      "filename": "ADN-751.mp4",
+      "file_size_mb": 2613.36,
+      "upload_date": "2026-01-31 16:28:44",
+      "video_player": "https://javcore.embedseek.com/#k3oru",
+      "video_downloader": "https://javcore.embedseek.com/#k3oru",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#k3oru\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 131,
+      "title": "NPJB-116",
+      "filename": "NPJB-116.mp4",
+      "file_size_mb": 2666.3,
+      "upload_date": "2026-01-31 16:46:21",
+      "video_player": "https://javcore.embedseek.com/#m1iju",
+      "video_downloader": "https://javcore.embedseek.com/#m1iju",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#m1iju\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 132,
+      "title": "NIMA-076",
+      "filename": "NIMA-076.mp4",
+      "file_size_mb": 2608.03,
+      "upload_date": "2026-01-31 16:56:40",
+      "video_player": "https://javcore.embedseek.com/#8ijqd",
+      "video_downloader": "https://javcore.embedseek.com/#8ijqd",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#8ijqd\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 133,
+      "title": "RBK-126",
+      "filename": "RBK-126.mp4",
+      "file_size_mb": 3053.47,
+      "upload_date": "2026-01-31 17:07:18",
+      "video_player": "https://javcore.embedseek.com/#jm86v",
+      "video_downloader": "https://javcore.embedseek.com/#jm86v",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#jm86v\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 134,
+      "title": "VAGU-290",
+      "filename": "VAGU-290.mp4",
+      "file_size_mb": 2805.55,
+      "upload_date": "2026-01-31 17:17:35",
+      "video_player": "https://javcore.embedseek.com/#s913z",
+      "video_downloader": "https://javcore.embedseek.com/#s913z",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#s913z\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 135,
+      "title": "UFD-082",
+      "filename": "UFD-082.mp4",
+      "file_size_mb": 2646.5,
+      "upload_date": "2026-01-31 17:27:29",
+      "video_player": "https://javcore.embedseek.com/#hania",
+      "video_downloader": "https://javcore.embedseek.com/#hania",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#hania\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
+    },
+    {
+      "id": 136,
+      "title": "VEC-759",
+      "filename": "VEC-759.mp4",
+      "file_size_mb": 2203.74,
+      "upload_date": "2026-01-31 17:36:02",
+      "video_player": "https://javcore.embedseek.com/#hani6",
+      "video_downloader": "https://javcore.embedseek.com/#hani6",
+      "embed_code": "<iframe src=\"https://javcore.embedseek.com/#hani6\" width=\"100%\" height=\"100%\" frameborder=\"0\" allowfullscreen></iframe>"
     }
   ],
   "stats": {
-    "total_videos": 108,
-    "total_size_mb": 333197.37
+    "total_videos": 136,
+    "total_size_mb": 411813.95
   }
 }
