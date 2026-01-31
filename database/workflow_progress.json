@@ -104,7 +104,8 @@
     "FPRE-213",
     "MIAB-605",
     "MIAB-603",
-    "FOCS-298"
+    "FOCS-298",
+    "WAAA-617"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -379,5 +380,5 @@
       "retry_count": 0
     }
   ],
-  "last_run": "2026-01-31T06:21:06.277600"
+  "last_run": "2026-01-31T06:44:43.885622"
 }
