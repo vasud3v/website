@@ -124,7 +124,8 @@
     "FPRE-214",
     "FOCS-297",
     "DVEH-077",
-    "CLUB-898"
+    "CLUB-898",
+    "CLUB-904"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -399,5 +400,5 @@
       "retry_count": 0
     }
   ],
-  "last_run": "2026-01-31T15:27:39.840495"
+  "last_run": "2026-01-31T15:36:57.956609"
 }

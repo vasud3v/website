@@ -1,9 +1,9 @@
 {
-  "last_updated": "2026-01-31T15:27:39.346244",
-  "total_videos": 125,
-  "total_processed": 122,
+  "last_updated": "2026-01-31T15:36:57.470981",
+  "total_videos": 126,
+  "total_processed": 123,
   "total_failed": 0,
-  "success_rate": 97.6,
-  "last_video_code": "CLUB-898",
+  "success_rate": 97.61904761904762,
+  "last_video_code": "CLUB-904",
   "last_video_url": null
 }
