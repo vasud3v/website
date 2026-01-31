@@ -110,7 +110,8 @@
     "SAME-209",
     "RBK-119",
     "RBK-127",
-    "NPJS-249"
+    "NPJS-249",
+    "NIMA-075"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -385,5 +386,5 @@
       "retry_count": 0
     }
   ],
-  "last_run": "2026-01-31T13:04:23.984730"
+  "last_run": "2026-01-31T13:13:36.178822"
 }
