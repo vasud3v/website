@@ -1,9 +1,9 @@
 {
-  "last_updated": "2026-01-31T07:12:13.253949",
-  "total_videos": 109,
-  "total_processed": 105,
+  "last_updated": "2026-01-31T07:20:36.743145",
+  "total_videos": 110,
+  "total_processed": 106,
   "total_failed": 0,
-  "success_rate": 96.3302752293578,
-  "last_video_code": "RBK-127",
+  "success_rate": 96.36363636363636,
+  "last_video_code": "RBK-119",
   "last_video_url": null
 }

@@ -108,7 +108,8 @@
     "WAAA-617",
     "SAME-202",
     "SAME-209",
-    "RBK-127"
+    "RBK-127",
+    "RBK-119"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -383,5 +384,5 @@
       "retry_count": 0
     }
   ],
-  "last_run": "2026-01-31T07:12:13.261916"
+  "last_run": "2026-01-31T07:20:38.301372"
 }
