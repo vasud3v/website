@@ -1,12 +1,6 @@
 {
   "last_scraped_page": 1,
   "processed_videos": [
-    "WAAA-616",
-    "SAME-220",
-    "WAAA-628",
-    "WAAA-611",
-    "WAAA-609",
-    "SAME-215",
     "MNGS-038",
     "MIRD-274",
     "MIKR-066",
@@ -80,14 +74,13 @@
     "SNOS-056-ENGLISH-SUBTITLE",
     "SNOS-054-ENGLISH-SUBTITLE",
     "SNOS-052-ENGLISH-SUBTITLE",
-    "DDH-379",
-    "200GANA-3322",
     "HUNTC-464-ENGLISH-SUBTITLE",
     "FNS-181-ENGLISH-SUBTITLE",
     "HUBLK-063-ENGLISH-SUBTITLE",
     "NMSL-025-ENGLISH-SUBTITLE",
     "MIDA-498",
-    "CAWD-945"
+    "CAWD-945",
+    "DDH-379"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -362,5 +355,5 @@
       "retry_count": 0
     }
   ],
-  "last_run": "2026-01-30T23:24:25.565497"
+  "last_run": "2026-01-31T01:37:45.408282"
 }
