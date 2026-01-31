@@ -1,9 +1,9 @@
 {
-  "last_updated": "2026-01-31T16:07:26.551764",
-  "total_videos": 129,
-  "total_processed": 126,
+  "last_updated": "2026-01-31T16:19:31.576004",
+  "total_videos": 130,
+  "total_processed": 127,
   "total_failed": 0,
-  "success_rate": 97.67441860465115,
-  "last_video_code": "ADN-759",
+  "success_rate": 97.6923076923077,
+  "last_video_code": "ADN-744",
   "last_video_url": null
 }

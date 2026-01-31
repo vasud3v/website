@@ -128,7 +128,8 @@
     "CLUB-904",
     "DVEH-076",
     "ADN-756",
-    "ADN-759"
+    "ADN-759",
+    "ADN-744"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -403,5 +404,5 @@
       "retry_count": 0
     }
   ],
-  "last_run": "2026-01-31T16:07:26.981800"
+  "last_run": "2026-01-31T16:19:32.027085"
 }
