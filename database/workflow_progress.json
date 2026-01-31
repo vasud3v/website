@@ -89,7 +89,8 @@
     "BF-741",
     "CAWD-929",
     "ATID-642",
-    "ADN-753"
+    "ADN-753",
+    "WAAA-610"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -364,5 +365,5 @@
       "retry_count": 0
     }
   ],
-  "last_run": "2026-01-31T02:55:25.252787"
+  "last_run": "2026-01-31T03:04:47.163474"
 }
