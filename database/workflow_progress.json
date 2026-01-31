@@ -120,7 +120,8 @@
     "MIAB-608",
     "MIAB-571",
     "MIAB-607",
-    "JUTA-188"
+    "JUTA-188",
+    "FPRE-214"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -395,5 +396,5 @@
       "retry_count": 0
     }
   ],
-  "last_run": "2026-01-31T14:45:29.836458"
+  "last_run": "2026-01-31T14:55:20.836635"
 }
