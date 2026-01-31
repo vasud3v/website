@@ -95,7 +95,8 @@
     "MNGS-040",
     "MIRD-279",
     "WAAA-616",
-    "SAME-220"
+    "SAME-220",
+    "WAAA-628"
   ],
   "failed_videos": [],
   "pending_enrichment": [
@@ -370,5 +371,5 @@
       "retry_count": 0
     }
   ],
-  "last_run": "2026-01-31T03:56:18.900800"
+  "last_run": "2026-01-31T04:04:47.358200"
 }
